@@ -80,6 +80,33 @@ Put the ones you reach for most in the first nine.
   button shows what's in there.
 - The **tag index** under the filter row lists every tag by weight — the only
   place you can see the whole cross-cut at once.
+
+## Projects
+
+**A project is a note you promoted.** Jot the idea first; if it turns into
+something you're actually doing, hit `Project` on its card. It keeps its
+colour, its tags, its number, and stays searchable — it just gains a status and
+somewhere to put steps.
+
+- **Status** is `idea → active → paused → done`, set from the card or the
+  projects screen. `active` is the one that shows up inverted, because it's the
+  only one that makes a claim on your time.
+- **Steps** are notes too, with the project as their parent. Type in the
+  project's step box and hit Enter. They arrive checkable, render as a
+  checklist on the card, and are hidden from the top level of the wall so they
+  don't clutter it.
+- Already jotted something that belongs to a project? `File` on its card moves
+  it in.
+- **`/projects`** lists everything grouped by status with a progress meter and
+  **the next unfinished step** — that last part is the point. A project list
+  without a next action is a graveyard.
+- **Today** shows one next step per *active* project, tickable in place. If you
+  only did those, every project you called active would move.
+- Deleting a project deletes its steps, and says so first.
+
+The wall's `Projects n` filter narrows to just projects. Nothing about this is
+a separate system — search, colour, archive and export all work on projects and
+steps exactly as they do on any other note.
 - Drafts are written to localStorage on every keystroke. Closing the tab
   mid-thought loses nothing.
 
@@ -110,12 +137,13 @@ no fake physics.
 
 ```
 src/
-  app/            layout (fonts, theme boot), / (Wall), /today
+  app/            layout (fonts, theme boot), / (Wall), /projects, /today
   fonts/          vendored Literata variable woff2 + OFL licence
   components/     Wall, Compose, NoteCard, NoteImages, Swatch,
-                  TagIndex, DataMenu, Today, Chrome
+                  TagIndex, DataMenu, Projects, ProjectPanel, Today, Chrome
   lib/
     notes.ts      hashtag + task-marker parsing, search matching
+    projects.ts   status ladder, steps, progress, next action
     images.ts     downscale/encode + IndexedDB blob store
     format.ts     seq labels, absolute timestamps
     store/        Store interface, LocalStore, React provider

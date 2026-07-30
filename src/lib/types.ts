@@ -1,4 +1,5 @@
 import type { NoteImage } from "./images";
+import type { ProjectStatus } from "./projects";
 
 export type Visibility = "private" | "unlisted" | "public";
 
@@ -21,6 +22,13 @@ export interface Note {
   tags: string[];
   /** Metadata only — the bytes live in IndexedDB, keyed by image id. */
   images: NoteImage[];
+  /**
+   * A project is a note you promoted. Non-null means this note is one; the
+   * status is how you keep tabs on it. Nothing else about the note changes.
+   */
+  projectStatus: ProjectStatus | null;
+  /** Set on a step: the id of the project note it belongs to. */
+  parentId: string | null;
   isTask: boolean;
   doneAt: string | null;
   pinned: boolean;
@@ -34,6 +42,8 @@ export interface NewNote {
   body: string;
   colorId: string | null;
   images?: NoteImage[];
+  /** Set to file the new note as a step of that project. */
+  parentId?: string | null;
 }
 
 export type { NoteImage };

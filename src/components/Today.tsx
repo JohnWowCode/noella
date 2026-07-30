@@ -1,7 +1,17 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useSyncExternalStore } from "react";
+import {
+  nextActionOf,
+  progressOf,
+  projectTitle,
+  projectsOf,
+  stepsOf,
+} from "@/lib/projects";
 import { useNoella } from "@/lib/store/provider";
+import type { Note } from "@/lib/types";
+import { Progress } from "./ProjectPanel";
 
 const DAY_MS = 86_400_000;
 
@@ -17,10 +27,30 @@ import { ThemeToggle } from "./ThemeToggle";
 export function Today() {
   const { ready, notes } = useNoella();
 
+  // One next step per active project. This is the executable list: if you only
+  // did these, every project you called active would move today.
+  const nextActions = useMemo(
+    () =>
+      projectsOf(notes)
+        .filter((p) => p.projectStatus === "active")
+        .map((project) => {
+          const steps = stepsOf(notes, project.id);
+          return { project, step: nextActionOf(steps), ...progressOf(steps) };
+        }),
+    [notes],
+  );
+
+  // Loose tasks only — steps belong to their project's line above.
   const open = useMemo(
     () =>
       notes
-        .filter((n) => n.isTask && n.doneAt === null && n.archivedAt === null)
+        .filter(
+          (n) =>
+            n.isTask &&
+            n.doneAt === null &&
+            n.archivedAt === null &&
+            n.parentId === null,
+        )
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
     [notes],
   );
@@ -32,9 +62,18 @@ export function Today() {
 
   const day = useSyncExternalStore(neverChanges, dayOnClient, dayOnServer);
 
-  // One old note, chosen by the day so it stays put until tomorrow.
+  // One old note, chosen by the day so it stays put until tomorrow. Anything
+  // already listed above is excluded — resurfacing should return something you
+  // had forgotten, not repeat what you are looking at.
   const resurfaced = useMemo(() => {
-    const older = notes.filter((n) => n.archivedAt === null && !n.pinned);
+    const older = notes.filter(
+      (n) =>
+        n.archivedAt === null &&
+        !n.pinned &&
+        n.parentId === null &&
+        n.projectStatus === null &&
+        !(n.isTask && n.doneAt === null),
+    );
     if (older.length === 0) return null;
     return older[day % older.length];
   }, [notes, day]);
@@ -45,6 +84,7 @@ export function Today() {
         right={
           <>
             <NavLink href="/">Wall</NavLink>
+            <NavLink href="/projects">Projects</NavLink>
             <ThemeToggle />
           </>
         }
@@ -57,6 +97,16 @@ export function Today() {
           </p>
         ) : (
           <>
+            <Block
+              title="Next actions"
+              count={nextActions.length}
+              empty="No active projects."
+            >
+              {nextActions.map((entry) => (
+                <NextAction key={entry.project.id} {...entry} />
+              ))}
+            </Block>
+
             <Block title="Open" count={open.length} empty="Nothing open.">
               {open.map((n) => (
                 <NoteCard key={n.id} note={n} />
@@ -86,6 +136,64 @@ export function Today() {
 
       <Footer />
     </div>
+  );
+}
+
+/** One active project, its next step, and a box to tick it off right here. */
+function NextAction({
+  project,
+  step,
+  done,
+  total,
+}: {
+  project: Note;
+  step: Note | null;
+  done: number;
+  total: number;
+}) {
+  const { colorOf, patchNote } = useNoella();
+  const color = colorOf(project);
+  const onColor = color !== null;
+
+  return (
+    <article
+      className={`flex flex-wrap items-start gap-x-4 gap-y-3 border border-rule px-5 py-4 ${
+        onColor ? "" : "bg-field"
+      }`}
+      style={onColor ? { backgroundColor: color.hex, color: "#111111" } : undefined}
+    >
+      {step ? (
+        <button
+          type="button"
+          onClick={() => patchNote(step.id, { doneAt: new Date().toISOString() })}
+          aria-label={`Mark done: ${step.body}`}
+          className="mt-1 grid h-4 w-4 shrink-0 place-items-center border border-current"
+        />
+      ) : (
+        <span className="mt-1 grid h-4 w-4 shrink-0 place-items-center border border-current opacity-30" />
+      )}
+
+      <span className="min-w-48 flex-1">
+        <Link
+          href={`/#note-${project.id}`}
+          className="label block opacity-60 hover:opacity-100"
+        >
+          {projectTitle(project)}
+        </Link>
+        <span className="prose-note mt-1 block text-[16px] leading-snug">
+          {step ? step.body : "No steps yet — add one on the wall."}
+        </span>
+      </span>
+
+      {total > 0 && (
+        <span className="label flex items-center gap-2 opacity-70">
+          <Progress done={done} total={total} onColor={onColor} />
+          <span className="tabular-nums">
+            {done}/{total}
+          </span>
+        </span>
+      )}
+    </article>
   );
 }
 

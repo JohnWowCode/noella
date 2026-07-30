@@ -22,14 +22,17 @@ function seedColors(): Color[] {
 }
 
 /**
- * Older walls were stored before images and before the palette grew past eight.
- * Both gaps are filled on read so no wall has to be thrown away to get the new
- * worlds — existing colours keep their ids, names and positions.
+ * Older walls were stored before images, before projects, and before the
+ * palette grew past eight. The gaps are filled on read so no wall has to be
+ * thrown away to get the new features — existing colours keep their ids,
+ * names and positions, and existing notes simply are not projects yet.
  */
 function migrate(snapshot: Snapshot): Snapshot {
   const notes = snapshot.notes.map((n) => ({
     ...n,
     images: Array.isArray(n.images) ? n.images : [],
+    projectStatus: n.projectStatus ?? null,
+    parentId: n.parentId ?? null,
   }));
 
   const colors = [...snapshot.colors];
@@ -109,7 +112,10 @@ export class LocalStore implements Store {
       colorId: input.colorId,
       tags: parseTags(body),
       images: input.images ?? [],
-      isTask,
+      projectStatus: null,
+      parentId: input.parentId ?? null,
+      // A step is a thing to do, so it arrives checkable.
+      isTask: isTask || input.parentId != null,
       doneAt: done ? now : null,
       pinned: false,
       visibility: "private",
@@ -150,10 +156,16 @@ export class LocalStore implements Store {
     return { ...next };
   }
 
+  /** Deleting a project takes its steps with it — a step alone means nothing. */
   async deleteNote(id: string): Promise<void> {
-    const note = this.snapshot.notes.find((n) => n.id === id);
-    for (const img of note?.images ?? []) this.forgetImage(img.id);
-    this.snapshot.notes = this.snapshot.notes.filter((n) => n.id !== id);
+    const doomed = this.snapshot.notes.filter(
+      (n) => n.id === id || n.parentId === id,
+    );
+    for (const note of doomed) {
+      for (const img of note.images) this.forgetImage(img.id);
+    }
+    const ids = new Set(doomed.map((n) => n.id));
+    this.snapshot.notes = this.snapshot.notes.filter((n) => !ids.has(n.id));
     write(this.snapshot);
   }
 

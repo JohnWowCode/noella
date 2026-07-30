@@ -4,9 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { seqLabel, stamp } from "@/lib/format";
 import { imageFilesFrom } from "@/lib/images";
 import { wordCount } from "@/lib/notes";
+import { isProject, projectTitle, stepsOf } from "@/lib/projects";
 import { useNoella } from "@/lib/store/provider";
 import type { Note } from "@/lib/types";
 import { Lightbox, NoteImages } from "./NoteImages";
+import { ProjectPanel } from "./ProjectPanel";
 
 interface Props {
   note: Note;
@@ -17,15 +19,22 @@ interface Props {
 }
 
 export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
-  const { colorOf, patchNote, removeNote, attachImage } = useNoella();
+  const { notes, colorOf, patchNote, removeNote, attachImage } = useNoella();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(note.body);
   const [viewing, setViewing] = useState<number | null>(null);
+  const [moving, setMoving] = useState(false);
   const areaRef = useRef<HTMLTextAreaElement>(null);
 
   const color = colorOf(note);
   const done = note.doneAt !== null;
   const archived = note.archivedAt !== null;
+  const project = isProject(note);
+  const steps = project ? stepsOf(notes, note.id) : [];
+  // Other projects this note could be filed under.
+  const targets = notes.filter(
+    (n) => isProject(n) && n.id !== note.id && n.archivedAt === null,
+  );
 
   useEffect(() => {
     if (editing) {
@@ -66,12 +75,13 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
 
   return (
     <article
+      id={`note-${note.id}`}
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
         e.preventDefault();
         void addImages(imageFilesFrom(e.dataTransfer));
       }}
-      className={`group border border-rule px-6 py-5 ${
+      className={`group scroll-mt-4 border border-rule px-6 py-5 ${
         onColor ? "" : "bg-field"
       } ${archived ? "opacity-60" : ""}`}
       style={surface}
@@ -97,8 +107,27 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
         )}
         <span>{seqLabel(note.seq)}</span>
         <Dot />
-        <span>{note.visibility}</span>
-        <Dot />
+        {project ? (
+          <>
+            <span
+              className={
+                note.projectStatus === "active"
+                  ? onColor
+                    ? "bg-[#111] px-1.5 py-0.5 text-white"
+                    : "bg-ink px-1.5 py-0.5 text-paper"
+                  : ""
+              }
+            >
+              project · {note.projectStatus}
+            </span>
+            <Dot />
+          </>
+        ) : (
+          <>
+            <span>{note.visibility}</span>
+            <Dot />
+          </>
+        )}
         <span>{wordCount(note.body)} words</span>
         {note.images.length > 0 && (
           <>
@@ -135,11 +164,27 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
           </Action>
           <Action
             onClick={() =>
-              patchNote(note.id, { isTask: !note.isTask, doneAt: null })
+              patchNote(note.id, {
+                projectStatus: project ? null : "idea",
+              })
             }
           >
-            {note.isTask ? "Untask" : "Task"}
+            {project ? "Unproject" : "Project"}
           </Action>
+          {!project && targets.length > 0 && (
+            <Action onClick={() => setMoving((v) => !v)}>
+              {note.parentId ? "Unfile" : "File"}
+            </Action>
+          )}
+          {!project && (
+            <Action
+              onClick={() =>
+                patchNote(note.id, { isTask: !note.isTask, doneAt: null })
+              }
+            >
+              {note.isTask ? "Untask" : "Task"}
+            </Action>
+          )}
           <Action
             onClick={() =>
               patchNote(note.id, {
@@ -149,9 +194,57 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
           >
             {archived ? "Restore" : "Archive"}
           </Action>
-          <Action onClick={() => removeNote(note.id)}>Del</Action>
+          <Action
+            onClick={() => {
+              // Steps go with the project, so say so before it happens.
+              if (
+                steps.length > 0 &&
+                !window.confirm(
+                  `Delete this project and its ${steps.length} ${
+                    steps.length === 1 ? "step" : "steps"
+                  }?`,
+                )
+              ) {
+                return;
+              }
+              removeNote(note.id);
+            }}
+          >
+            Del
+          </Action>
         </span>
       </header>
+
+      {moving && (
+        <div className="label mt-3 flex flex-wrap items-center gap-2">
+          <span className="opacity-60">File under</span>
+          {note.parentId && (
+            <button
+              type="button"
+              onClick={() => {
+                patchNote(note.id, { parentId: null });
+                setMoving(false);
+              }}
+              className="border border-current px-2 py-1 hover:bg-[#111] hover:text-white"
+            >
+              Nothing
+            </button>
+          )}
+          {targets.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => {
+                patchNote(note.id, { parentId: p.id, isTask: true });
+                setMoving(false);
+              }}
+              className="max-w-56 truncate border border-current px-2 py-1 normal-case tracking-normal hover:bg-[#111] hover:text-white"
+            >
+              {projectTitle(p)}
+            </button>
+          ))}
+        </div>
+      )}
 
       {editing ? (
         <textarea
@@ -180,6 +273,10 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
       )}
 
       <NoteImages images={note.images} onOpen={setViewing} />
+
+      {project && (
+        <ProjectPanel project={note} steps={steps} onColor={onColor} />
+      )}
 
       {(note.tags.length > 0 || color !== null) && (
         <footer className="label mt-4 flex flex-wrap items-center gap-2">

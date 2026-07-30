@@ -40,6 +40,12 @@ create table public.notes (
   is_task     boolean not null default false,
   done_at     timestamptz,
   due_at      timestamptz,
+  -- A project is a note you promoted; non-null means this note is one.
+  project_status text
+              check (project_status in ('idea', 'active', 'paused', 'done')),
+  -- Set on a step: the project note it belongs to. Deleting a project takes
+  -- its steps with it, because a step alone means nothing.
+  parent_id   uuid references public.notes (id) on delete cascade,
   pinned      boolean not null default false,
   visibility  text not null default 'private'
               check (visibility in ('private', 'unlisted', 'public')),
@@ -49,10 +55,17 @@ create table public.notes (
   search_vector tsvector
     generated always as (to_tsvector('english', body)) stored,
 
-  unique (owner_id, seq)
+  unique (owner_id, seq),
+  -- A project cannot also be somebody's step; the tree stays one level deep.
+  constraint notes_project_or_step
+    check (project_status is null or parent_id is null)
 );
 
 create index notes_owner_created_idx on public.notes (owner_id, created_at desc);
+create index notes_parent_idx on public.notes (parent_id, created_at)
+  where parent_id is not null;
+create index notes_project_idx on public.notes (owner_id, project_status)
+  where project_status is not null;
 create index notes_search_idx        on public.notes using gin (search_vector);
 create index notes_tags_idx          on public.notes using gin (tags);
 create index notes_color_idx         on public.notes (color_id);

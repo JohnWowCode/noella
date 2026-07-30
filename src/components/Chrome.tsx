@@ -13,6 +13,7 @@ export function Header({
   const { notes, colors } = useNoella();
   const live = notes.filter((n) => n.archivedAt === null);
   const open = live.filter((n) => n.isTask && n.doneAt === null).length;
+  const active = live.filter((n) => n.projectStatus === "active").length;
 
   return (
     <header className="border-b border-rule">
@@ -21,7 +22,8 @@ export function Header({
           NOELLA
         </Link>
         <span className="label hidden text-mute sm:inline">
-          {live.length} notes · {colors.length} worlds · {open} open
+          {live.filter((n) => n.parentId === null).length} notes ·{" "}
+          {colors.length} worlds · {active} active · {open} open
         </span>
         <div className="ml-auto flex items-center gap-2">{right}</div>
       </div>

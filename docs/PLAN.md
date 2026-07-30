@@ -35,6 +35,15 @@ Added after the first pass, on request:
   nice-to-have while the only copy of the data is one browser profile.
 - **Tag index** and per-swatch note counts, so both axes of the filing system
   are visible at rest rather than only when filtered.
+- **Projects**, on request — a place to keep tabs on many ongoing things and
+  work out how to execute them. A project is a note you promoted, and a step is
+  a note whose `parentId` points at it, so the one-data-type rule survives: an
+  idea becomes a project without being copied into a second system, and steps
+  stay searchable, colourable, exportable notes. Status is
+  `idea → active → paused → done`; `/projects` groups by status and surfaces the
+  next unfinished step; Today lists one next step per active project. The tree
+  is deliberately one level deep — a project cannot be a step, enforced by a
+  check constraint in the schema.
 
 **Two things changed during the build:**
 

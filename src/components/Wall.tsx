@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { matches } from "@/lib/notes";
+import { isProject } from "@/lib/projects";
 import { colorLabel, useNoella } from "@/lib/store/provider";
 import { Footer, Header, NavLink } from "./Chrome";
 import { Compose } from "./Compose";
@@ -18,6 +19,7 @@ export function Wall() {
   const [tag, setTag] = useState<string | null>(null);
   const [composeColor, setComposeColor] = useState<string | null>(null);
   const [onlyOpen, setOnlyOpen] = useState(false);
+  const [onlyProjects, setOnlyProjects] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
 
   const composeRef = useRef<HTMLTextAreaElement>(null);
@@ -62,9 +64,12 @@ export function Wall() {
     const rows = notes.filter(
       (n) =>
         (showArchive ? n.archivedAt !== null : n.archivedAt === null) &&
+        // Steps are shown inside their project's card, not loose on the wall.
+        n.parentId === null &&
         (world === null || n.colorId === world) &&
         (tag === null || n.tags.includes(tag)) &&
         (!onlyOpen || (n.isTask && n.doneAt === null)) &&
+        (!onlyProjects || isProject(n)) &&
         matches(n, query),
     );
     // Pinned float, then reverse-chron. Nothing else reorders the wall.
@@ -72,13 +77,15 @@ export function Wall() {
       if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
       return b.createdAt.localeCompare(a.createdAt);
     });
-  }, [notes, world, tag, onlyOpen, query, showArchive]);
+  }, [notes, world, tag, onlyOpen, onlyProjects, query, showArchive]);
 
   const activeWorld = colors.find((c) => c.id === world) ?? null;
+  // Top-level rows: steps are counted with their project, not against the wall.
   const live = useMemo(
-    () => notes.filter((n) => n.archivedAt === null),
+    () => notes.filter((n) => n.archivedAt === null && n.parentId === null),
     [notes],
   );
+  const projectCount = useMemo(() => live.filter(isProject).length, [live]);
   const counts = useMemo(() => {
     const m = new Map<string, number>();
     for (const n of live) {
@@ -86,8 +93,9 @@ export function Wall() {
     }
     return m;
   }, [live]);
-  const archivedCount = notes.length - live.length;
-  const filtered = world !== null || tag !== null || query !== "" || onlyOpen;
+  const archivedCount = notes.filter((n) => n.archivedAt !== null).length;
+  const filtered =
+    world !== null || tag !== null || query !== "" || onlyOpen || onlyProjects;
 
   return (
     <div className="flex min-h-full flex-col">
@@ -109,6 +117,7 @@ export function Wall() {
               className="label w-32 border border-rule bg-field px-2.5 py-2
                          outline-none placeholder:text-mute focus:w-48"
             />
+            <NavLink href="/projects">Projects</NavLink>
             <NavLink href="/today">Today</NavLink>
             <ThemeToggle />
           </>
@@ -149,6 +158,18 @@ export function Wall() {
             >
               Open tasks
             </button>
+            {projectCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setOnlyProjects((v) => !v)}
+                aria-pressed={onlyProjects}
+                className={`label border border-rule px-2.5 py-1.5 ${
+                  onlyProjects ? "bg-ink text-paper" : "text-mute hover:text-ink"
+                }`}
+              >
+                Projects {projectCount}
+              </button>
+            )}
             {archivedCount > 0 && (
               <button
                 type="button"
@@ -169,6 +190,7 @@ export function Wall() {
                   setTag(null);
                   setQuery("");
                   setOnlyOpen(false);
+                  setOnlyProjects(false);
                 }}
                 className="label border border-rule px-2.5 py-1.5 hover:bg-ink hover:text-paper"
               >
