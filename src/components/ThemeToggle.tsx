@@ -23,7 +23,7 @@ export function ThemeToggle() {
       type="button"
       onClick={flip}
       aria-label="Toggle theme"
-      className="label border border-rule px-2 py-1 hover:bg-ink hover:text-paper"
+      className="label border border-rule px-2.5 py-2 hover:bg-ink hover:text-paper"
     >
       <span className="dark:hidden">Light</span>
       <span className="hidden dark:inline">Dark</span>

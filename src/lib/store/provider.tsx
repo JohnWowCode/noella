@@ -8,9 +8,10 @@ import {
   useMemo,
   useState,
 } from "react";
-import type { Color, NewNote, Note } from "../types";
+import { prepareImage } from "../images";
+import type { Color, NewNote, Note, NoteImage } from "../types";
 import { LocalStore } from "./local";
-import type { Store } from "./types";
+import type { Backup, Store } from "./types";
 
 interface Noella {
   ready: boolean;
@@ -22,6 +23,11 @@ interface Noella {
   patchNote: (id: string, patch: Partial<Note>) => void;
   removeNote: (id: string) => void;
   patchColor: (id: string, patch: Partial<Color>) => void;
+  /** Downscales, stores the bytes, and hands back metadata to attach. */
+  attachImage: (file: File) => Promise<NoteImage>;
+  imageUrl: (id: string) => Promise<string | null>;
+  exportBackup: () => Promise<Backup>;
+  importBackup: (backup: Backup) => Promise<void>;
 }
 
 const Ctx = createContext<Noella | null>(null);
@@ -88,6 +94,28 @@ export function NoellaProvider({ children }: { children: React.ReactNode }) {
     [store],
   );
 
+  const attachImage = useCallback(
+    async (file: File) => {
+      const { meta, blob } = await prepareImage(file);
+      await store.saveImage(meta.id, blob);
+      return meta;
+    },
+    [store],
+  );
+
+  const imageUrl = useCallback((id: string) => store.imageUrl(id), [store]);
+
+  const exportBackup = useCallback(() => store.export(), [store]);
+
+  const importBackup = useCallback(
+    async (backup: Backup) => {
+      const snapshot = await store.import(backup);
+      setNotes(snapshot.notes);
+      setColors(snapshot.colors);
+    },
+    [store],
+  );
+
   const value = useMemo<Noella>(() => {
     const byId = new Map(colors.map((c) => [c.id, c]));
     return {
@@ -100,8 +128,25 @@ export function NoellaProvider({ children }: { children: React.ReactNode }) {
       patchNote,
       removeNote,
       patchColor,
+      attachImage,
+      imageUrl,
+      exportBackup,
+      importBackup,
     };
-  }, [store, ready, notes, colors, addNote, patchNote, removeNote, patchColor]);
+  }, [
+    store,
+    ready,
+    notes,
+    colors,
+    addNote,
+    patchNote,
+    removeNote,
+    patchColor,
+    attachImage,
+    imageUrl,
+    exportBackup,
+    importBackup,
+  ]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

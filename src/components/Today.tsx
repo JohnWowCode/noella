@@ -50,9 +50,9 @@ export function Today() {
         }
       />
 
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 pt-5">
+      <main className="mx-auto w-full max-w-3xl flex-1 px-5 pt-8 sm:px-6">
         {!ready ? (
-          <p className="label border border-rule bg-field px-4 py-10 text-center text-mute">
+          <p className="label border border-rule bg-field px-6 py-14 text-center text-mute">
             Reading local store…
           </p>
         ) : (
@@ -101,21 +101,19 @@ function Block({
   children: React.ReactNode;
 }) {
   return (
-    <section className="mb-8">
-      <h2 className="label mb-2 flex items-center gap-2 text-mute">
+    <section className="mb-11">
+      <h2 className="label mb-3 flex items-center gap-2 text-mute">
         <span>{title}</span>
         <span aria-hidden>·</span>
         <span>{count}</span>
       </h2>
-      <div className="border border-rule">
-        {count === 0 ? (
-          <p className="label bg-field px-4 py-8 text-center text-mute">
-            {empty}
-          </p>
-        ) : (
-          children
-        )}
-      </div>
+      {count === 0 ? (
+        <p className="label border border-rule bg-field px-6 py-12 text-center text-mute">
+          {empty}
+        </p>
+      ) : (
+        <div className="flex flex-col gap-3">{children}</div>
+      )}
     </section>
   );
 }

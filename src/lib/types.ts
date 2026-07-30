@@ -1,3 +1,5 @@
+import type { NoteImage } from "./images";
+
 export type Visibility = "private" | "unlisted" | "public";
 
 /** A colour is a world. Naming it is optional and always. */
@@ -17,6 +19,8 @@ export interface Note {
   colorId: string | null;
   /** Parsed out of the body on write. Cross-cuts worlds. */
   tags: string[];
+  /** Metadata only — the bytes live in IndexedDB, keyed by image id. */
+  images: NoteImage[];
   isTask: boolean;
   doneAt: string | null;
   pinned: boolean;
@@ -29,4 +33,7 @@ export interface Note {
 export interface NewNote {
   body: string;
   colorId: string | null;
+  images?: NoteImage[];
 }
+
+export type { NoteImage };

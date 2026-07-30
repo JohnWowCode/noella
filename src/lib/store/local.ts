@@ -1,7 +1,8 @@
+import { deleteBlob, getBlob, putBlob } from "../images";
 import { detectTask, parseTags } from "../notes";
 import type { Color, NewNote, Note } from "../types";
 import { DEFAULT_SWATCHES } from "./defaults";
-import type { Snapshot, Store } from "./types";
+import type { Backup, Snapshot, Store } from "./types";
 
 const KEY = "noella.v1";
 
@@ -12,14 +13,34 @@ function uid(): string {
   return `id-${Math.floor(Math.random() * 1e12).toString(36)}`;
 }
 
+function colorAt(hex: string, position: number): Color {
+  return { id: uid(), hex, name: null, emoji: null, position };
+}
+
 function seedColors(): Color[] {
-  return DEFAULT_SWATCHES.map((hex, i) => ({
-    id: uid(),
-    hex,
-    name: null,
-    emoji: null,
-    position: i,
+  return DEFAULT_SWATCHES.map(colorAt);
+}
+
+/**
+ * Older walls were stored before images and before the palette grew past eight.
+ * Both gaps are filled on read so no wall has to be thrown away to get the new
+ * worlds — existing colours keep their ids, names and positions.
+ */
+function migrate(snapshot: Snapshot): Snapshot {
+  const notes = snapshot.notes.map((n) => ({
+    ...n,
+    images: Array.isArray(n.images) ? n.images : [],
   }));
+
+  const colors = [...snapshot.colors];
+  const present = new Set(colors.map((c) => c.hex.toUpperCase()));
+  for (const hex of DEFAULT_SWATCHES) {
+    if (!present.has(hex.toUpperCase())) {
+      colors.push(colorAt(hex, colors.length));
+    }
+  }
+
+  return { notes, colors };
 }
 
 function read(): Snapshot | null {
@@ -44,16 +65,34 @@ function write(snapshot: Snapshot): void {
   }
 }
 
-/** Browser-local store. No server, no account, no network. */
+async function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(blob);
+  });
+}
+
+async function dataUrlToBlob(url: string): Promise<Blob> {
+  const res = await fetch(url);
+  return res.blob();
+}
+
+/** Browser-local store: notes in localStorage, image bytes in IndexedDB. */
 export class LocalStore implements Store {
-  readonly label = "LOCALSTORAGE";
+  readonly label = "LOCAL";
 
   private snapshot: Snapshot = { notes: [], colors: [] };
+  /** Object URLs handed out for <img src>, reused so one blob maps to one URL. */
+  private urls = new Map<string, string>();
 
   async load(): Promise<Snapshot> {
     const existing = read();
-    this.snapshot = existing ?? { notes: [], colors: seedColors() };
-    if (!existing) write(this.snapshot);
+    this.snapshot = existing
+      ? migrate(existing)
+      : { notes: [], colors: seedColors() };
+    write(this.snapshot);
     return this.clone();
   }
 
@@ -69,6 +108,7 @@ export class LocalStore implements Store {
       body,
       colorId: input.colorId,
       tags: parseTags(body),
+      images: input.images ?? [],
       isTask,
       doneAt: done ? now : null,
       pinned: false,
@@ -87,8 +127,9 @@ export class LocalStore implements Store {
     const i = this.snapshot.notes.findIndex((n) => n.id === id);
     if (i === -1) throw new Error(`no note ${id}`);
 
+    const previous = this.snapshot.notes[i];
     const next: Note = {
-      ...this.snapshot.notes[i],
+      ...previous,
       ...patch,
       id,
       updatedAt: new Date().toISOString(),
@@ -96,12 +137,22 @@ export class LocalStore implements Store {
     // Tags are derived, never passed in.
     if (patch.body !== undefined) next.tags = parseTags(next.body);
 
+    // Images dropped from a note lose their bytes too, or IndexedDB only grows.
+    if (patch.images !== undefined) {
+      const kept = new Set(next.images.map((img) => img.id));
+      for (const img of previous.images) {
+        if (!kept.has(img.id)) this.forgetImage(img.id);
+      }
+    }
+
     this.snapshot.notes = this.snapshot.notes.with(i, next);
     write(this.snapshot);
     return { ...next };
   }
 
   async deleteNote(id: string): Promise<void> {
+    const note = this.snapshot.notes.find((n) => n.id === id);
+    for (const img of note?.images ?? []) this.forgetImage(img.id);
     this.snapshot.notes = this.snapshot.notes.filter((n) => n.id !== id);
     write(this.snapshot);
   }
@@ -114,6 +165,71 @@ export class LocalStore implements Store {
     this.snapshot.colors = this.snapshot.colors.with(i, next);
     write(this.snapshot);
     return { ...next };
+  }
+
+  async saveImage(id: string, blob: Blob): Promise<void> {
+    await putBlob(id, blob);
+  }
+
+  async imageUrl(id: string): Promise<string | null> {
+    const cached = this.urls.get(id);
+    if (cached) return cached;
+    const blob = await getBlob(id);
+    if (!blob) return null;
+    const url = URL.createObjectURL(blob);
+    this.urls.set(id, url);
+    return url;
+  }
+
+  async export(): Promise<Backup> {
+    const images: Record<string, string> = {};
+    for (const note of this.snapshot.notes) {
+      for (const img of note.images) {
+        const blob = await getBlob(img.id);
+        if (blob) images[img.id] = await blobToDataUrl(blob);
+      }
+    }
+    return {
+      format: "noella.backup",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      notes: this.snapshot.notes,
+      colors: this.snapshot.colors,
+      images,
+    };
+  }
+
+  async import(backup: Backup): Promise<Snapshot> {
+    if (backup.format !== "noella.backup") {
+      throw new Error("not a Noella backup");
+    }
+
+    for (const [id, dataUrl] of Object.entries(backup.images ?? {})) {
+      try {
+        await putBlob(id, await dataUrlToBlob(dataUrl));
+      } catch {
+        // One unreadable image should not sink the whole restore.
+      }
+    }
+
+    for (const url of this.urls.values()) URL.revokeObjectURL(url);
+    this.urls.clear();
+
+    this.snapshot = migrate({
+      notes: backup.notes ?? [],
+      colors: backup.colors ?? seedColors(),
+    });
+    write(this.snapshot);
+    return this.clone();
+  }
+
+  private forgetImage(id: string): void {
+    const url = this.urls.get(id);
+    if (url) {
+      URL.revokeObjectURL(url);
+      this.urls.delete(id);
+    }
+    void deleteBlob(id);
   }
 
   private clone(): Snapshot {

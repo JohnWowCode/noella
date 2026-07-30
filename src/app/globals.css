@@ -26,7 +26,7 @@
   --color-rule: var(--rule);
   --color-field: var(--field);
 
-  --font-sans: var(--font-geist-sans);
+  --font-serif: var(--font-literata);
   --font-mono: var(--font-geist-mono);
 }
 
@@ -51,7 +51,7 @@
   }
 
   body {
-    font-family: var(--font-geist-sans), system-ui, sans-serif;
+    font-family: var(--font-literata), Georgia, serif;
   }
 
   ::selection {
@@ -91,4 +91,13 @@
   line-height: 1.1;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+/* Note bodies. The vendored file carries the weight axis only, so size and
+   leading do the work rather than optical sizing. */
+@utility prose-note {
+  font-family: var(--font-literata), Georgia, serif;
+  font-size: 18px;
+  line-height: 1.62;
+  text-wrap: pretty;
 }

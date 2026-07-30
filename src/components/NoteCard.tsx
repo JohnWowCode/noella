@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { seqLabel, stamp } from "@/lib/format";
+import { imageFilesFrom } from "@/lib/images";
 import { wordCount } from "@/lib/notes";
 import { useNoella } from "@/lib/store/provider";
 import type { Note } from "@/lib/types";
+import { Lightbox, NoteImages } from "./NoteImages";
 
 interface Props {
   note: Note;
@@ -15,13 +17,15 @@ interface Props {
 }
 
 export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
-  const { colorOf, patchNote, removeNote } = useNoella();
+  const { colorOf, patchNote, removeNote, attachImage } = useNoella();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(note.body);
+  const [viewing, setViewing] = useState<number | null>(null);
   const areaRef = useRef<HTMLTextAreaElement>(null);
 
   const color = colorOf(note);
   const done = note.doneAt !== null;
+  const archived = note.archivedAt !== null;
 
   useEffect(() => {
     if (editing) {
@@ -38,6 +42,22 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
     else setDraft(note.body);
   }
 
+  // Images can be dropped straight onto an existing card.
+  async function addImages(files: File[]) {
+    if (files.length === 0) return;
+    const added = [];
+    for (const file of files) {
+      try {
+        added.push(await attachImage(file));
+      } catch {
+        // Skip anything unreadable.
+      }
+    }
+    if (added.length > 0) {
+      patchNote(note.id, { images: [...note.images, ...added] });
+    }
+  }
+
   // Colour is a flat full fill, and #111 always clears contrast on it.
   const onColor = color !== null;
   const surface = onColor
@@ -46,13 +66,18 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
 
   return (
     <article
-      className={`group border-b border-rule px-4 py-3.5 last:border-b-0 ${
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={(e) => {
+        e.preventDefault();
+        void addImages(imageFilesFrom(e.dataTransfer));
+      }}
+      className={`group border border-rule px-6 py-5 ${
         onColor ? "" : "bg-field"
-      }`}
+      } ${archived ? "opacity-60" : ""}`}
       style={surface}
     >
       <header
-        className={`label flex flex-wrap items-center gap-x-2 gap-y-1 ${
+        className={`label flex flex-wrap items-center gap-x-2.5 gap-y-1.5 ${
           onColor ? "opacity-70" : "text-mute"
         }`}
       >
@@ -75,6 +100,14 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
         <span>{note.visibility}</span>
         <Dot />
         <span>{wordCount(note.body)} words</span>
+        {note.images.length > 0 && (
+          <>
+            <Dot />
+            <span>
+              {note.images.length} {note.images.length === 1 ? "image" : "images"}
+            </span>
+          </>
+        )}
         <Dot />
         <span>{stamp(note.createdAt)}</span>
         {note.pinned && (
@@ -83,10 +116,16 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
             <span>pinned</span>
           </>
         )}
+        {archived && (
+          <>
+            <Dot />
+            <span>archived</span>
+          </>
+        )}
 
         <span
           data-card-actions
-          className="ml-auto flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100"
+          className="ml-auto flex items-center gap-2.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100"
         >
           <Action onClick={() => setEditing((v) => !v)}>
             {editing ? "Done" : "Edit"}
@@ -96,13 +135,19 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
           </Action>
           <Action
             onClick={() =>
-              patchNote(note.id, {
-                isTask: !note.isTask,
-                doneAt: null,
-              })
+              patchNote(note.id, { isTask: !note.isTask, doneAt: null })
             }
           >
             {note.isTask ? "Untask" : "Task"}
+          </Action>
+          <Action
+            onClick={() =>
+              patchNote(note.id, {
+                archivedAt: archived ? null : new Date().toISOString(),
+              })
+            }
+          >
+            {archived ? "Restore" : "Archive"}
           </Action>
           <Action onClick={() => removeNote(note.id)}>Del</Action>
         </span>
@@ -119,26 +164,30 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
             if ((e.metaKey || e.ctrlKey) && e.key === "Enter") commit();
           }}
           rows={3}
-          className="mt-2 block w-full resize-none border border-current
-                     bg-transparent px-2 py-1.5 text-[17px] leading-relaxed outline-none"
+          className="prose-note mt-3 block w-full resize-none border border-current
+                     bg-transparent px-3 py-2 outline-none"
         />
       ) : (
-        <p
-          className={`mt-2 whitespace-pre-wrap text-[17px] leading-relaxed ${
-            done ? "line-through opacity-55" : ""
-          }`}
-        >
-          <Highlight text={note.body} query={query} />
-        </p>
+        note.body.length > 0 && (
+          <p
+            className={`prose-note mt-3 whitespace-pre-wrap ${
+              done ? "line-through opacity-55" : ""
+            }`}
+          >
+            <Highlight text={note.body} query={query} />
+          </p>
+        )
       )}
 
+      <NoteImages images={note.images} onOpen={setViewing} />
+
       {(note.tags.length > 0 || color !== null) && (
-        <footer className="label mt-3 flex flex-wrap items-center gap-1.5">
+        <footer className="label mt-4 flex flex-wrap items-center gap-2">
           {color !== null && onEnterWorld && (
             <button
               type="button"
               onClick={() => onEnterWorld(color.id)}
-              className="border border-current px-1.5 py-1 hover:bg-[#111] hover:text-white"
+              className="border border-current px-2 py-1.5 hover:bg-[#111] hover:text-white"
             >
               {color.emoji ? `${color.emoji} ` : ""}
               {color.name ?? "Enter world"}
@@ -150,7 +199,7 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
                 key={t}
                 type="button"
                 onClick={() => onTag(t)}
-                className={`border border-current px-1.5 py-1 hover:bg-[#111] hover:text-white ${
+                className={`border border-current px-2 py-1.5 hover:bg-[#111] hover:text-white ${
                   onColor ? "opacity-70" : "text-mute"
                 }`}
               >
@@ -159,7 +208,7 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
             ) : (
               <span
                 key={t}
-                className={`border border-current px-1.5 py-1 ${
+                className={`border border-current px-2 py-1.5 ${
                   onColor ? "opacity-70" : "text-mute"
                 }`}
               >
@@ -168,6 +217,15 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
             ),
           )}
         </footer>
+      )}
+
+      {viewing !== null && (
+        <Lightbox
+          images={note.images}
+          index={viewing}
+          onIndex={setViewing}
+          onClose={() => setViewing(null)}
+        />
       )}
     </article>
   );

@@ -13,8 +13,14 @@ Nothing to configure. No account, no server, no keys.
 
 ## Where the data lives
 
-Right now: **your browser**. `LocalStore` (`src/lib/store/local.ts`) persists to
-localStorage under `noella.v1`, and the footer says so on every page.
+Right now: **your browser**. `LocalStore` (`src/lib/store/local.ts`) keeps notes
+in localStorage under `noella.v1` and image bytes in IndexedDB
+(`noella-images`) — a single phone photo would blow localStorage's ~5 MB cap.
+The footer says where the data lives on every page.
+
+Because that's one browser profile and nothing else, **Export writes a
+self-contained JSON backup with the images inlined**, and Import restores it.
+Use it. A cleared cache is otherwise the end of the wall.
 
 That is deliberate, not a placeholder. The UI only ever talks to the `Store`
 interface in `src/lib/store/types.ts`:
@@ -27,6 +33,10 @@ interface Store {
   updateNote(id: string, patch: Partial<Note>): Promise<Note>;
   deleteNote(id: string): Promise<void>;
   updateColor(id: string, patch: Partial<Color>): Promise<Color>;
+  imageUrl(id: string): Promise<string | null>;
+  saveImage(id: string, blob: Blob): Promise<void>;
+  export(): Promise<Backup>;
+  import(backup: Backup): Promise<Snapshot>;
 }
 ```
 
@@ -34,8 +44,8 @@ To move to Postgres, apply `supabase/migrations/0001_init.sql`, write a
 `SupabaseStore` against the same interface, and swap the one line in
 `src/lib/store/provider.tsx` that constructs `new LocalStore()`. No component
 changes. The migration already carries `owner_id`, `visibility`, RLS, full-text
-search and the public-read policy, so sharing later is a feature flag rather
-than a schema rewrite.
+search, the `note_images` manifest and the public-read policy, so sharing later
+is a feature flag rather than a schema rewrite.
 
 ## Using it
 
@@ -43,10 +53,14 @@ than a schema rewrite.
 |---|---|
 | `n` | jump to the compose box |
 | `⌘/Ctrl + Enter` | save |
-| `⌘/Ctrl + 1`–`8` | file into that world (`⌘0` clears) |
-| `1`–`8` | pick a world and start typing |
+| `⌘/Ctrl + 1`–`9` | file into that world (`⌘0` clears) |
+| `1`–`9` | pick a world and start typing |
 | `/` | search |
 | `Esc` | clear search and filters |
+| `←` `→` `Esc` | in the image viewer |
+
+There are twelve worlds and nine number keys, so worlds 10–12 are click-only.
+Put the ones you reach for most in the first nine.
 
 - The chosen colour is **sticky** between notes, so a run of notes in one world
   costs one keystroke each.
@@ -55,7 +69,17 @@ than a schema rewrite.
 - `#hashtags` are parsed out of the body and cross-cut worlds — click one to
   filter. Colour is the spine, tags are the cross-cut.
 - Tapping a swatch in the filter row **enters that world**: the app takes on its
-  colour and everything else stays greyscale. Name the world from the band.
+  colour and everything else stays greyscale. Name the world from the band. The
+  number under each swatch is how many notes live there.
+- **Images**: paste, drag onto the compose box or an existing card, or use
+  `+ Image`. Anything larger than 1600px on its long edge is downscaled and
+  re-encoded to WebP on the way in — a 4 MB camera JPEG lands around 150 KB,
+  which is what makes storing them locally viable. Click any image for a flat
+  full-bleed viewer.
+- **Archive** takes a note off the wall without deleting it. The `Archive n`
+  button shows what's in there.
+- The **tag index** under the filter row lists every tag by weight — the only
+  place you can see the whole cross-cut at once.
 - Drafts are written to localStorage on every keystroke. Closing the tab
   mid-thought loses nothing.
 
@@ -69,12 +93,15 @@ no fake physics.
 - **No shadows** except one: a hard 4px zero-blur offset on the focused compose
   box, tinted to the selected world. No gradients anywhere.
 - **Two type voices** — Geist Mono for all chrome (uppercase, 11px, letterspaced,
-  via the `label` utility), Geist Sans for note bodies. The contrast is the design.
+  via the `label` utility), **Literata** for note bodies (18px/1.62, via
+  `prose-note`). A screen-first serif with enough ink to hold up on saturated
+  cards and enough voice that your own writing reads as considered rather than
+  logged. The contrast between the two is the design.
 - **Paper by default** (`#F4F2ED` / `#111`); dark is a toggle. Flat colour reads
   louder on paper.
 - **Colour is load-bearing and nowhere else.** Chrome is greyscale; only cards
-  and swatches carry colour. All eight swatches clear 4.5:1 against `#111`, so
-  card contrast never flips.
+  and swatches carry colour. All twelve swatches clear 4.5:1 against `#111`
+  (the darkest, `#E85D5D`, sits at 6.2:1), so card contrast never flips.
 - **The app states facts about itself** — `NOTE 0041 · PRIVATE · 14 WORDS ·
   2026-07-30 08:41`, a live row count in the footer, blunt empty states.
 - **80ms linear, or nothing.** No easing curves, no springs.
@@ -84,14 +111,20 @@ no fake physics.
 ```
 src/
   app/            layout (fonts, theme boot), / (Wall), /today
-  components/     Wall, Compose, NoteCard, Swatch, Today, Chrome
+  fonts/          vendored Literata variable woff2 + OFL licence
+  components/     Wall, Compose, NoteCard, NoteImages, Swatch,
+                  TagIndex, DataMenu, Today, Chrome
   lib/
     notes.ts      hashtag + task-marker parsing, search matching
+    images.ts     downscale/encode + IndexedDB blob store
     format.ts     seq labels, absolute timestamps
     store/        Store interface, LocalStore, React provider
 supabase/
   migrations/     Postgres schema, not yet applied
 docs/PLAN.md      scope, phases, what is deliberately left out
 ```
+
+Literata is licensed under the SIL Open Font License; the licence ships in
+`src/fonts/`.
 
 Built on Next.js 16 (App Router, Turbopack) + Tailwind v4.

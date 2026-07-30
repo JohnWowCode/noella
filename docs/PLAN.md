@@ -16,7 +16,25 @@ Phases 0–4 are **built and working** on a local store. See README.md to run it
 | 3 · Search & tags | done — live filter, `#tag` parsing, clickable tag chips |
 | 4 · Tasks & Today | done — `[]` capture, checkboxes, Today screen |
 | 5 · AI (OpenRouter) | not started |
-| 6 · Polish & mobile | not started — PWA manifest, share target, offline |
+| 6 · Polish & mobile | partial — spacing, type, images; PWA/share target left |
+
+Added after the first pass, on request:
+
+- **Twelve worlds** instead of eight. The original eight keep their positions so
+  nothing already filed moves out from under its shortcut; the four additions
+  (amber, orchid, cyan, green) fill the real gaps in the wheel. An existing wall
+  gets them appended on load rather than being reset.
+- **Images** — paste, drop or pick. Downscaled to 1600px and re-encoded to WebP
+  on the way in, bytes in IndexedDB, metadata on the note, flat full-bleed
+  viewer. Only the manifest is in localStorage.
+- **Literata** for note bodies, replacing Geist Sans. Chosen by rendering it
+  against Newsreader and Source Serif 4 on real cards — Newsreader read too
+  thin on saturated colour, Source Serif had less voice.
+- **Archive**, completing the `archived_at` field that had been carried unused.
+- **Export / import** of the whole wall as one JSON file, images inlined. Not a
+  nice-to-have while the only copy of the data is one browser profile.
+- **Tag index** and per-swatch note counts, so both axes of the filing system
+  are visible at rest rather than only when filtered.
 
 **Two things changed during the build:**
 

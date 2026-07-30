@@ -57,6 +57,27 @@ create index notes_search_idx        on public.notes using gin (search_vector);
 create index notes_tags_idx          on public.notes using gin (tags);
 create index notes_color_idx         on public.notes (color_id);
 
+-- ----------------------------------------------------------------- images ---
+-- Bytes go to a Supabase Storage bucket; this table is the ordered manifest,
+-- mirroring the NoteImage metadata the local store keeps in IndexedDB.
+
+create table public.note_images (
+  id         uuid primary key default gen_random_uuid(),
+  note_id    uuid not null references public.notes (id) on delete cascade,
+  owner_id   uuid not null references auth.users (id) on delete cascade,
+  -- Path within the storage bucket, not a public URL.
+  storage_key text not null,
+  width      integer not null check (width > 0),
+  height     integer not null check (height > 0),
+  mime       text not null,
+  bytes      integer not null check (bytes >= 0),
+  alt        text,
+  position   integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create index note_images_note_idx on public.note_images (note_id, position);
+
 -- --------------------------------------------------------------- triggers ---
 
 -- Per-owner sequence. The advisory lock keeps two concurrent inserts from
@@ -122,7 +143,7 @@ create trigger notes_touch_updated_at
   before update on public.notes
   for each row execute function public.touch_updated_at();
 
--- Eight unnamed worlds per new account. The taxonomy emerges from use.
+-- Twelve unnamed worlds per new account. The taxonomy emerges from use.
 create or replace function public.seed_default_colors()
 returns trigger
 language plpgsql
@@ -134,7 +155,8 @@ begin
   select new.id, swatch, ord - 1
     from unnest(array[
            '#F2E14C', '#A8C64F', '#5FC9A8', '#6FA8F0',
-           '#A98BE0', '#E87FB4', '#E85D5D', '#F29441'
+           '#A98BE0', '#E87FB4', '#E85D5D', '#F29441',
+           '#F0B92E', '#CE8BE8', '#6FD8E8', '#7ED97E'
          ]) with ordinality as t(swatch, ord);
   return new;
 end;
@@ -146,8 +168,14 @@ create trigger seed_default_colors_on_signup
 
 -- -------------------------------------------------------------------- RLS ---
 
-alter table public.notes  enable row level security;
-alter table public.colors enable row level security;
+alter table public.notes       enable row level security;
+alter table public.colors      enable row level security;
+alter table public.note_images enable row level security;
+
+create policy note_images_owner_all on public.note_images
+  for all
+  using (owner_id = auth.uid())
+  with check (owner_id = auth.uid());
 
 create policy notes_owner_all on public.notes
   for all
