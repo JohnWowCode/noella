@@ -4,6 +4,34 @@ A fast, color-organized wall of notes and ideas. Personal first, social later.
 
 ---
 
+## Status
+
+Phases 0–4 are **built and working** on a local store. See README.md to run it.
+
+| Phase | State |
+|---|---|
+| 0 · Scaffold | done — Next 16, Tailwind v4, design tokens locked |
+| 1 · Capture & Wall | done — compose, feed, inline edit, optimistic insert, drafts |
+| 2 · Color | done — 8 worlds, swatch rows, enter-a-world, rename |
+| 3 · Search & tags | done — live filter, `#tag` parsing, clickable tag chips |
+| 4 · Tasks & Today | done — `[]` capture, checkboxes, Today screen |
+| 5 · AI (OpenRouter) | not started |
+| 6 · Polish & mobile | not started — PWA manifest, share target, offline |
+
+**Two things changed during the build:**
+
+1. **Search is a live filter on the Wall, not a fourth screen.** Two routes
+   (`/` and `/today`) instead of four. Typing in the header input filters the
+   wall as you type, which is both more minimal and fewer taps than a route
+   change. The plan's four-screen split was the wrong call.
+2. **The database is deferred.** A new Supabase project costs **$10/mo** on this
+   org — the free tier assumed below does not apply, because the account is on a
+   paid plan. So the app runs on `LocalStore` (browser localStorage) behind a
+   `Store` interface, and `supabase/migrations/0001_init.sql` is written and
+   waiting. Swapping to Postgres is one constructor line plus a `SupabaseStore`.
+
+---
+
 ## The one thing that matters
 
 Apps like this die for one reason: **filing friction**. Not missing features — the
@@ -106,6 +134,11 @@ unstructured thoughts.
 Honest caveats: Supabase pauses a project after ~1 week of zero activity (irrelevant
 if you use it daily); 500 MB DB and 5 GB egress, thousands of notes away from
 mattering. Vercel Hobby forbids commercial use — fine until this is a product.
+
+**Correction:** the "free" in the Supabase row above is wrong for this account. The
+org is on a paid plan, so each additional project bills **$10/mo**. The options are
+a dedicated project at that price, sharing an existing project's Postgres and auth,
+or staying on the local store — which is where it sits today.
 
 ---
 

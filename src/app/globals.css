@@ -1,0 +1,94 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* Paper, not dark. Dark is a toggle, not the default. */
+:root {
+  --paper: #f4f2ed;
+  --ink: #111111;
+  --mute: #6f6b64;
+  --rule: #111111;
+  --field: #fffefb;
+}
+
+[data-theme="dark"] {
+  --paper: #0b0b0b;
+  --ink: #ededed;
+  --mute: #8a867f;
+  --rule: #ededed;
+  --field: #141414;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-mute: var(--mute);
+  --color-rule: var(--rule);
+  --color-field: var(--field);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@theme {
+  /* 80ms linear, or none. No easing curves, no spring physics. */
+  --default-transition-duration: 80ms;
+  --default-transition-timing-function: linear;
+}
+
+@layer base {
+  /* 0px corners. Everywhere. No exceptions. */
+  *,
+  *::before,
+  *::after {
+    border-radius: 0 !important;
+  }
+
+  html {
+    background: var(--paper);
+    color: var(--ink);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    font-family: var(--font-geist-sans), system-ui, sans-serif;
+  }
+
+  ::selection {
+    background: var(--ink);
+    color: var(--paper);
+  }
+
+  /* Colour is load-bearing on cards. It never leaks into focus rings. */
+  :focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 1px;
+  }
+
+  textarea,
+  input,
+  button {
+    font: inherit;
+    color: inherit;
+  }
+
+  textarea {
+    field-sizing: content;
+  }
+}
+
+/* Touch devices never hover, so per-card actions stay visible there. */
+@media (hover: none) {
+  [data-card-actions] {
+    opacity: 1 !important;
+  }
+}
+
+/* Chrome speaks in flat machine language. */
+@utility label {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11px;
+  line-height: 1.1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
