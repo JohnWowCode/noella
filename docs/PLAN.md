@@ -6,7 +6,8 @@ A fast, color-organized wall of notes and ideas. Personal first, social later.
 
 ## Status
 
-Phases 0–4 are **built and working** on a local store. See README.md to run it.
+Everything except the AI phase is **built and working** on a local store.
+See README.md to run it.
 
 | Phase | State |
 |---|---|
@@ -16,7 +17,7 @@ Phases 0–4 are **built and working** on a local store. See README.md to run it
 | 3 · Search & tags | done — live filter, `#tag` parsing, clickable tag chips |
 | 4 · Tasks & Today | done — `[]` capture, checkboxes, Today screen |
 | 5 · AI (OpenRouter) | not started |
-| 6 · Polish & mobile | partial — spacing, type, images; PWA/share target left |
+| 6 · Polish & mobile | done — PWA, offline, share target, quick capture |
 
 Added after the first pass, on request:
 
@@ -44,6 +45,21 @@ Added after the first pass, on request:
   next unfinished step; Today lists one next step per active project. The tree
   is deliberately one level deep — a project cannot be a step, enforced by a
   check constraint in the schema.
+- **Bills**, on request, following the same promote-a-note pattern. Recurrence
+  is stored as the set of periods already settled rather than expanded into
+  rows, so a monthly bill never accumulates twelve notes a year. `/money`
+  answers two questions — what am I committed to monthly, and what is still
+  owed now — and Today lists what wants money this week. A bill can only have
+  missed periods that fell due after it was written down, so adding rent
+  mid-month does not immediately claim you are late. Not a budgeting app:
+  colour already does categories.
+- **Night mode follows the system** by default. The toggle is now
+  `auto → light → dark`, applied before first paint, and a change to the OS
+  setting reaches an open tab live. It previously defaulted to light whatever
+  the device was doing.
+- **Capture from anywhere** — a `+ Note` button on every screen, `n` from any
+  route, and a PWA manifest plus service worker so it installs to a phone,
+  runs offline, and registers as a share target that opens prefilled.
 
 **Two things changed during the build:**
 

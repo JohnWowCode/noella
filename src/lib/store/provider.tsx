@@ -9,7 +9,14 @@ import {
   useState,
 } from "react";
 import { prepareImage } from "../images";
-import type { Color, NewNote, Note, NoteImage } from "../types";
+import {
+  DEFAULT_SETTINGS,
+  type Color,
+  type NewNote,
+  type Note,
+  type NoteImage,
+  type Settings,
+} from "../types";
 import { LocalStore } from "./local";
 import type { Backup, Store } from "./types";
 
@@ -18,11 +25,13 @@ interface Noella {
   label: string;
   notes: Note[];
   colors: Color[];
+  settings: Settings;
   colorOf: (note: Note) => Color | null;
   addNote: (input: NewNote) => void;
   patchNote: (id: string, patch: Partial<Note>) => void;
   removeNote: (id: string) => void;
   patchColor: (id: string, patch: Partial<Color>) => void;
+  patchSettings: (patch: Partial<Settings>) => void;
   /** Downscales, stores the bytes, and hands back metadata to attach. */
   attachImage: (file: File) => Promise<NoteImage>;
   imageUrl: (id: string) => Promise<string | null>;
@@ -39,6 +48,7 @@ export function NoellaProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const [notes, setNotes] = useState<Note[]>([]);
   const [colors, setColors] = useState<Color[]>([]);
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
 
   useEffect(() => {
     let live = true;
@@ -46,6 +56,7 @@ export function NoellaProvider({ children }: { children: React.ReactNode }) {
       if (!live) return;
       setNotes(snapshot.notes);
       setColors(snapshot.colors);
+      setSettings(snapshot.settings);
       setReady(true);
     });
     return () => {
@@ -94,6 +105,14 @@ export function NoellaProvider({ children }: { children: React.ReactNode }) {
     [store],
   );
 
+  const patchSettings = useCallback(
+    (patch: Partial<Settings>) => {
+      setSettings((prev) => ({ ...prev, ...patch }));
+      store.updateSettings(patch);
+    },
+    [store],
+  );
+
   const attachImage = useCallback(
     async (file: File) => {
       const { meta, blob } = await prepareImage(file);
@@ -112,6 +131,7 @@ export function NoellaProvider({ children }: { children: React.ReactNode }) {
       const snapshot = await store.import(backup);
       setNotes(snapshot.notes);
       setColors(snapshot.colors);
+      setSettings(snapshot.settings);
     },
     [store],
   );
@@ -123,11 +143,13 @@ export function NoellaProvider({ children }: { children: React.ReactNode }) {
       label: store.label,
       notes,
       colors,
+      settings,
       colorOf: (note) => (note.colorId ? byId.get(note.colorId) ?? null : null),
       addNote,
       patchNote,
       removeNote,
       patchColor,
+      patchSettings,
       attachImage,
       imageUrl,
       exportBackup,
@@ -138,10 +160,12 @@ export function NoellaProvider({ children }: { children: React.ReactNode }) {
     ready,
     notes,
     colors,
+    settings,
     addNote,
     patchNote,
     removeNote,
     patchColor,
+    patchSettings,
     attachImage,
     imageUrl,
     exportBackup,

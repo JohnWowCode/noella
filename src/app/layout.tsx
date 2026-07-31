@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { GeistMono } from "geist/font/mono";
+import { QuickCapture } from "@/components/QuickCapture";
+import { ServiceWorker } from "@/components/ServiceWorker";
 import { NoellaProvider } from "@/lib/store/provider";
 import "./globals.css";
 
@@ -21,14 +23,22 @@ const literata = localFont({
 export const metadata: Metadata = {
   title: "Noella",
   description: "A wall of notes. Colour is the filing system.",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, title: "Noella", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#f4f2ed",
+  // Matches the paper and the dark canvas, so the phone chrome follows suit.
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f4f2ed" },
+    { media: "(prefers-color-scheme: dark)", color: "#0b0b0b" },
+  ],
+  viewportFit: "cover",
 };
 
-// Applied before first paint so the theme never flashes.
-const THEME_BOOT = `try{var t=localStorage.getItem("noella.theme");if(t==="dark")document.documentElement.dataset.theme="dark"}catch(e){}`;
+// Applied before first paint so the theme never flashes. Default is auto, so a
+// phone in night mode opens Noella in night mode without being told to.
+const THEME_BOOT = `try{var t=localStorage.getItem("noella.theme")||"auto";var d=t==="dark"||(t==="auto"&&matchMedia("(prefers-color-scheme: dark)").matches);if(d)document.documentElement.dataset.theme="dark"}catch(e){}`;
 
 export default function RootLayout({
   children,
@@ -45,7 +55,11 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
       </head>
       <body className="min-h-full antialiased">
-        <NoellaProvider>{children}</NoellaProvider>
+        <NoellaProvider>
+          {children}
+          <QuickCapture />
+        </NoellaProvider>
+        <ServiceWorker />
       </body>
     </html>
   );

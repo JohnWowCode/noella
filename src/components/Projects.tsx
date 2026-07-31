@@ -43,6 +43,7 @@ export function Projects() {
           <>
             <NavLink href="/">Wall</NavLink>
             <NavLink href="/today">Today</NavLink>
+            <NavLink href="/money">Bills</NavLink>
             <ThemeToggle />
           </>
         }

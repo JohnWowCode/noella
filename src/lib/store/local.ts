@@ -1,6 +1,6 @@
 import { deleteBlob, getBlob, putBlob } from "../images";
 import { detectTask, parseTags } from "../notes";
-import type { Color, NewNote, Note } from "../types";
+import { DEFAULT_SETTINGS, type Color, type NewNote, type Note, type Settings } from "../types";
 import { DEFAULT_SWATCHES } from "./defaults";
 import type { Backup, Snapshot, Store } from "./types";
 
@@ -33,6 +33,7 @@ function migrate(snapshot: Snapshot): Snapshot {
     images: Array.isArray(n.images) ? n.images : [],
     projectStatus: n.projectStatus ?? null,
     parentId: n.parentId ?? null,
+    bill: n.bill ?? null,
   }));
 
   const colors = [...snapshot.colors];
@@ -43,7 +44,11 @@ function migrate(snapshot: Snapshot): Snapshot {
     }
   }
 
-  return { notes, colors };
+  return {
+    notes,
+    colors,
+    settings: { ...DEFAULT_SETTINGS, ...(snapshot.settings ?? {}) },
+  };
 }
 
 function read(): Snapshot | null {
@@ -54,7 +59,11 @@ function read(): Snapshot | null {
     if (!Array.isArray(parsed.notes) || !Array.isArray(parsed.colors)) {
       return null;
     }
-    return { notes: parsed.notes, colors: parsed.colors };
+    return {
+      notes: parsed.notes,
+      colors: parsed.colors,
+      settings: { ...DEFAULT_SETTINGS, ...(parsed.settings ?? {}) },
+    };
   } catch {
     return null;
   }
@@ -86,7 +95,11 @@ async function dataUrlToBlob(url: string): Promise<Blob> {
 export class LocalStore implements Store {
   readonly label = "LOCAL";
 
-  private snapshot: Snapshot = { notes: [], colors: [] };
+  private snapshot: Snapshot = {
+    notes: [],
+    colors: [],
+    settings: DEFAULT_SETTINGS,
+  };
   /** Object URLs handed out for <img src>, reused so one blob maps to one URL. */
   private urls = new Map<string, string>();
 
@@ -94,7 +107,7 @@ export class LocalStore implements Store {
     const existing = read();
     this.snapshot = existing
       ? migrate(existing)
-      : { notes: [], colors: seedColors() };
+      : { notes: [], colors: seedColors(), settings: DEFAULT_SETTINGS };
     write(this.snapshot);
     return this.clone();
   }
@@ -114,6 +127,7 @@ export class LocalStore implements Store {
       images: input.images ?? [],
       projectStatus: null,
       parentId: input.parentId ?? null,
+      bill: null,
       // A step is a thing to do, so it arrives checkable.
       isTask: isTask || input.parentId != null,
       doneAt: done ? now : null,
@@ -179,6 +193,12 @@ export class LocalStore implements Store {
     return { ...next };
   }
 
+  async updateSettings(patch: Partial<Settings>): Promise<Settings> {
+    this.snapshot.settings = { ...this.snapshot.settings, ...patch };
+    write(this.snapshot);
+    return { ...this.snapshot.settings };
+  }
+
   async saveImage(id: string, blob: Blob): Promise<void> {
     await putBlob(id, blob);
   }
@@ -207,6 +227,7 @@ export class LocalStore implements Store {
       exportedAt: new Date().toISOString(),
       notes: this.snapshot.notes,
       colors: this.snapshot.colors,
+      settings: this.snapshot.settings,
       images,
     };
   }
@@ -230,6 +251,7 @@ export class LocalStore implements Store {
     this.snapshot = migrate({
       notes: backup.notes ?? [],
       colors: backup.colors ?? seedColors(),
+      settings: backup.settings ?? DEFAULT_SETTINGS,
     });
     write(this.snapshot);
     return this.clone();
@@ -248,6 +270,7 @@ export class LocalStore implements Store {
     return {
       notes: this.snapshot.notes.map((n) => ({ ...n })),
       colors: this.snapshot.colors.map((c) => ({ ...c })),
+      settings: { ...this.snapshot.settings },
     };
   }
 }

@@ -33,6 +33,7 @@ interface Store {
   updateNote(id: string, patch: Partial<Note>): Promise<Note>;
   deleteNote(id: string): Promise<void>;
   updateColor(id: string, patch: Partial<Color>): Promise<Color>;
+  updateSettings(patch: Partial<Settings>): Promise<Settings>;
   imageUrl(id: string): Promise<string | null>;
   saveImage(id: string, blob: Blob): Promise<void>;
   export(): Promise<Backup>;
@@ -44,14 +45,15 @@ To move to Postgres, apply `supabase/migrations/0001_init.sql`, write a
 `SupabaseStore` against the same interface, and swap the one line in
 `src/lib/store/provider.tsx` that constructs `new LocalStore()`. No component
 changes. The migration already carries `owner_id`, `visibility`, RLS, full-text
-search, the `note_images` manifest and the public-read policy, so sharing later
-is a feature flag rather than a schema rewrite.
+search, the `note_images` manifest, the bill columns, a `settings` table and
+the public-read policy, so sharing later is a feature flag rather than a schema
+rewrite.
 
 ## Using it
 
 | Key | |
 |---|---|
-| `n` | jump to the compose box |
+| `n` | compose box on the wall, capture overlay anywhere else |
 | `⌘/Ctrl + Enter` | save |
 | `⌘/Ctrl + 1`–`9` | file into that world (`⌘0` clears) |
 | `1`–`9` | pick a world and start typing |
@@ -80,6 +82,8 @@ Put the ones you reach for most in the first nine.
   button shows what's in there.
 - The **tag index** under the filter row lists every tag by weight — the only
   place you can see the whole cross-cut at once.
+- Drafts are written to localStorage on every keystroke. Closing the tab
+  mid-thought loses nothing.
 
 ## Projects
 
@@ -107,8 +111,48 @@ somewhere to put steps.
 The wall's `Projects n` filter narrows to just projects. Nothing about this is
 a separate system — search, colour, archive and export all work on projects and
 steps exactly as they do on any other note.
-- Drafts are written to localStorage on every keystroke. Closing the tab
-  mid-thought loses nothing.
+
+## Bills
+
+Same pattern: **a bill is a note you promoted.** Hit `Bill` on a card, set an
+amount, how often, and when. Rent lives on the wall with everything else.
+
+- Cadence is `monthly` (a day of the month), `weekly`, `yearly` or `once`.
+  Monthly on the 31st lands on the last day of shorter months rather than
+  skipping them.
+- **Nothing is expanded into rows.** A bill records the *periods* it has been
+  settled for — `2026-07` — so next month resets itself and the store never
+  accumulates twelve copies of rent a year.
+- **`/money`** shows what you're committed to every month, what's still owed
+  right now, and how many are late. Pay from the row.
+- **Today** lists what wants money in the next seven days, plus anything late.
+  Bills on **autopay** are excluded — they're money you're committed to, not a
+  thing to do.
+- Adding "rent, 3rd of the month" on the 30th does **not** announce that you're
+  already late for this month. A bill can only have missed periods that fell
+  due after you wrote it down.
+- One currency per wall, set at the bottom of `/money`.
+
+It is not a budgeting app: no categories (colour already does that), no charts,
+no reconciliation, no bank connection.
+
+## Capture from anywhere
+
+- The **`+ Note`** button sits in the corner of every screen, and `n` opens it
+  from anywhere except the wall, where `n` jumps to the compose box instead.
+- Paste or drop an image straight into it.
+- **Install it.** Noella ships a web app manifest and a service worker, so it
+  goes on a phone home screen, opens without browser chrome, and works with no
+  connection — the data was already local.
+- Once installed it registers as a **share target**: share a link or some text
+  from any app, pick Noella, and the capture box opens prefilled.
+
+## Night mode
+
+The theme button cycles `auto → light → dark`. **Auto** follows your system, so
+a phone that switches to dark at sunset takes Noella with it, and a change to
+the OS setting reaches an open tab live. The choice is remembered and applied
+before first paint, so there's no flash.
 
 ## Design rules
 
@@ -137,16 +181,21 @@ no fake physics.
 
 ```
 src/
-  app/            layout (fonts, theme boot), / (Wall), /projects, /today
+  app/            layout (fonts, theme boot, PWA), / (Wall),
+                  /projects, /money, /today
   fonts/          vendored Literata variable woff2 + OFL licence
-  components/     Wall, Compose, NoteCard, NoteImages, Swatch,
-                  TagIndex, DataMenu, Projects, ProjectPanel, Today, Chrome
+  components/     Wall, Compose, QuickCapture, NoteCard, NoteImages,
+                  Swatch, TagIndex, DataMenu, Projects, ProjectPanel,
+                  Money, BillPanel, Today, Chrome
   lib/
     notes.ts      hashtag + task-marker parsing, search matching
     projects.ts   status ladder, steps, progress, next action
+    money.ts      bill recurrence, periods, what is owed now
+    clock.ts      today as a stable snapshot, local calendar days
     images.ts     downscale/encode + IndexedDB blob store
     format.ts     seq labels, absolute timestamps
     store/        Store interface, LocalStore, React provider
+public/           manifest, service worker, icons
 supabase/
   migrations/     Postgres schema, not yet applied
 docs/PLAN.md      scope, phases, what is deliberately left out

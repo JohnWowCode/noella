@@ -118,6 +118,7 @@ export function Wall() {
                          outline-none placeholder:text-mute focus:w-48"
             />
             <NavLink href="/projects">Projects</NavLink>
+            <NavLink href="/money">Bills</NavLink>
             <NavLink href="/today">Today</NavLink>
             <ThemeToggle />
           </>

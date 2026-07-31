@@ -1,18 +1,60 @@
 "use client";
 
-/**
- * No React state: the label is picked by CSS from the `data-theme` attribute
- * the boot script already applied. That keeps server and client markup
- * identical while always showing the truth.
- */
+import { useEffect, useState } from "react";
+
+export type ThemeChoice = "auto" | "light" | "dark";
+
+const KEY = "noella.theme";
+const ORDER: ThemeChoice[] = ["auto", "light", "dark"];
+
+/** Auto follows the OS, so night mode arrives when your phone's does. */
+export function applyTheme(choice: ThemeChoice): void {
+  const root = document.documentElement;
+  const dark =
+    choice === "dark" ||
+    (choice === "auto" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches);
+  if (dark) root.dataset.theme = "dark";
+  else delete root.dataset.theme;
+}
+
 export function ThemeToggle() {
-  function flip() {
-    const root = document.documentElement;
-    const next = root.dataset.theme === "dark" ? "light" : "dark";
-    if (next === "dark") root.dataset.theme = "dark";
-    else delete root.dataset.theme;
+  const [choice, setChoice] = useState<ThemeChoice>("auto");
+
+  // The stored choice is read after mount so the markup matches the server;
+  // the boot script in the layout has already painted the right colours.
+  useEffect(() => {
+    let live = true;
+    const stored = (() => {
+      try {
+        return localStorage.getItem(KEY) as ThemeChoice | null;
+      } catch {
+        return null;
+      }
+    })();
+    Promise.resolve().then(() => {
+      if (live && stored && ORDER.includes(stored)) setChoice(stored);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  // In auto, a change to the OS setting has to reach the page live.
+  useEffect(() => {
+    if (choice !== "auto") return;
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const sync = () => applyTheme("auto");
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, [choice]);
+
+  function cycle() {
+    const next = ORDER[(ORDER.indexOf(choice) + 1) % ORDER.length];
+    setChoice(next);
+    applyTheme(next);
     try {
-      localStorage.setItem("noella.theme", next);
+      localStorage.setItem(KEY, next);
     } catch {
       // Preference just won't persist.
     }
@@ -21,12 +63,12 @@ export function ThemeToggle() {
   return (
     <button
       type="button"
-      onClick={flip}
-      aria-label="Toggle theme"
+      onClick={cycle}
+      aria-label={`Theme: ${choice}. Click to change.`}
+      title="Auto follows your system"
       className="label border border-rule px-2.5 py-2 hover:bg-ink hover:text-paper"
     >
-      <span className="dark:hidden">Light</span>
-      <span className="hidden dark:inline">Dark</span>
+      {choice}
     </button>
   );
 }

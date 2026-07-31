@@ -1,7 +1,16 @@
 import type { NoteImage } from "./images";
+import type { Bill } from "./money";
 import type { ProjectStatus } from "./projects";
 
 export type Visibility = "private" | "unlisted" | "public";
+
+/** App-wide preferences. Travels with the wall in an export. */
+export interface Settings {
+  /** Symbol shown before every amount. One currency per wall is enough. */
+  currency: string;
+}
+
+export const DEFAULT_SETTINGS: Settings = { currency: "$" };
 
 /** A colour is a world. Naming it is optional and always. */
 export interface Color {
@@ -29,6 +38,8 @@ export interface Note {
   projectStatus: ProjectStatus | null;
   /** Set on a step: the id of the project note it belongs to. */
   parentId: string | null;
+  /** Non-null means this note is a bill. Recurrence, not a row per month. */
+  bill: Bill | null;
   isTask: boolean;
   doneAt: string | null;
   pinned: boolean;

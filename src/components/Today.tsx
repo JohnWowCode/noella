@@ -1,7 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useSyncExternalStore } from "react";
+import { useMemo } from "react";
+import { daysBetween, fromKey, useTodayKey } from "@/lib/clock";
+import {
+  billLines,
+  formatMoney,
+  togglePaid,
+  type BillLine,
+} from "@/lib/money";
 import {
   nextActionOf,
   progressOf,
@@ -11,21 +18,14 @@ import {
 } from "@/lib/projects";
 import { useNoella } from "@/lib/store/provider";
 import type { Note } from "@/lib/types";
-import { Progress } from "./ProjectPanel";
-
-const DAY_MS = 86_400_000;
-
-// The clock is an external system, so the impure read belongs in a snapshot
-// rather than in render. It never changes within a session.
-const neverChanges = () => () => {};
-const dayOnClient = () => Math.floor(Date.now() / DAY_MS);
-const dayOnServer = () => 0;
 import { Footer, Header, NavLink } from "./Chrome";
 import { NoteCard } from "./NoteCard";
+import { Progress } from "./ProjectPanel";
 import { ThemeToggle } from "./ThemeToggle";
 
 export function Today() {
-  const { ready, notes } = useNoella();
+  const { ready, notes, settings } = useNoella();
+  const todayKey = useTodayKey();
 
   // One next step per active project. This is the executable list: if you only
   // did these, every project you called active would move today.
@@ -39,6 +39,19 @@ export function Today() {
         }),
     [notes],
   );
+
+  // Bills wanting money soon. Autopay ones are excluded: they are money you
+  // are committed to, not a thing to do.
+  const due = useMemo(() => {
+    if (!todayKey) return [];
+    return billLines(notes, fromKey(todayKey)).filter(
+      (l) =>
+        !l.dueSettled &&
+        !l.bill.autopay &&
+        l.dueKey !== null &&
+        daysBetween(todayKey, l.dueKey) <= 7,
+    );
+  }, [notes, todayKey]);
 
   // Loose tasks only — steps belong to their project's line above.
   const open = useMemo(
@@ -60,8 +73,6 @@ export function Today() {
     [notes],
   );
 
-  const day = useSyncExternalStore(neverChanges, dayOnClient, dayOnServer);
-
   // One old note, chosen by the day so it stays put until tomorrow. Anything
   // already listed above is excluded — resurfacing should return something you
   // had forgotten, not repeat what you are looking at.
@@ -72,11 +83,15 @@ export function Today() {
         !n.pinned &&
         n.parentId === null &&
         n.projectStatus === null &&
+        n.bill === null &&
         !(n.isTask && n.doneAt === null),
     );
-    if (older.length === 0) return null;
-    return older[day % older.length];
-  }, [notes, day]);
+    if (older.length === 0 || !todayKey) return null;
+    // Any stable function of the date works; this one just has to not move
+    // until tomorrow.
+    const seed = [...todayKey].reduce((n, ch) => n * 31 + ch.charCodeAt(0), 7);
+    return older[Math.abs(seed) % older.length];
+  }, [notes, todayKey]);
 
   return (
     <div className="flex min-h-full flex-col">
@@ -85,6 +100,7 @@ export function Today() {
           <>
             <NavLink href="/">Wall</NavLink>
             <NavLink href="/projects">Projects</NavLink>
+            <NavLink href="/money">Bills</NavLink>
             <ThemeToggle />
           </>
         }
@@ -104,6 +120,17 @@ export function Today() {
             >
               {nextActions.map((entry) => (
                 <NextAction key={entry.project.id} {...entry} />
+              ))}
+            </Block>
+
+            <Block title="Due" count={due.length} empty="Nothing due this week.">
+              {due.map((line) => (
+                <DueBill
+                  key={line.note.id}
+                  line={line}
+                  todayKey={todayKey}
+                  currency={settings.currency}
+                />
               ))}
             </Block>
 
@@ -193,6 +220,74 @@ function NextAction({
           </span>
         </span>
       )}
+    </article>
+  );
+}
+
+/** A bill wanting money this week, payable from here. */
+function DueBill({
+  line,
+  todayKey,
+  currency,
+}: {
+  line: BillLine;
+  todayKey: string;
+  currency: string;
+}) {
+  const { colorOf, patchNote } = useNoella();
+  const { note, bill, duePeriod, dueKey, overdue } = line;
+  const color = colorOf(note);
+  const onColor = color !== null;
+  const days = dueKey ? daysBetween(todayKey, dueKey) : null;
+
+  return (
+    <article
+      className={`flex flex-wrap items-center gap-x-4 gap-y-3 border border-rule px-5 py-4 ${
+        onColor ? "" : "bg-field"
+      }`}
+      style={onColor ? { backgroundColor: color.hex, color: "#111111" } : undefined}
+    >
+      <span className="min-w-40 flex-1">
+        <Link
+          href={`/#note-${note.id}`}
+          className="prose-note block text-[16px] leading-snug hover:underline"
+        >
+          {projectTitle(note)}
+        </Link>
+        <span
+          className={`label mt-1.5 inline-block px-1.5 py-0.5 ${
+            overdue
+              ? onColor
+                ? "bg-[#111] text-white"
+                : "bg-ink text-paper"
+              : "opacity-65"
+          }`}
+        >
+          {days === null
+            ? "—"
+            : days < 0
+              ? `${-days}d late`
+              : days === 0
+                ? "due today"
+                : `in ${days}d`}
+        </span>
+      </span>
+
+      <span className="prose-note text-[19px] leading-none tabular-nums">
+        {formatMoney(bill.amount, currency)}
+      </span>
+
+      <button
+        type="button"
+        onClick={() => patchNote(note.id, { bill: togglePaid(bill, duePeriod) })}
+        className={`label border border-current px-2.5 py-1.5 ${
+          onColor
+            ? "hover:bg-[#111] hover:text-white"
+            : "hover:bg-ink hover:text-paper"
+        }`}
+      >
+        Pay
+      </button>
     </article>
   );
 }

@@ -1,8 +1,9 @@
-import type { Color, NewNote, Note } from "../types";
+import type { Color, NewNote, Note, Settings } from "../types";
 
 export interface Snapshot {
   notes: Note[];
   colors: Color[];
+  settings: Settings;
 }
 
 /** A whole wall, images inlined as data URLs. What export writes and import reads. */
@@ -12,6 +13,7 @@ export interface Backup {
   exportedAt: string;
   notes: Note[];
   colors: Color[];
+  settings?: Settings;
   /** image id -> data URL. Absent means the note renders without its images. */
   images: Record<string, string>;
 }
@@ -29,6 +31,7 @@ export interface Store {
   updateNote(id: string, patch: Partial<Note>): Promise<Note>;
   deleteNote(id: string): Promise<void>;
   updateColor(id: string, patch: Partial<Color>): Promise<Color>;
+  updateSettings(patch: Partial<Settings>): Promise<Settings>;
 
   /** Resolves an image id to something an <img src> accepts. */
   imageUrl(id: string): Promise<string | null>;

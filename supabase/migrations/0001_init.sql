@@ -46,6 +46,17 @@ create table public.notes (
   -- Set on a step: the project note it belongs to. Deleting a project takes
   -- its steps with it, because a step alone means nothing.
   parent_id   uuid references public.notes (id) on delete cascade,
+
+  -- A bill is a note you promoted. Recurrence is never expanded into rows:
+  -- bill_paid_periods holds the buckets already settled ('2026-07'), so next
+  -- month resets itself. A payments table is the natural upgrade if this ever
+  -- needs amounts-actually-paid or a history.
+  bill_amount   numeric(12, 2) check (bill_amount >= 0),
+  bill_cadence  text check (bill_cadence in ('monthly', 'weekly', 'yearly', 'once')),
+  -- Read per cadence: day of month, day of week, 'MM-DD', or 'YYYY-MM-DD'.
+  bill_due_on   text,
+  bill_paid_periods text[] not null default '{}',
+  bill_autopay  boolean not null default false,
   pinned      boolean not null default false,
   visibility  text not null default 'private'
               check (visibility in ('private', 'unlisted', 'public')),
@@ -58,7 +69,14 @@ create table public.notes (
   unique (owner_id, seq),
   -- A project cannot also be somebody's step; the tree stays one level deep.
   constraint notes_project_or_step
-    check (project_status is null or parent_id is null)
+    check (project_status is null or parent_id is null),
+  -- A bill is either fully described or not a bill at all.
+  constraint notes_bill_complete
+    check (
+      (bill_amount is null and bill_cadence is null and bill_due_on is null)
+      or (bill_amount is not null and bill_cadence is not null
+          and bill_due_on is not null)
+    )
 );
 
 create index notes_owner_created_idx on public.notes (owner_id, created_at desc);
@@ -66,6 +84,15 @@ create index notes_parent_idx on public.notes (parent_id, created_at)
   where parent_id is not null;
 create index notes_project_idx on public.notes (owner_id, project_status)
   where project_status is not null;
+create index notes_bill_idx on public.notes (owner_id)
+  where bill_amount is not null;
+
+-- App-wide preferences, one row per owner. Travels with an export.
+create table public.settings (
+  owner_id uuid primary key references auth.users (id) on delete cascade,
+  currency text not null default '$',
+  updated_at timestamptz not null default now()
+);
 create index notes_search_idx        on public.notes using gin (search_vector);
 create index notes_tags_idx          on public.notes using gin (tags);
 create index notes_color_idx         on public.notes (color_id);
@@ -184,6 +211,12 @@ create trigger seed_default_colors_on_signup
 alter table public.notes       enable row level security;
 alter table public.colors      enable row level security;
 alter table public.note_images enable row level security;
+alter table public.settings    enable row level security;
+
+create policy settings_owner_all on public.settings
+  for all
+  using (owner_id = auth.uid())
+  with check (owner_id = auth.uid());
 
 create policy note_images_owner_all on public.note_images
   for all
