@@ -119,13 +119,13 @@ export function Wall() {
             />
             <NavLink href="/projects">Projects</NavLink>
             <NavLink href="/money">Bills</NavLink>
-            <NavLink href="/today">Today</NavLink>
+            <NavLink href="/">Today</NavLink>
             <ThemeToggle />
           </>
         }
       />
 
-      <main className="mx-auto w-full max-w-3xl flex-1 px-5 pt-8 sm:px-6">
+      <main className="mx-auto w-full max-w-3xl flex-1 px-5 pt-8 sm:px-6 pb-28">
         <Compose
           colorId={composeColor}
           onColorId={setComposeColor}

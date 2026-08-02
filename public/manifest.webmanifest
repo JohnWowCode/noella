@@ -19,7 +19,7 @@
     "params": { "title": "title", "text": "text", "url": "url" }
   },
   "shortcuts": [
-    { "name": "Today", "url": "/today" },
+    { "name": "The wall", "url": "/wall" },
     { "name": "Projects", "url": "/projects" },
     { "name": "Bills", "url": "/money" }
   ]

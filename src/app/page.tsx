@@ -1,5 +1,5 @@
-import { Wall } from "@/components/Wall";
+import { Focus } from "@/components/Focus";
 
 export default function Page() {
-  return <Wall />;
+  return <Focus />;
 }

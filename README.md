@@ -1,8 +1,16 @@
 # Noella
 
-A wall of notes where **colour is the filing system**. Type the thing, optionally
-tap a swatch, done. A colour is a world — "army world" is orange — so you can say
-what a note *is* without writing a sentence about what it is.
+An instrument for **seeing whether you are moving**, for people with more
+creative projects than hours.
+
+The front door asks one question — *what moves today* — and answers it with a
+single next step, the projects you have quietly stopped working on, and eight
+weeks of evidence about whether any of this is working.
+
+Behind it is a wall of notes where **colour is the filing system**. Type the
+thing, optionally tap a swatch, done. A colour is a world — "army world" is
+orange — so you can say what a note *is* without writing a sentence about what
+it is. Ideas start there and graduate into projects.
 
 ```bash
 npm install
@@ -84,6 +92,24 @@ Put the ones you reach for most in the first nine.
   place you can see the whole cross-cut at once.
 - Drafts are written to localStorage on every keystroke. Closing the tab
   mid-thought loses nothing.
+
+## Today — the front door
+
+- **The move.** The next unfinished step on your focused project, in the
+  project's colour, at a size nothing else on the screen is allowed to match.
+  One box to tick.
+- **Also active.** The other things you called active, each with its next step,
+  tickable in place. `Focus` swaps which one is today's.
+- **Drifting.** Any project quiet for 14+ days, with three answers: revive,
+  park, drop. A project you called *active* but haven't touched in a fortnight
+  is moved out of the active list and into here — that confrontation is the
+  point. There is no dismiss, because leaving it unanswered is the only wrong
+  answer.
+- **The ledger.** Eight weeks of days, filled on days you finished something. A
+  move is a completed step — never a captured note, because capture is easy and
+  would make the number flattering and useless.
+- **The stance:** three active projects. Not enforced — you're an adult — but
+  never hidden either, because too many actives is the actual disease.
 
 ## Projects
 

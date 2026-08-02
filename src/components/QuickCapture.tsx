@@ -83,7 +83,7 @@ export function QuickCapture() {
       if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
       // On the wall `n` focuses the compose box, which is already the fastest
       // path there; everywhere else it opens this.
-      if (e.key === "n" && window.location.pathname !== "/") {
+      if (e.key === "n" && window.location.pathname !== "/wall") {
         e.preventDefault();
         setOpen(true);
       }

@@ -61,6 +61,43 @@ Added after the first pass, on request:
   route, and a PWA manifest plus service worker so it installs to a phone,
   runs offline, and registers as a share target that opens prefilled.
 
+## The rethink
+
+The plan above named one thing that matters — *time from thought to saved* —
+and it was the wrong one. Capture was never the bottleneck; capture is easy.
+Notes apps die as **landfills**, and for someone running several creative
+projects at once the scarce thing is not starting, it is **finishing**.
+
+So the app's job changed:
+
+> Noella is an instrument for seeing whether you are moving, and for making
+> you choose what to move. The wall is where thinking goes. It is a bad thing
+> to open every morning, because a feed of everything answers no question.
+
+What follows from that:
+
+- **The front door is `/`, not the wall.** One screen, one question: what moves
+  today. The wall moved to `/wall` and became what a wall is actually good for
+  — re-reading old thinking.
+- **Projects are the spine, not a bolt-on.** Idea → project → shipped is the
+  path through the app, and the front door shows exactly one next step.
+- **The app has a stance: three active projects.** Not enforced, never hidden.
+  Too many actives is the actual disease.
+- **Drift is surfaced, and killing is a feature.** Anything quiet for 14 days
+  is escalated with three answers — revive, park, drop. A project you say is
+  active but have not touched in a fortnight is moved *out* of the active list
+  and into that confrontation. Leaving it unanswered is the only wrong answer.
+- **The ledger.** Eight weeks of days, filled when you finished something. A
+  *move* is a completed step, never a captured note — capture is easy and would
+  make the number flattering and useless.
+- **Bills are subordinate.** One quiet strip on the front door. They earn a
+  place because unpaid rent is a real interruption, not because money tracking
+  is what this is for.
+
+Honest limits: no app guarantees anything. What this one does is make two
+things impossible to avoid — what you said you would do, and whether you did
+it. Everything else on the screen is in service of that or should be cut.
+
 **Two things changed during the build:**
 
 1. **Search is a live filter on the Wall, not a fourth screen.** Two routes

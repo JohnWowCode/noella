@@ -12,6 +12,8 @@ import {
   stepsOf,
   type ProjectStatus,
 } from "@/lib/projects";
+import { ACTIVE_LIMIT, quietDays } from "@/lib/momentum";
+import { useTodayKey } from "@/lib/clock";
 import { useNoella } from "@/lib/store/provider";
 import type { Note } from "@/lib/types";
 import { Footer, Header, NavLink } from "./Chrome";
@@ -24,7 +26,8 @@ import { ThemeToggle } from "./ThemeToggle";
  * reading one.
  */
 export function Projects() {
-  const { ready, notes } = useNoella();
+  const { ready, notes, settings } = useNoella();
+  const todayKey = useTodayKey();
 
   const grouped = useMemo(() => {
     const all = projectsOf(notes);
@@ -35,21 +38,31 @@ export function Projects() {
   }, [notes]);
 
   const total = grouped.reduce((n, g) => n + g.projects.length, 0);
+  const activeCount =
+    grouped.find((g) => g.status === "active")?.projects.length ?? 0;
 
   return (
     <div className="flex min-h-full flex-col">
       <Header
         right={
           <>
-            <NavLink href="/">Wall</NavLink>
-            <NavLink href="/today">Today</NavLink>
+            <NavLink href="/wall">Wall</NavLink>
+            <NavLink href="/">Today</NavLink>
             <NavLink href="/money">Bills</NavLink>
             <ThemeToggle />
           </>
         }
       />
 
-      <main className="mx-auto w-full max-w-3xl flex-1 px-5 pt-8 sm:px-6">
+      <main className="mx-auto w-full max-w-3xl flex-1 px-5 pt-8 sm:px-6 pb-28">
+        {/* The stance, stated plainly. Not enforced — you are an adult — but
+            never hidden either, because too many actives is the actual disease. */}
+        {activeCount > ACTIVE_LIMIT && (
+          <p className="label mb-6 border border-rule bg-ink px-5 py-4 text-paper">
+            {activeCount} projects are active. You can move {ACTIVE_LIMIT}. Park
+            the rest — parked is not failure, it is honesty.
+          </p>
+        )}
         {!ready ? (
           <Empty>Reading local store…</Empty>
         ) : total === 0 ? (
@@ -74,7 +87,13 @@ export function Projects() {
                 </h2>
                 <div className="flex flex-col gap-3">
                   {projects.map((p) => (
-                    <Row key={p.id} project={p} notes={notes} />
+                    <Row
+                      key={p.id}
+                      project={p}
+                      notes={notes}
+                      todayKey={todayKey}
+                      focused={settings.focusId === p.id}
+                    />
                   ))}
                 </div>
               </section>
@@ -88,8 +107,18 @@ export function Projects() {
   );
 }
 
-function Row({ project, notes }: { project: Note; notes: Note[] }) {
-  const { colorOf, patchNote } = useNoella();
+function Row({
+  project,
+  notes,
+  todayKey,
+  focused,
+}: {
+  project: Note;
+  notes: Note[];
+  todayKey: string;
+  focused: boolean;
+}) {
+  const { colorOf, patchNote, patchSettings } = useNoella();
   const color = colorOf(project);
   const steps = stepsOf(notes, project.id);
   const { done, total } = progressOf(steps);
@@ -132,11 +161,35 @@ function Row({ project, notes }: { project: Note; notes: Note[] }) {
 
       <div className="label mt-3 flex flex-wrap items-center gap-x-2.5 gap-y-2 opacity-70">
         <span>{stamp(project.createdAt)}</span>
+        {todayKey && (
+          <>
+            <span aria-hidden>·</span>
+            <span>{quietDays(notes, project, todayKey)}d quiet</span>
+          </>
+        )}
         <span aria-hidden>·</span>
         {project.tags.map((t) => (
           <span key={t}>#{t}</span>
         ))}
         <span className="ml-auto flex items-center gap-1.5">
+          {project.projectStatus === "active" && (
+            <button
+              type="button"
+              onClick={() => patchSettings({ focusId: project.id })}
+              disabled={focused}
+              className={`label border border-current px-2 py-1 ${
+                focused
+                  ? onColor
+                    ? "bg-[#111] text-white"
+                    : "bg-ink text-paper"
+                  : onColor
+                    ? "hover:bg-[#111] hover:text-white"
+                    : "hover:bg-ink hover:text-paper"
+              }`}
+            >
+              {focused ? "Today" : "Make today"}
+            </button>
+          )}
           {PROJECT_STATUSES.filter((s) => s !== project.projectStatus).map((s) => (
             <button
               key={s}
@@ -150,7 +203,7 @@ function Row({ project, notes }: { project: Note; notes: Note[] }) {
             </button>
           ))}
           <Link
-            href={`/#note-${project.id}`}
+            href={`/wall#note-${project.id}`}
             className={`label border border-current px-2 py-1 hover:opacity-100 ${
               onColor ? "hover:bg-[#111] hover:text-white" : "hover:bg-ink hover:text-paper"
             }`}

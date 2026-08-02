@@ -8,9 +8,11 @@ export type Visibility = "private" | "unlisted" | "public";
 export interface Settings {
   /** Symbol shown before every amount. One currency per wall is enough. */
   currency: string;
+  /** The one project today is about. Everything else waits its turn. */
+  focusId: string | null;
 }
 
-export const DEFAULT_SETTINGS: Settings = { currency: "$" };
+export const DEFAULT_SETTINGS: Settings = { currency: "$", focusId: null };
 
 /** A colour is a world. Naming it is optional and always. */
 export interface Color {

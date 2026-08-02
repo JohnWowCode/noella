@@ -8,7 +8,7 @@
  */
 
 const VERSION = "noella-v1";
-const SHELL = ["/", "/today", "/projects", "/money"];
+const SHELL = ["/", "/wall", "/projects", "/money"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

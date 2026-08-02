@@ -41,15 +41,15 @@ export function Money() {
       <Header
         right={
           <>
-            <NavLink href="/">Wall</NavLink>
+            <NavLink href="/wall">Wall</NavLink>
             <NavLink href="/projects">Projects</NavLink>
-            <NavLink href="/today">Today</NavLink>
+            <NavLink href="/">Today</NavLink>
             <ThemeToggle />
           </>
         }
       />
 
-      <main className="mx-auto w-full max-w-3xl flex-1 px-5 pt-8 sm:px-6">
+      <main className="mx-auto w-full max-w-3xl flex-1 px-5 pt-8 sm:px-6 pb-28">
         {!ready || !todayKey ? (
           <Empty>Reading local store…</Empty>
         ) : lines.length === 0 ? (
@@ -151,7 +151,7 @@ function Row({ line, todayKey }: { line: BillLine; todayKey: string }) {
     >
       <span className="min-w-40 flex-1">
         <Link
-          href={`/#note-${note.id}`}
+          href={`/wall#note-${note.id}`}
           className="prose-note block text-[17px] leading-snug hover:underline"
         >
           {projectTitle(note)}
