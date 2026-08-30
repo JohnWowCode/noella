@@ -8,11 +8,9 @@ export type Visibility = "private" | "unlisted" | "public";
 export interface Settings {
   /** Symbol shown before every amount. One currency per wall is enough. */
   currency: string;
-  /** The one project today is about. Everything else waits its turn. */
-  focusId: string | null;
 }
 
-export const DEFAULT_SETTINGS: Settings = { currency: "$", focusId: null };
+export const DEFAULT_SETTINGS: Settings = { currency: "$" };
 
 /** A colour is a world. Naming it is optional and always. */
 export interface Color {
@@ -42,6 +40,12 @@ export interface Note {
   parentId: string | null;
   /** Non-null means this note is a bill. Recurrence, not a row per month. */
   bill: Bill | null;
+  /**
+   * Hand-set priority among siblings — projects among projects, steps within
+   * their project. Lower is sooner. Position 1 among the active projects is
+   * today's move.
+   */
+  order: number;
   isTask: boolean;
   doneAt: string | null;
   pinned: boolean;

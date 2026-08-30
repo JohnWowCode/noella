@@ -22,13 +22,21 @@ interface Props {
 }
 
 export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
-  const { notes, colorOf, patchNote, removeNote, attachImage, settings } =
-    useNoella();
+  const {
+    notes,
+    colors,
+    colorOf,
+    patchNote,
+    removeNote,
+    attachImage,
+    settings,
+  } = useNoella();
   const todayKey = useTodayKey();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(note.body);
   const [viewing, setViewing] = useState<number | null>(null);
   const [moving, setMoving] = useState(false);
+  const [recolouring, setRecolouring] = useState(false);
   const areaRef = useRef<HTMLTextAreaElement>(null);
 
   const color = colorOf(note);
@@ -175,6 +183,7 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
           <Action onClick={() => patchNote(note.id, { pinned: !note.pinned })}>
             {note.pinned ? "Unpin" : "Pin"}
           </Action>
+          <Action onClick={() => setRecolouring((v) => !v)}>Colour</Action>
           {!bill && (
             <Action
               onClick={() =>
@@ -238,6 +247,38 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
           </Action>
         </span>
       </header>
+
+      {recolouring && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {colors.map((c, i) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => {
+                patchNote(note.id, {
+                  colorId: c.id === note.colorId ? null : c.id,
+                });
+                setRecolouring(false);
+              }}
+              aria-label={`File in ${c.name ?? `World ${i + 1}`}`}
+              className={`h-7 w-7 border border-rule ${
+                c.id === note.colorId ? "ring-2 ring-inset ring-ink" : ""
+              }`}
+              style={{ backgroundColor: c.hex }}
+            />
+          ))}
+          <button
+            type="button"
+            onClick={() => {
+              patchNote(note.id, { colorId: null });
+              setRecolouring(false);
+            }}
+            className="label border border-current px-2 py-1.5 hover:bg-[#111] hover:text-white"
+          >
+            None
+          </button>
+        </div>
+      )}
 
       {moving && (
         <div className="label mt-3 flex flex-wrap items-center gap-2">

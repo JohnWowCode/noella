@@ -94,6 +94,18 @@ What follows from that:
   place because unpaid rent is a real interruption, not because money tracking
   is what this is for.
 
+Two things followed from using it:
+
+- **Priority is a list, not a setting.** `focusId` was a second place the
+  answer to "what am I doing" could live, and it could disagree with the order
+  on screen. Projects now carry a hand-set position, and position 01 among the
+  active ones *is* today's move — one concept instead of two.
+- **Jotting needed somewhere to land.** Capture was frictionless but a note
+  with no world just dissolved into the feed, and there was no way to give it
+  one afterwards — a note's colour could not be changed at all. Now anything
+  unfiled is counted on the front door and filterable on the wall, and `Colour`
+  files it whenever you get round to it.
+
 Honest limits: no app guarantees anything. What this one does is make two
 things impossible to avoid — what you said you would do, and whether you did
 it. Everything else on the screen is in service of that or should be cut.

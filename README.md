@@ -99,7 +99,7 @@ Put the ones you reach for most in the first nine.
   project's colour, at a size nothing else on the screen is allowed to match.
   One box to tick.
 - **Also active.** The other things you called active, each with its next step,
-  tickable in place. `Focus` swaps which one is today's.
+  tickable in place. `Rank` takes you to the list that decides the order.
 - **Drifting.** Any project quiet for 14+ days, with three answers: revive,
   park, drop. A project you called *active* but haven't touched in a fortnight
   is moved out of the active list and into here — that confrontation is the
@@ -108,8 +108,33 @@ Put the ones you reach for most in the first nine.
 - **The ledger.** Eight weeks of days, filled on days you finished something. A
   move is a completed step — never a captured note, because capture is easy and
   would make the number flattering and useless.
+- **Unfiled.** A count of everything you jotted without giving it a world. It
+  is the only nag on the screen, and it exists so dumping a thought is safe.
 - **The stance:** three active projects. Not enforced — you're an adult — but
   never hidden either, because too many actives is the actual disease.
+
+## Priorities
+
+`/projects` is a ranked list, not a pile. Every project shows its position —
+`01`, `02`, `03` — and moves with `↑` / `↓`.
+
+**Position 01 among the active projects is today's move.** There is no separate
+"focus" setting to drift out of sync with the order: re-ranking and choosing
+what to work on are the same gesture. Reviving a drifting project puts it on
+top, because that is what reviving means.
+
+Steps inside a project rank the same way, so "what's next" is what you decided
+was next rather than whatever you happened to type first.
+
+## Jotting
+
+Type it and go. No colour, no project, no title, no decision:
+
+- `+ Note` on every screen, or `n` from anywhere but the wall.
+- Anything you jot without picking a world lands in **Unfiled**, counted on the
+  front door and filterable on the wall. Nothing dissolves into the feed.
+- File it later: `Colour` on any card assigns or clears its world after the
+  fact, and `Project` / `File` promote it or put it under something.
 
 ## Projects
 

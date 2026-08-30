@@ -34,6 +34,7 @@ function migrate(snapshot: Snapshot): Snapshot {
     projectStatus: n.projectStatus ?? null,
     parentId: n.parentId ?? null,
     bill: n.bill ?? null,
+    order: typeof n.order === "number" ? n.order : 0,
   }));
 
   const colors = [...snapshot.colors];
@@ -128,6 +129,10 @@ export class LocalStore implements Store {
       projectStatus: null,
       parentId: input.parentId ?? null,
       bill: null,
+      // New steps land at the bottom of their project's list.
+      order: input.parentId
+        ? this.snapshot.notes.filter((n) => n.parentId === input.parentId).length
+        : 0,
       // A step is a thing to do, so it arrives checkable.
       isTask: isTask || input.parentId != null,
       doneAt: done ? now : null,

@@ -19,6 +19,7 @@ import {
   projectTitle,
   projectsOf,
   stepsOf,
+  unfiled,
 } from "@/lib/projects";
 import { useNoella } from "@/lib/store/provider";
 import type { Note } from "@/lib/types";
@@ -39,7 +40,7 @@ const MONTH = ["January", "February", "March", "April", "May", "June", "July",
  * moving, or a loop you have quietly stopped working on.
  */
 export function Focus() {
-  const { ready, notes, settings, patchSettings } = useNoella();
+  const { ready, notes, settings } = useNoella();
   const todayKey = useTodayKey();
 
   const active = useMemo(
@@ -56,10 +57,10 @@ export function Focus() {
 
   // A project you called active but haven't touched in a fortnight belongs in
   // Drifting, not here — that is the confrontation the screen exists for.
+  // projectsOf() is already in priority order, so the first one is today's.
   const moving = active.filter((p) => !driftIds.has(p.id));
-  const focus =
-    moving.find((p) => p.id === settings.focusId) ?? moving[0] ?? null;
-  const others = moving.filter((p) => p.id !== focus?.id);
+  const focus = moving[0] ?? null;
+  const others = moving.slice(1);
 
   const cells = useMemo(
     () => (todayKey ? ledger(notes, todayKey) : []),
@@ -76,6 +77,7 @@ export function Focus() {
     );
   }, [notes, todayKey]);
 
+  const loose = useMemo(() => unfiled(notes), [notes]);
   const days = streak(cells);
   const week = movesThisWeek(cells);
   const today = todayKey ? fromKey(todayKey) : null;
@@ -127,12 +129,7 @@ export function Focus() {
                 </h2>
                 <div className="flex flex-col gap-2">
                   {others.map((p) => (
-                    <AlsoActive
-                      key={p.id}
-                      project={p}
-                      notes={notes}
-                      onFocus={() => patchSettings({ focusId: p.id })}
-                    />
+                    <AlsoActive key={p.id} project={p} notes={notes} />
                   ))}
                 </div>
               </section>
@@ -183,6 +180,18 @@ export function Focus() {
                   ))}
                 </div>
               </section>
+            )}
+
+            {loose.length > 0 && (
+              <Link
+                href="/wall"
+                className="label mt-10 flex items-center gap-3 border border-rule bg-field px-4 py-3 text-mute hover:bg-ink hover:text-paper"
+              >
+                <span>{loose.length} unfiled</span>
+                <span className="ml-auto normal-case tracking-normal">
+                  jotted, no world yet →
+                </span>
+              </Link>
             )}
 
             <Ledger cells={cells} />
@@ -272,15 +281,7 @@ function TheMove({ project, notes }: { project: Note; notes: Note[] }) {
   );
 }
 
-function AlsoActive({
-  project,
-  notes,
-  onFocus,
-}: {
-  project: Note;
-  notes: Note[];
-  onFocus: () => void;
-}) {
+function AlsoActive({ project, notes }: { project: Note; notes: Note[] }) {
   const { colorOf, patchNote } = useNoella();
   const color = colorOf(project);
   const step = nextActionOf(stepsOf(notes, project.id));
@@ -316,13 +317,12 @@ function AlsoActive({
           {step ? step.body : "No next step"}
         </span>
       </span>
-      <button
-        type="button"
-        onClick={onFocus}
+      <Link
+        href="/projects"
         className="label shrink-0 border border-rule px-2 py-1 hover:bg-ink hover:text-paper"
       >
-        Focus
-      </button>
+        Rank
+      </Link>
     </article>
   );
 }
@@ -332,7 +332,7 @@ function AlsoActive({
  * unanswered is the only bad one, which is why there is no dismiss.
  */
 function Drifting({ project, quiet }: { project: Note; quiet: number }) {
-  const { patchNote, patchSettings } = useNoella();
+  const { patchNote } = useNoella();
 
   return (
     <article className="flex flex-col gap-3 border border-rule bg-field px-4 py-3.5 sm:flex-row sm:items-center sm:gap-x-3">
@@ -343,10 +343,9 @@ function Drifting({ project, quiet }: { project: Note; quiet: number }) {
       <span className="flex flex-wrap items-center gap-1.5">
         <button
           type="button"
-          onClick={() => {
-            patchNote(project.id, { projectStatus: "active" });
-            patchSettings({ focusId: project.id });
-          }}
+          onClick={() =>
+            patchNote(project.id, { projectStatus: "active", order: -1 })
+          }
           className="label border border-rule px-2 py-1 hover:bg-ink hover:text-paper"
         >
           Revive

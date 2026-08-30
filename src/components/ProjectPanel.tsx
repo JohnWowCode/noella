@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { PROJECT_STATUSES, progressOf, type ProjectStatus } from "@/lib/projects";
+import { reorder } from "@/lib/order";
 import { useNoella } from "@/lib/store/provider";
 import type { Note } from "@/lib/types";
 
@@ -73,7 +74,7 @@ export function ProjectPanel({
           screen and on Today, where there is no checklist. */}
       {steps.length > 0 && (
         <ul className={`mt-3 border ${line}`}>
-          {steps.map((step) => (
+          {steps.map((step, i) => (
             <li
               key={step.id}
               className={`group/step flex items-start gap-3 border-b ${line} px-3 py-2.5 last:border-b-0`}
@@ -97,13 +98,41 @@ export function ProjectPanel({
               >
                 {step.body}
               </span>
-              <button
-                type="button"
-                onClick={() => removeNote(step.id)}
-                className="label shrink-0 opacity-0 underline decoration-1 underline-offset-2 transition-opacity group-hover/step:opacity-70 focus:opacity-100"
-              >
-                Del
-              </button>
+              <span className="flex shrink-0 items-center gap-2 opacity-0 transition-opacity group-hover/step:opacity-70 focus-within:opacity-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    for (const patch of reorder(steps, step.id, -1)) {
+                      patchNote(patch.id, { order: patch.order });
+                    }
+                  }}
+                  disabled={i === 0}
+                  aria-label="Move step up"
+                  className="label disabled:opacity-30"
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    for (const patch of reorder(steps, step.id, 1)) {
+                      patchNote(patch.id, { order: patch.order });
+                    }
+                  }}
+                  disabled={i === steps.length - 1}
+                  aria-label="Move step down"
+                  className="label disabled:opacity-30"
+                >
+                  ↓
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeNote(step.id)}
+                  className="label underline decoration-1 underline-offset-2"
+                >
+                  Del
+                </button>
+              </span>
             </li>
           ))}
         </ul>

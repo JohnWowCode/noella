@@ -13,6 +13,7 @@ import {
   type ProjectStatus,
 } from "@/lib/projects";
 import { ACTIVE_LIMIT, quietDays } from "@/lib/momentum";
+import { reorder } from "@/lib/order";
 import { useTodayKey } from "@/lib/clock";
 import { useNoella } from "@/lib/store/provider";
 import type { Note } from "@/lib/types";
@@ -26,7 +27,7 @@ import { ThemeToggle } from "./ThemeToggle";
  * reading one.
  */
 export function Projects() {
-  const { ready, notes, settings } = useNoella();
+  const { ready, notes, patchNote } = useNoella();
   const todayKey = useTodayKey();
 
   const grouped = useMemo(() => {
@@ -86,13 +87,20 @@ export function Projects() {
                   <span>{projects.length}</span>
                 </h2>
                 <div className="flex flex-col gap-3">
-                  {projects.map((p) => (
+                  {projects.map((p, i) => (
                     <Row
                       key={p.id}
                       project={p}
                       notes={notes}
                       todayKey={todayKey}
-                      focused={settings.focusId === p.id}
+                      rank={i + 1}
+                      first={i === 0}
+                      last={i === projects.length - 1}
+                      onMove={(delta) => {
+                        for (const patch of reorder(projects, p.id, delta)) {
+                          patchNote(patch.id, { order: patch.order });
+                        }
+                      }}
                     />
                   ))}
                 </div>
@@ -111,14 +119,20 @@ function Row({
   project,
   notes,
   todayKey,
-  focused,
+  rank,
+  first,
+  last,
+  onMove,
 }: {
   project: Note;
   notes: Note[];
   todayKey: string;
-  focused: boolean;
+  rank: number;
+  first: boolean;
+  last: boolean;
+  onMove: (delta: -1 | 1) => void;
 }) {
-  const { colorOf, patchNote, patchSettings } = useNoella();
+  const { colorOf, patchNote } = useNoella();
   const color = colorOf(project);
   const steps = stepsOf(notes, project.id);
   const { done, total } = progressOf(steps);
@@ -131,6 +145,9 @@ function Row({
       style={onColor ? { backgroundColor: color.hex, color: "#111111" } : undefined}
     >
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-2">
+        <span className="label tabular-nums opacity-55">
+          {String(rank).padStart(2, "0")}
+        </span>
         <h3 className="prose-note text-[17px] leading-snug">
           {projectTitle(project)}
         </h3>
@@ -172,24 +189,41 @@ function Row({
           <span key={t}>#{t}</span>
         ))}
         <span className="ml-auto flex items-center gap-1.5">
-          {project.projectStatus === "active" && (
-            <button
-              type="button"
-              onClick={() => patchSettings({ focusId: project.id })}
-              disabled={focused}
-              className={`label border border-current px-2 py-1 ${
-                focused
-                  ? onColor
-                    ? "bg-[#111] text-white"
-                    : "bg-ink text-paper"
-                  : onColor
-                    ? "hover:bg-[#111] hover:text-white"
-                    : "hover:bg-ink hover:text-paper"
+          {project.projectStatus === "active" && rank === 1 && (
+            <span
+              className={`label px-2 py-1 ${
+                onColor ? "bg-[#111] text-white" : "bg-ink text-paper"
               }`}
             >
-              {focused ? "Today" : "Make today"}
-            </button>
+              Today
+            </span>
           )}
+          <button
+            type="button"
+            onClick={() => onMove(-1)}
+            disabled={first}
+            aria-label={`Move ${projectTitle(project)} up`}
+            className={`label border border-current px-2 py-1 disabled:opacity-30 ${
+              onColor
+                ? "enabled:hover:bg-[#111] enabled:hover:text-white"
+                : "enabled:hover:bg-ink enabled:hover:text-paper"
+            }`}
+          >
+            ↑
+          </button>
+          <button
+            type="button"
+            onClick={() => onMove(1)}
+            disabled={last}
+            aria-label={`Move ${projectTitle(project)} down`}
+            className={`label border border-current px-2 py-1 disabled:opacity-30 ${
+              onColor
+                ? "enabled:hover:bg-[#111] enabled:hover:text-white"
+                : "enabled:hover:bg-ink enabled:hover:text-paper"
+            }`}
+          >
+            ↓
+          </button>
           {PROJECT_STATUSES.filter((s) => s !== project.projectStatus).map((s) => (
             <button
               key={s}

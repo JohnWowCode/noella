@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { matches } from "@/lib/notes";
-import { isProject } from "@/lib/projects";
+import { isProject, unfiled } from "@/lib/projects";
 import { colorLabel, useNoella } from "@/lib/store/provider";
 import { Footer, Header, NavLink } from "./Chrome";
 import { Compose } from "./Compose";
@@ -20,6 +20,7 @@ export function Wall() {
   const [composeColor, setComposeColor] = useState<string | null>(null);
   const [onlyOpen, setOnlyOpen] = useState(false);
   const [onlyProjects, setOnlyProjects] = useState(false);
+  const [onlyUnfiled, setOnlyUnfiled] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
 
   const composeRef = useRef<HTMLTextAreaElement>(null);
@@ -60,6 +61,12 @@ export function Wall() {
     return () => window.removeEventListener("keydown", onKey);
   }, [colors]);
 
+  // Jotted and not yet given a home. Kept as ids so the filter stays cheap.
+  const unfiledIds = useMemo(
+    () => new Set(unfiled(notes).map((n) => n.id)),
+    [notes],
+  );
+
   const visible = useMemo(() => {
     const rows = notes.filter(
       (n) =>
@@ -70,6 +77,7 @@ export function Wall() {
         (tag === null || n.tags.includes(tag)) &&
         (!onlyOpen || (n.isTask && n.doneAt === null)) &&
         (!onlyProjects || isProject(n)) &&
+        (!onlyUnfiled || unfiledIds.has(n.id)) &&
         matches(n, query),
     );
     // Pinned float, then reverse-chron. Nothing else reorders the wall.
@@ -77,7 +85,7 @@ export function Wall() {
       if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
       return b.createdAt.localeCompare(a.createdAt);
     });
-  }, [notes, world, tag, onlyOpen, onlyProjects, query, showArchive]);
+  }, [notes, world, tag, onlyOpen, onlyProjects, onlyUnfiled, unfiledIds, query, showArchive]);
 
   const activeWorld = colors.find((c) => c.id === world) ?? null;
   // Top-level rows: steps are counted with their project, not against the wall.
@@ -95,7 +103,12 @@ export function Wall() {
   }, [live]);
   const archivedCount = notes.filter((n) => n.archivedAt !== null).length;
   const filtered =
-    world !== null || tag !== null || query !== "" || onlyOpen || onlyProjects;
+    world !== null ||
+    tag !== null ||
+    query !== "" ||
+    onlyOpen ||
+    onlyProjects ||
+    onlyUnfiled;
 
   return (
     <div className="flex min-h-full flex-col">
@@ -159,6 +172,18 @@ export function Wall() {
             >
               Open tasks
             </button>
+            {unfiledIds.size > 0 && (
+              <button
+                type="button"
+                onClick={() => setOnlyUnfiled((v) => !v)}
+                aria-pressed={onlyUnfiled}
+                className={`label border border-rule px-2.5 py-1.5 ${
+                  onlyUnfiled ? "bg-ink text-paper" : "text-mute hover:text-ink"
+                }`}
+              >
+                Unfiled {unfiledIds.size}
+              </button>
+            )}
             {projectCount > 0 && (
               <button
                 type="button"
@@ -192,6 +217,7 @@ export function Wall() {
                   setQuery("");
                   setOnlyOpen(false);
                   setOnlyProjects(false);
+                  setOnlyUnfiled(false);
                 }}
                 className="label border border-rule px-2.5 py-1.5 hover:bg-ink hover:text-paper"
               >

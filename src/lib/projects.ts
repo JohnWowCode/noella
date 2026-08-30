@@ -4,6 +4,7 @@
  * into some other system, and steps stay searchable notes like everything else.
  */
 
+import { byOrder } from "./order";
 import type { Note } from "./types";
 
 export const PROJECT_STATUSES = ["idea", "active", "paused", "done"] as const;
@@ -25,11 +26,12 @@ export function isStep(note: Note): boolean {
   return note.parentId !== null;
 }
 
-/** Steps in the order they were added — that is the order you meant to do them. */
+/** Steps in the order you put them in; added order until you rank them. */
 export function stepsOf(notes: Note[], projectId: string): Note[] {
-  return notes
-    .filter((n) => n.parentId === projectId && n.archivedAt === null)
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  return byOrder(
+    notes.filter((n) => n.parentId === projectId && n.archivedAt === null),
+    (a, b) => a.createdAt.localeCompare(b.createdAt),
+  );
 }
 
 export function progressOf(steps: Note[]): { done: number; total: number } {
@@ -47,6 +49,10 @@ export function nextActionOf(steps: Note[]): Note | null {
   return steps.find((s) => s.doneAt === null) ?? null;
 }
 
+/**
+ * Projects by status, then by hand-set priority within each status. The first
+ * active project is the one today is about, so this ordering is load-bearing.
+ */
 export function projectsOf(notes: Note[]): Note[] {
   return notes
     .filter((n) => isProject(n) && n.archivedAt === null)
@@ -54,9 +60,26 @@ export function projectsOf(notes: Note[]): Note[] {
       (a, b) =>
         STATUS_RANK[a.projectStatus as ProjectStatus] -
           STATUS_RANK[b.projectStatus as ProjectStatus] ||
+        a.order - b.order ||
         Number(b.pinned) - Number(a.pinned) ||
         b.createdAt.localeCompare(a.createdAt),
     );
+}
+
+/**
+ * Anything jotted and not yet filed: no world, not a project, not a step, not
+ * a bill. This is what makes dumping a thought safe — it lands somewhere with
+ * a name instead of dissolving into the feed.
+ */
+export function unfiled(notes: Note[]): Note[] {
+  return notes.filter(
+    (n) =>
+      n.archivedAt === null &&
+      n.colorId === null &&
+      n.projectStatus === null &&
+      n.parentId === null &&
+      n.bill === null,
+  );
 }
 
 /** First line of the body, which is all a project needs for a name. */
