@@ -61,6 +61,7 @@ rewrite.
 
 | Key | |
 |---|---|
+| `⌘/Ctrl + K` | the palette: search, jump, or act, from any screen |
 | `n` | compose box on the wall, capture overlay anywhere else |
 | `⌘/Ctrl + Enter` | save |
 | `⌘/Ctrl + 1`–`9` | file into that world (`⌘0` clears) |
@@ -92,6 +93,42 @@ Put the ones you reach for most in the first nine.
   place you can see the whole cross-cut at once.
 - Drafts are written to localStorage on every keystroke. Closing the tab
   mid-thought loses nothing.
+- **Deleting is undoable.** A delete offers itself back for eight seconds, and
+  a deleted project brings its steps with it. Everything else — archive, status
+  changes — was always reversible from the UI, so delete is the only thing that
+  needed catching.
+
+## The palette
+
+`⌘K` from anywhere. It is why the screens can stay quiet — no screen needs a
+visible control for every action.
+
+- **Go** — Today, the wall, projects, bills.
+- **Do** — tick off today's move without navigating to it, export a backup.
+- **Projects** — pick any project to make it today's, from any screen.
+- **Notes** — search the whole wall; results carry their world's colour.
+
+`↑` `↓` to move, `↵` to run, `esc` to close.
+
+## Speed
+
+Measured on a wall of 2,000 notes, before and after a pass:
+
+| | before | after |
+|---|---|---|
+| load → first card | 3,417 ms | **464 ms** |
+| search keystrokes → settled | 2,864 ms | **305 ms** |
+| cards in the DOM | 2,000 | **40** |
+
+The wall renders a page of 40 and extends as you reach the bottom, so the cost
+is flat: 500 notes and 2,000 notes now behave identically. Cards are wildly
+different heights — images, step checklists, bill editors — so windowing them
+would have been guesswork; paging is exact.
+
+Persisting is coalesced too. Writing is a full re-serialise of every note, which
+you could feel on every ticked box; writes now settle into the next frame or
+two and are flushed before the page can be hidden or closed, so nothing is ever
+owed to disk across a tab switch.
 
 ## Today — the front door
 

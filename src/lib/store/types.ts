@@ -30,6 +30,8 @@ export interface Store {
   createNote(input: NewNote): Promise<Note>;
   updateNote(id: string, patch: Partial<Note>): Promise<Note>;
   deleteNote(id: string): Promise<void>;
+  /** Puts deleted notes back exactly as they were. What undo is built on. */
+  restoreNotes(notes: Note[]): Promise<void>;
   updateColor(id: string, patch: Partial<Color>): Promise<Color>;
   updateSettings(patch: Partial<Settings>): Promise<Settings>;
 

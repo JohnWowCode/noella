@@ -70,12 +70,44 @@ function read(): Snapshot | null {
   }
 }
 
-function write(snapshot: Snapshot): void {
+/**
+ * Persisting is a full re-serialise of every note, which at a couple of
+ * thousand notes is milliseconds you can feel when it happens on every ticked
+ * box. Writes are coalesced into the next frame or two, and always flushed
+ * before the page can be hidden or closed, so nothing is ever owed to disk
+ * across a tab switch.
+ */
+let pending: Snapshot | null = null;
+let timer: number | null = null;
+
+function flush(): void {
+  if (timer !== null) {
+    clearTimeout(timer);
+    timer = null;
+  }
+  const snapshot = pending;
+  pending = null;
+  if (!snapshot) return;
   try {
     localStorage.setItem(KEY, JSON.stringify(snapshot));
   } catch {
     // Quota or private mode. The in-memory state is still correct.
   }
+}
+
+if (typeof window !== "undefined") {
+  // pagehide covers the mobile case that beforeunload does not.
+  window.addEventListener("pagehide", flush);
+  window.addEventListener("beforeunload", flush);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") flush();
+  });
+}
+
+function write(snapshot: Snapshot): void {
+  pending = snapshot;
+  if (timer !== null) return;
+  timer = window.setTimeout(flush, 120);
 }
 
 async function blobToDataUrl(blob: Blob): Promise<string> {
@@ -185,6 +217,15 @@ export class LocalStore implements Store {
     }
     const ids = new Set(doomed.map((n) => n.id));
     this.snapshot.notes = this.snapshot.notes.filter((n) => !ids.has(n.id));
+    write(this.snapshot);
+  }
+
+  async restoreNotes(notes: Note[]): Promise<void> {
+    const known = new Set(this.snapshot.notes.map((n) => n.id));
+    this.snapshot.notes = [
+      ...notes.filter((n) => !known.has(n.id)),
+      ...this.snapshot.notes,
+    ];
     write(this.snapshot);
   }
 

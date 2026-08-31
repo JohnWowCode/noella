@@ -8,6 +8,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { seqLabel } from "../format";
 import { prepareImage } from "../images";
 import {
   DEFAULT_SETTINGS,
@@ -32,6 +33,9 @@ interface Noella {
   removeNote: (id: string) => void;
   patchColor: (id: string, patch: Partial<Color>) => void;
   patchSettings: (patch: Partial<Settings>) => void;
+  /** The last undoable thing that happened, if it is still offered. */
+  undo: { label: string; run: () => void } | null;
+  dismissUndo: () => void;
   /** Downscales, stores the bytes, and hands back metadata to attach. */
   attachImage: (file: File) => Promise<NoteImage>;
   imageUrl: (id: string) => Promise<string | null>;
@@ -49,6 +53,7 @@ export function NoellaProvider({ children }: { children: React.ReactNode }) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [colors, setColors] = useState<Color[]>([]);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [undo, setUndo] = useState<Noella["undo"]>(null);
 
   useEffect(() => {
     let live = true;
@@ -87,13 +92,41 @@ export function NoellaProvider({ children }: { children: React.ReactNode }) {
     [store],
   );
 
+  /**
+   * Delete is the only action in the app that cannot be walked back from the
+   * UI — archive keeps the note, status changes are just fields. So it is the
+   * one that carries an undo, and it captures the project's steps too, because
+   * deleting a project takes them with it.
+   */
   const removeNote = useCallback(
     (id: string) => {
-      setNotes((prev) => prev.filter((n) => n.id !== id));
+      setNotes((prev) => {
+        const doomed = prev.filter((n) => n.id === id || n.parentId === id);
+        if (doomed.length > 0) {
+          const subject = doomed.find((n) => n.id === id);
+          const extra = doomed.length - 1;
+          setUndo({
+            label:
+              `Deleted ${seqLabel(subject?.seq ?? 0)}` +
+              (extra > 0 ? ` and ${extra} step${extra === 1 ? "" : "s"}` : ""),
+            run: () => {
+              setNotes((current) => [
+                ...doomed.filter((d) => !current.some((c) => c.id === d.id)),
+                ...current,
+              ]);
+              store.restoreNotes(doomed);
+              setUndo(null);
+            },
+          });
+        }
+        return prev.filter((n) => n.id !== id && n.parentId !== id);
+      });
       store.deleteNote(id);
     },
     [store],
   );
+
+  const dismissUndo = useCallback(() => setUndo(null), []);
 
   const patchColor = useCallback(
     (id: string, patch: Partial<Color>) => {
@@ -150,6 +183,8 @@ export function NoellaProvider({ children }: { children: React.ReactNode }) {
       removeNote,
       patchColor,
       patchSettings,
+      undo,
+      dismissUndo,
       attachImage,
       imageUrl,
       exportBackup,
@@ -166,6 +201,8 @@ export function NoellaProvider({ children }: { children: React.ReactNode }) {
     removeNote,
     patchColor,
     patchSettings,
+    undo,
+    dismissUndo,
     attachImage,
     imageUrl,
     exportBackup,

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { GeistMono } from "geist/font/mono";
+import { Palette, UndoBar } from "@/components/Palette";
 import { QuickCapture } from "@/components/QuickCapture";
 import { ServiceWorker } from "@/components/ServiceWorker";
 import { NoellaProvider } from "@/lib/store/provider";
@@ -58,6 +59,8 @@ export default function RootLayout({
         <NoellaProvider>
           {children}
           <QuickCapture />
+          <Palette />
+          <UndoBar />
         </NoellaProvider>
         <ServiceWorker />
       </body>

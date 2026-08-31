@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { matches } from "@/lib/notes";
 import { isProject, unfiled } from "@/lib/projects";
 import { colorLabel, useNoella } from "@/lib/store/provider";
@@ -11,6 +11,9 @@ import { NoteCard } from "./NoteCard";
 import { Swatch } from "./Swatch";
 import { TagIndex } from "./TagIndex";
 import { ThemeToggle } from "./ThemeToggle";
+
+/** Cards rendered per page. Enough to fill any screen, cheap enough to be instant. */
+const PAGE = 40;
 
 export function Wall() {
   const { ready, notes, colors, patchColor } = useNoella();
@@ -25,6 +28,16 @@ export function Wall() {
 
   const composeRef = useRef<HTMLTextAreaElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const moreRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Cards are wildly different heights — images, step checklists, bill editors
+   * — so windowing them would be guesswork. Rendering a page at a time and
+   * extending as you reach the bottom is simpler and exact. Without this, two
+   * thousand notes put two thousand cards in the DOM and the wall took 3.4s to
+   * paint and lagged ~3s behind the search box.
+   */
+  const [limit, setLimit] = useState(PAGE);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -86,6 +99,34 @@ export function Wall() {
       return b.createdAt.localeCompare(a.createdAt);
     });
   }, [notes, world, tag, onlyOpen, onlyProjects, onlyUnfiled, unfiledIds, query, showArchive]);
+
+  // Any change to what is being shown starts the list again from the top.
+  // Adjusted during render rather than in an effect, so the first paint after
+  // a filter change is already the short list instead of the old long one.
+  const filterSignature = [
+    query, world, tag, onlyOpen, onlyProjects, onlyUnfiled, showArchive,
+  ].join("\u0000");
+  const [lastSignature, setLastSignature] = useState(filterSignature);
+  if (filterSignature !== lastSignature) {
+    setLastSignature(filterSignature);
+    setLimit(PAGE);
+  }
+
+  const shown = useMemo(() => visible.slice(0, limit), [visible, limit]);
+  const more = visible.length - shown.length;
+
+  const loadMore = useCallback(() => setLimit((n) => n + PAGE), []);
+
+  useEffect(() => {
+    const el = moreRef.current;
+    if (!el || more === 0) return;
+    const io = new IntersectionObserver(
+      (entries) => entries[0].isIntersecting && loadMore(),
+      { rootMargin: "600px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [more, loadMore]);
 
   const activeWorld = colors.find((c) => c.id === world) ?? null;
   // Top-level rows: steps are counted with their project, not against the wall.
@@ -254,7 +295,7 @@ export function Wall() {
                   : "No rows match this filter."}
             </Empty>
           ) : (
-            visible.map((n) => (
+            shown.map((n) => (
               <NoteCard
                 key={n.id}
                 note={n}
@@ -266,11 +307,24 @@ export function Wall() {
           )}
         </section>
 
+        {more > 0 && (
+          <div ref={moreRef} className="mt-3">
+            <button
+              type="button"
+              onClick={loadMore}
+              className="label w-full border border-rule bg-field px-4 py-4 text-mute hover:bg-ink hover:text-paper"
+            >
+              {more} more
+            </button>
+          </div>
+        )}
+
         {ready && (
           <div className="label mt-5 flex flex-wrap items-center gap-x-3 gap-y-2 text-mute">
             <span>
-              {visible.length} of {showArchive ? archivedCount : live.length}{" "}
-              shown
+              {shown.length} of {visible.length} shown
+              {visible.length !== (showArchive ? archivedCount : live.length) &&
+                ` · ${showArchive ? archivedCount : live.length} total`}
             </span>
             <span className="ml-auto">
               <DataMenu />
