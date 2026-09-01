@@ -137,14 +137,16 @@ owed to disk across a tab switch.
   One box to tick.
 - **Also active.** The other things you called active, each with its next step,
   tickable in place. `Rank` takes you to the list that decides the order.
-- **Drifting.** Any project quiet for 14+ days, with three answers: revive,
-  park, drop. A project you called *active* but haven't touched in a fortnight
-  is moved out of the active list and into here — that confrontation is the
-  point. There is no dismiss, because leaving it unanswered is the only wrong
-  answer.
-- **The ledger.** Eight weeks of days, filled on days you finished something. A
-  move is a completed step — never a captured note, because capture is easy and
-  would make the number flattering and useless.
+- **Still want these?** Any project quiet for 14+ days, with four answers:
+  revive, park, drop, or not now. A project you called *active* but haven't
+  touched in a fortnight is moved out of the active list and into here, because
+  the gap between what you said and what happened is worth seeing. It asks
+  rather than accuses, and `Not now` defers it a week.
+- **The ledger.** Eight weeks of days, filled on days you finished something,
+  with moves this week, moves in eight weeks, and your best run. A move is a
+  completed step — never a captured note, because capture is easy and would
+  make the number flattering and useless. There is no streak that resets to
+  zero.
 - **Unfiled.** A count of everything you jotted without giving it a world. It
   is the only nag on the screen, and it exists so dumping a thought is safe.
 - **The stance:** three active projects. Not enforced — you're an adult — but
