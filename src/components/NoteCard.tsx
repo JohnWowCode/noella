@@ -144,21 +144,31 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
             <Dot />
           </>
         ) : (
+          // Visibility is identical on every note until sharing ships, so it
+          // earns its place on a card only when it is *not* the default.
+          note.visibility !== "private" && (
+            <>
+              <span>{note.visibility}</span>
+              <Dot />
+            </>
+          )
+        )}
+        {/* A word count says something about a paragraph of thinking and
+            nothing at all about a project title or a bill. */}
+        {!project && !bill && wordCount(note.body) > 3 && (
           <>
-            <span>{note.visibility}</span>
+            <span>{wordCount(note.body)} words</span>
             <Dot />
           </>
         )}
-        <span>{wordCount(note.body)} words</span>
         {note.images.length > 0 && (
           <>
-            <Dot />
             <span>
               {note.images.length} {note.images.length === 1 ? "image" : "images"}
             </span>
+            <Dot />
           </>
         )}
-        <Dot />
         <span>{stamp(note.createdAt)}</span>
         {note.pinned && (
           <>

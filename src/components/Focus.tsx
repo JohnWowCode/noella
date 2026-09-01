@@ -116,7 +116,7 @@ export function Focus() {
             )}
 
             {others.length > 0 && (
-              <section className="mt-10">
+              <Block>
                 <h2 className="label mb-3 flex items-center gap-2 text-mute">
                   <span>Also active</span>
                   <span aria-hidden>·</span>
@@ -132,11 +132,11 @@ export function Focus() {
                     <AlsoActive key={p.id} project={p} notes={notes} />
                   ))}
                 </div>
-              </section>
+              </Block>
             )}
 
             {due.length > 0 && (
-              <section className="mt-10">
+              <Block>
                 <h2 className="label mb-3 text-mute">Money this week</h2>
                 <div className="flex flex-col gap-px">
                   {due.map((l) => (
@@ -157,11 +157,11 @@ export function Focus() {
                     </Link>
                   ))}
                 </div>
-              </section>
+              </Block>
             )}
 
             {drift.length > 0 && (
-              <section className="mt-10">
+              <Block>
                 <h2 className="label mb-3 flex items-center gap-2 text-mute">
                   <span>Drifting</span>
                   <span aria-hidden>·</span>
@@ -179,22 +179,24 @@ export function Focus() {
                     />
                   ))}
                 </div>
-              </section>
+              </Block>
             )}
 
             {loose.length > 0 && (
-              <Link
-                href="/wall"
-                className="label mt-10 flex items-center gap-3 border border-rule bg-field px-4 py-3 text-mute hover:bg-ink hover:text-paper"
-              >
-                <span>{loose.length} unfiled</span>
-                <span className="ml-auto normal-case tracking-normal">
-                  jotted, no world yet →
-                </span>
-              </Link>
+              <Block>
+                <Link
+                  href="/wall"
+                  className="label flex items-center gap-3 border border-rule bg-field px-4 py-3.5 text-mute hover:bg-ink hover:text-paper"
+                >
+                  <span>{loose.length} unfiled</span>
+                  <span className="ml-auto normal-case tracking-normal">
+                    jotted, no world yet →
+                  </span>
+                </Link>
+              </Block>
             )}
 
-            <Ledger cells={cells} />
+            <Ledger cells={cells} streakDays={days} week={week} />
           </>
         )}
       </main>
@@ -371,40 +373,83 @@ function Drifting({ project, quiet }: { project: Note; quiet: number }) {
   );
 }
 
-/** Eight weeks of days. Filled means you moved something. */
-function Ledger({ cells }: { cells: { key: string; moves: number }[] }) {
+/**
+ * Eight weeks of days, filled on the days you finished something, with the
+ * numbers it adds up to alongside. The grid alone left half the width empty
+ * and read as decoration; paired with the figures it reads as an instrument.
+ */
+function Ledger({
+  cells,
+  streakDays,
+  week,
+}: {
+  cells: { key: string; moves: number }[];
+  streakDays: number;
+  week: number;
+}) {
   const total = cells.reduce((n, c) => n + c.moves, 0);
 
   return (
-    <section className="mt-12">
+    <Block>
       <h2 className="label mb-3 flex items-center gap-2 text-mute">
         <span>Ledger</span>
-        <span aria-hidden>·</span>
-        <span className="tabular-nums">{total} moves</span>
         <span className="ml-auto normal-case tracking-normal">last 8 weeks</span>
       </h2>
-      <div className="grid grid-flow-col grid-rows-7 justify-start gap-1">
-        {cells.map((c) => (
-          <span
-            key={c.key}
-            title={`${c.key} — ${c.moves} ${c.moves === 1 ? "move" : "moves"}`}
-            className="h-3.5 w-3.5 border border-rule"
-            style={{
-              // Four steps, not a gradient: the wall has no gradients either.
-              backgroundColor:
-                c.moves === 0
-                  ? "transparent"
-                  : c.moves === 1
-                    ? "color-mix(in srgb, var(--ink) 30%, transparent)"
-                    : c.moves < 4
-                      ? "color-mix(in srgb, var(--ink) 60%, transparent)"
-                      : "var(--ink)",
-            }}
-          />
-        ))}
+      <div className="flex flex-wrap items-center gap-x-8 gap-y-6 border border-rule bg-field px-5 py-5">
+        <div className="grid grid-flow-col grid-rows-7 gap-[3px]">
+          {cells.map((c) => (
+            <span
+              key={c.key}
+              title={`${c.key} — ${c.moves} ${c.moves === 1 ? "move" : "moves"}`}
+              className="h-4 w-4 border border-rule-soft"
+              style={{
+                // Four steps, not a gradient: the wall has no gradients either.
+                backgroundColor:
+                  c.moves === 0
+                    ? "transparent"
+                    : c.moves === 1
+                      ? "color-mix(in srgb, var(--ink) 32%, transparent)"
+                      : c.moves < 4
+                        ? "color-mix(in srgb, var(--ink) 64%, transparent)"
+                        : "var(--ink)",
+              }}
+            />
+          ))}
+        </div>
+
+        <dl className="flex flex-1 flex-wrap items-baseline justify-between gap-x-8 gap-y-4">
+          <Figure value={streakDays} unit={streakDays === 1 ? "day" : "days"} label="streak" />
+          <Figure value={week} unit="moves" label="this week" />
+          <Figure value={total} unit="moves" label="8 weeks" />
+        </dl>
       </div>
-    </section>
+    </Block>
   );
+}
+
+function Figure({
+  value,
+  unit,
+  label,
+}: {
+  value: number;
+  unit: string;
+  label: string;
+}) {
+  return (
+    <div>
+      <dd className="prose-note text-[30px] leading-none tabular-nums">
+        {value}
+        <span className="label ml-1.5 align-baseline text-mute">{unit}</span>
+      </dd>
+      <dt className="label mt-2 text-mute">{label}</dt>
+    </div>
+  );
+}
+
+/** One vertical rhythm for every band on this screen. */
+function Block({ children }: { children: React.ReactNode }) {
+  return <section className="mt-11">{children}</section>;
 }
 
 function NothingFocused({ hasProjects }: { hasProjects: boolean }) {

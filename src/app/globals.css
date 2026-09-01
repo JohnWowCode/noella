@@ -2,21 +2,37 @@
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
-/* Paper, not dark. Dark is a toggle, not the default. */
+/*
+ * Paper, not dark. Dark is a toggle, not the default.
+ *
+ * Two rule weights, because shadows are banned and border weight is therefore
+ * the only hierarchy left. `rule` is structural — the edge of a card, the line
+ * under the header. `rule-soft` is interior — dividers inside a list, which at
+ * full strength turn a step checklist into a buzzing grid.
+ */
 :root {
   --paper: #f4f2ed;
+  --field: #fffefb;
   --ink: #111111;
   --mute: #6f6b64;
   --rule: #111111;
-  --field: #fffefb;
+  --rule-soft: #d3cec4;
 }
 
+/*
+ * Dark is not the light palette inverted. Two things had to change: a raised
+ * surface a shade off the canvas is invisible at #141414 on #0b0b0b, so the
+ * field is lifted until a card reads as a surface rather than an outline; and
+ * a full-strength #ededed hairline around every card glares, so the structural
+ * rule is pulled back off white.
+ */
 [data-theme="dark"] {
-  --paper: #0b0b0b;
+  --paper: #0a0a0b;
+  --field: #191a1d;
   --ink: #ededed;
-  --mute: #8a867f;
-  --rule: #ededed;
-  --field: #141414;
+  --mute: #918d86;
+  --rule: #c6c6c4;
+  --rule-soft: #34363a;
 }
 
 @theme inline {
@@ -24,6 +40,7 @@
   --color-ink: var(--ink);
   --color-mute: var(--mute);
   --color-rule: var(--rule);
+  --color-rule-soft: var(--rule-soft);
   --color-field: var(--field);
 
   --font-serif: var(--font-literata);
@@ -70,6 +87,13 @@
   button {
     font: inherit;
     color: inherit;
+  }
+
+  /* Every control presses. One pixel, flat, no easing — the same physics as
+     the rest of the app, which is to say none. */
+  button:active:not(:disabled),
+  a:active {
+    transform: translateY(1px);
   }
 
   textarea {

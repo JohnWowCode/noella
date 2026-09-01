@@ -194,11 +194,11 @@ export function Palette() {
       role="dialog"
       aria-modal="true"
       aria-label="Command palette"
-      className="fixed inset-0 z-60 flex items-start justify-center bg-ink/25 px-4 pt-[12vh]"
+      className="fixed inset-0 z-60 flex items-start justify-center bg-ink/40 px-4 pt-[12vh]"
       onClick={close}
     >
       <div
-        className="w-full max-w-xl border border-rule bg-paper"
+        className="w-full max-w-xl border border-rule bg-paper shadow-[6px_6px_0_0_var(--ink)]"
         onClick={(e) => e.stopPropagation()}
       >
         <input
@@ -235,7 +235,7 @@ export function Palette() {
             if (rows.length === 0) return null;
             return (
               <section key={g}>
-                <h3 className="label border-b border-rule px-5 py-2 text-mute">
+                <h3 className="label border-b border-rule-soft bg-field px-5 py-2 text-mute">
                   {g}
                 </h3>
                 {rows.map((item) => {
@@ -272,7 +272,7 @@ export function Palette() {
           })}
         </div>
 
-        <p className="label flex items-center gap-3 border-t border-rule px-5 py-3 text-mute">
+        <p className="label flex items-center gap-3 border-t border-rule-soft bg-field px-5 py-3 text-mute">
           <span>↑↓ move</span>
           <span>↵ select</span>
           <span>esc close</span>

@@ -33,7 +33,7 @@ export function ProjectPanel({
     setDraft("");
   }
 
-  const line = onColor ? "border-current/30" : "border-rule";
+  const line = onColor ? "border-current/30" : "border-rule-soft";
 
   return (
     <div className={`mt-4 border-t ${line} pt-4`}>

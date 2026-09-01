@@ -249,8 +249,20 @@ no fake physics.
 
 - **0px corners**, everywhere, enforced globally in `globals.css`.
 - **1px hairline borders** do all the structural work.
-- **No shadows** except one: a hard 4px zero-blur offset on the focused compose
-  box, tinted to the selected world. No gradients anywhere.
+- **Two rule weights**, because shadows are banned and border weight is
+  therefore the only hierarchy left. `rule` is structural — the edge of a card,
+  the line under the header. `rule-soft` is interior — dividers inside a list,
+  which at full strength turn a step checklist into a buzzing grid.
+- **No shadows** except two: a hard 4px zero-blur offset on the focused compose
+  box, tinted to the selected world, and a 6px one under the command palette.
+  No gradients anywhere.
+- **Every control presses** one pixel on `:active`. Flat, no easing — the same
+  physics as the rest of the app, which is to say none.
+- **Dark is not the light palette inverted.** A raised surface a shade off the
+  canvas is invisible at `#141414` on `#0b0b0b`, so the field is lifted until a
+  card reads as a surface rather than an outline; and a full-strength `#ededed`
+  hairline around every card glares, so the structural rule is pulled back off
+  white.
 - **Two type voices** — Geist Mono for all chrome (uppercase, 11px, letterspaced,
   via the `label` utility), **Literata** for note bodies (18px/1.62, via
   `prose-note`). A screen-first serif with enough ink to hold up on saturated
