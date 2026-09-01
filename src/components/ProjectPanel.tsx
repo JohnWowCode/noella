@@ -25,6 +25,7 @@ export function ProjectPanel({
 
   const status = project.projectStatus as ProjectStatus;
   const { done, total } = progressOf(steps);
+  const spent = steps.reduce((n, s) => n + (s.actualMinutes ?? 0), 0);
 
   function addStep() {
     const body = draft.trim();
@@ -61,6 +62,7 @@ export function ProjectPanel({
 
         {total > 0 && (
           <span className="label ml-auto flex items-center gap-2 opacity-70">
+            {spent > 0 && <span className="tabular-nums">{spent}m spent</span>}
             <Progress done={done} total={total} onColor={onColor} />
             <span className="tabular-nums">
               {done}/{total}
@@ -98,6 +100,11 @@ export function ProjectPanel({
               >
                 {step.body}
               </span>
+              {step.actualMinutes !== null && (
+                <span className="label shrink-0 tabular-nums opacity-50">
+                  {step.actualMinutes}m
+                </span>
+              )}
               <span className="flex shrink-0 items-center gap-2 opacity-0 transition-opacity group-hover/step:opacity-70 focus-within:opacity-100">
                 <button
                   type="button"

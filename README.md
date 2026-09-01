@@ -171,9 +171,13 @@ that, and two of them are corrections to earlier versions of this app.
 - **One next step, at a size nothing else matches.** Long lists are
   overwhelming and vague tasks do not start; the front door shows exactly one
   thing and hides the rest.
-- **`Start · 5 min`.** Task initiation is the hard part, and a five-minute
-  commitment is cheap enough to say yes to. The clock keeps running across
-  navigation and reload.
+- **`▶ Just start · 5 minutes`.** Task initiation is the hard part, and a
+  five-minute commitment is cheap enough to say yes to. It is the only filled
+  button on the card, because it is the only thing there that gets you moving.
+  The clock keeps running across navigation and reload.
+- **How long things actually take** is visible where the work is: minutes on
+  each finished step, a total on the project, and your own guess-to-result
+  ratio in the ledger.
 - **Time is on screen rather than guessed at.** Estimate a step at 5/15/30/60
   minutes and a bar fills against that estimate while the clock runs — a number
   you have to read and compare is the thing that does not land. It says how far
@@ -286,6 +290,11 @@ before first paint, so there's no flash.
 
 The interface is honest about being an interface. No fake paper, no fake depth,
 no fake physics.
+
+Two voices, deliberately. The chrome is flat machine language — `NOTE 0041`,
+`14 WORDS`, `LOCAL · NO SERVER` — and stays that way; that is the joke and the
+structure. But anything addressed to *you* is plain and warm, because a machine
+voice telling you your wall is empty is funny once and cold every time after.
 
 - **0px corners**, everywhere, enforced globally in `globals.css`.
 - **1px hairline borders** do all the structural work.

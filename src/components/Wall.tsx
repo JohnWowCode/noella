@@ -289,10 +289,10 @@ export function Wall() {
           ) : visible.length === 0 ? (
             <Empty>
               {showArchive
-                ? "Nothing archived."
+                ? "Nothing archived yet."
                 : notes.length === 0
-                  ? "No rows. The wall is empty."
-                  : "No rows match this filter."}
+                  ? "Nothing here yet. Type something above — anything."
+                  : "Nothing matches. Try a different world, or clear it."}
             </Empty>
           ) : (
             shown.map((n) => (

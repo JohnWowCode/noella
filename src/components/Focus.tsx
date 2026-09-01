@@ -271,12 +271,12 @@ function TheMove({ project, notes }: { project: Note; notes: Note[] }) {
           }}
         >
           <p className="prose-note text-[22px] leading-tight opacity-60 sm:text-[26px]">
-            No next step. Name the smallest one.
+            What is the smallest next bit?
           </p>
           <input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder="The next physical thing…"
+            placeholder="Something you could do in five minutes…"
             aria-label="Next step"
             className="prose-note border border-current bg-transparent px-4 py-3 text-[18px]
                        outline-none placeholder:opacity-50"
@@ -532,7 +532,7 @@ function StartSmaller({
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={(e) => e.key === "Escape" && setOpen(false)}
-        placeholder="The smaller thing…"
+        placeholder="A smaller first bit…"
         aria-label="A smaller first step"
         className="prose-note min-w-0 flex-1 border border-current bg-transparent px-3 py-2
                    text-[16px] outline-none placeholder:opacity-50"
@@ -567,12 +567,12 @@ function NothingFocused({ hasProjects }: { hasProjects: boolean }) {
   return (
     <section className="mt-6 border border-rule bg-field px-6 py-10 sm:px-8">
       <p className="prose-note text-[22px] leading-tight sm:text-[26px]">
-        Nothing is active.
+        Nothing on today.
       </p>
       <p className="label mt-4 text-mute">
         {hasProjects
-          ? "Set a project to active and it becomes today's move."
-          : "Write something on the wall, promote it to a project, give it one step."}
+          ? "Make a project active and it lands here as today's move."
+          : "Jot something on the wall, make it a project, give it one small step."}
       </p>
       <Link
         href={hasProjects ? "/projects" : "/wall"}

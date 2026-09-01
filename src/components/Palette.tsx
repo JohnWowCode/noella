@@ -228,7 +228,7 @@ export function Palette() {
 
         <div ref={listRef} className="max-h-[52vh] overflow-y-auto">
           {items.length === 0 && (
-            <p className="label px-5 py-8 text-center text-mute">No match.</p>
+            <p className="label px-5 py-8 text-center text-mute">Nothing by that name.</p>
           )}
           {groups.map((g) => {
             const rows = items.filter((i) => i.group === g);

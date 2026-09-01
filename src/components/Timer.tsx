@@ -148,13 +148,18 @@ export function Timer({ step, onColor }: { step: Note; onColor: boolean }) {
         <button
           type="button"
           onClick={start}
-          className={`label border px-2.5 py-1.5 ${button}`}
+          className={`label border px-4 py-2.5 ${
+            onColor
+              ? "border-current bg-[#111] text-white hover:bg-transparent hover:text-current"
+              : "border-rule bg-ink text-paper hover:bg-transparent hover:text-ink"
+          }`}
         >
-          Start · 5 min
+          ▶ Just start · 5 minutes
         </button>
       )}
 
       <span className="label flex items-center gap-1.5 opacity-60">
+        <span className="mr-0.5">How long?</span>
         {ESTIMATES.map((m) => (
           <button
             key={m}
@@ -181,9 +186,9 @@ export function Timer({ step, onColor }: { step: Note; onColor: boolean }) {
 
       {step.actualMinutes !== null && (
         <span className="label ml-auto tabular-nums opacity-60">
-          {step.actualMinutes}m spent
+          took {step.actualMinutes}m
           {step.estimateMinutes !== null &&
-            ` · guessed ${step.estimateMinutes}m`}
+            ` · you guessed ${step.estimateMinutes}m`}
         </span>
       )}
     </div>
