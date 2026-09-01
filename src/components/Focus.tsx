@@ -8,6 +8,7 @@ import {
   ACTIVE_LIMIT,
   bestRun,
   drifting,
+  estimateFactor,
   ledger,
   movesThisWeek,
   quietDays,
@@ -79,6 +80,7 @@ export function Focus() {
   }, [notes, todayKey]);
 
   const loose = useMemo(() => unfiled(notes), [notes]);
+  const calibration = useMemo(() => estimateFactor(notes), [notes]);
   const days = streak(cells);
   const week = movesThisWeek(cells);
   const today = todayKey ? fromKey(todayKey) : null;
@@ -198,7 +200,7 @@ export function Focus() {
               </Block>
             )}
 
-            <Ledger cells={cells} week={week} />
+            <Ledger cells={cells} week={week} calibration={calibration} />
           </>
         )}
       </main>
@@ -283,6 +285,8 @@ function TheMove({ project, notes }: { project: Note; notes: Note[] }) {
       )}
 
       {step && <Timer step={step} onColor={onColor} />}
+
+      {step && <StartSmaller step={step} project={project} onColor={onColor} />}
     </section>
   );
 }
@@ -403,9 +407,11 @@ function Drifting({ project, quiet }: { project: Note; quiet: number }) {
 function Ledger({
   cells,
   week,
+  calibration,
 }: {
   cells: { key: string; moves: number }[];
   week: number;
+  calibration: { samples: number; factor: number } | null;
 }) {
   const total = cells.reduce((n, c) => n + c.moves, 0);
   const best = bestRun(cells);
@@ -442,6 +448,13 @@ function Ledger({
           <Figure value={week} unit="moves" label="this week" />
           <Figure value={total} unit="moves" label="8 weeks" />
           <Figure value={best} unit={best === 1 ? "day" : "days"} label="best run" />
+          {calibration && (
+            <Figure
+              value={`×${calibration.factor.toFixed(1)}`}
+              unit="actual"
+              label={`vs your guess · ${calibration.samples}`}
+            />
+          )}
         </dl>
       </div>
     </Block>
@@ -453,7 +466,7 @@ function Figure({
   unit,
   label,
 }: {
-  value: number;
+  value: number | string;
   unit: string;
   label: string;
 }) {
@@ -465,6 +478,83 @@ function Figure({
       </dd>
       <dt className="label mt-2 text-mute">{label}</dt>
     </div>
+  );
+}
+
+/**
+ * When a step will not start, the answer is not motivation, it is specificity:
+ * name something smaller and do that instead. The smaller thing is inserted
+ * above, so it becomes the move immediately, and the original is untouched.
+ */
+function StartSmaller({
+  step,
+  project,
+  onColor,
+}: {
+  step: Note;
+  project: Note;
+  onColor: boolean;
+}) {
+  const { addNote } = useNoella();
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState("");
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="label mt-3 underline decoration-1 underline-offset-2 opacity-55 hover:opacity-100"
+      >
+        Too big? Start smaller
+      </button>
+    );
+  }
+
+  return (
+    <form
+      className="mt-3 flex flex-wrap items-center gap-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!draft.trim()) return;
+        addNote({
+          body: draft.trim(),
+          colorId: project.colorId,
+          parentId: project.id,
+          order: step.order - 1,
+        });
+        setDraft("");
+        setOpen(false);
+      }}
+    >
+      <input
+        autoFocus
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => e.key === "Escape" && setOpen(false)}
+        placeholder="The smaller thing…"
+        aria-label="A smaller first step"
+        className="prose-note min-w-0 flex-1 border border-current bg-transparent px-3 py-2
+                   text-[16px] outline-none placeholder:opacity-50"
+      />
+      <button
+        type="button"
+        onClick={() => setOpen(false)}
+        className="label border border-current px-2.5 py-2 opacity-60 hover:opacity-100"
+      >
+        Cancel
+      </button>
+      <button
+        type="submit"
+        className={`label border border-current px-2.5 py-2 ${
+          onColor
+            ? "hover:bg-[#111] hover:text-white"
+            : "hover:bg-ink hover:text-paper"
+        }`}
+      >
+        Do this first
+      </button>
+    </form>
   );
 }
 

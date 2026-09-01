@@ -117,6 +117,32 @@ export function drifting(notes: Note[], todayKey: string): Note[] {
     .sort((a, b) => quietDays(notes, b, todayKey) - quietDays(notes, a, todayKey));
 }
 
+/**
+ * How your estimates actually land.
+ *
+ * Duration estimates run short, reliably and by a lot, and no amount of being
+ * told that fixes it. Being shown your own multiplier does: it turns "add 50%"
+ * — advice for someone else — into a number you produced.
+ */
+export function estimateFactor(
+  notes: Note[],
+): { samples: number; factor: number } | null {
+  const scored = notes.filter(
+    (n) =>
+      n.estimateMinutes !== null &&
+      n.actualMinutes !== null &&
+      n.estimateMinutes > 0,
+  );
+  if (scored.length < 3) return null;
+
+  const factor =
+    scored.reduce(
+      (sum, n) => sum + (n.actualMinutes as number) / (n.estimateMinutes as number),
+      0,
+    ) / scored.length;
+  return { samples: scored.length, factor };
+}
+
 /** Projects finished, newest first. The evidence that any of this works. */
 export function shipped(notes: Note[]): Note[] {
   return notes

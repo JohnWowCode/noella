@@ -167,10 +167,13 @@ export class LocalStore implements Store {
       estimateMinutes: null,
       actualMinutes: null,
       snoozedUntil: null,
-      // New steps land at the bottom of their project's list.
-      order: input.parentId
-        ? this.snapshot.notes.filter((n) => n.parentId === input.parentId).length
-        : 0,
+      // New steps land at the bottom of their project's list unless placed.
+      order:
+        input.order ??
+        (input.parentId
+          ? this.snapshot.notes.filter((n) => n.parentId === input.parentId)
+              .length
+          : 0),
       // A step is a thing to do, so it arrives checkable.
       isTask: isTask || input.parentId != null,
       doneAt: done ? now : null,

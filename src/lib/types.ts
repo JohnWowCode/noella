@@ -70,6 +70,8 @@ export interface NewNote {
   images?: NoteImage[];
   /** Set to file the new note as a step of that project. */
   parentId?: string | null;
+  /** Explicit position among siblings. Used to insert a step above another. */
+  order?: number;
 }
 
 export type { NoteImage };

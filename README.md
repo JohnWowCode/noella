@@ -175,8 +175,16 @@ that, and two of them are corrections to earlier versions of this app.
   commitment is cheap enough to say yes to. The clock keeps running across
   navigation and reload.
 - **Time is on screen rather than guessed at.** Estimate a step at 5/15/30/60
-  minutes; the timer records what it actually took and shows both. Estimation
-  runs short, and the only fix is seeing your own guess beside your own result.
+  minutes and a bar fills against that estimate while the clock runs — a number
+  you have to read and compare is the thing that does not land. It says how far
+  over you are rather than hiding it.
+- **Your own multiplier.** Once a handful of steps have both a guess and a
+  result, the ledger shows the ratio: `×1.9 actual vs your guess`. Estimates run
+  short, reliably and by a lot, and being told to "add 50%" is advice for
+  someone else. A number you produced is not.
+- **`Too big? Start smaller`.** When a step will not start, the answer is not
+  motivation, it is specificity. Name something smaller and it is inserted
+  above, becoming the move immediately. The original step is untouched.
 - **Capture takes no decisions.** No colour, project or title required —
   anything unfiled is counted rather than lost, so dumping a thought is safe.
 - **Deleting is undoable** and the app is installable, so it is where you left

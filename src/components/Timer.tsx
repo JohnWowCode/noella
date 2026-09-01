@@ -98,8 +98,25 @@ export function Timer({ step, onColor }: { step: Note; onColor: boolean }) {
     <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-2">
       {active ? (
         <>
+          {step.estimateMinutes !== null && (
+            <span
+              className="inline-block h-2.5 w-24 border border-current align-middle"
+              role="img"
+              aria-label={`${mins} of about ${step.estimateMinutes} minutes`}
+            >
+              <span
+                className={`block h-full ${onColor ? "bg-[#111]" : "bg-ink"}`}
+                style={{
+                  width: `${Math.min(100, (elapsed / (step.estimateMinutes * 60000)) * 100)}%`,
+                }}
+              />
+            </span>
+          )}
           <span className="label tabular-nums">
             {String(mins).padStart(2, "0")}:{String(secs).padStart(2, "0")}
+            {step.estimateMinutes !== null &&
+              mins >= step.estimateMinutes &&
+              ` · over by ${mins - step.estimateMinutes}m`}
           </span>
           <button
             type="button"
