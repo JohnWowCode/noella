@@ -41,6 +41,15 @@ export interface Note {
   /** Non-null means this note is a bill. Recurrence, not a row per month. */
   bill: Bill | null;
   /**
+   * Minutes you guessed this would take, and minutes it actually took.
+   * ADHD time estimation is systematically short, and the only way to correct
+   * for that is to see your own guess next to your own result.
+   */
+  estimateMinutes: number | null;
+  actualMinutes: number | null;
+  /** Drift can be deferred. An undismissable list of failures is a reason to stop opening the app. */
+  snoozedUntil: string | null;
+  /**
    * Hand-set priority among siblings — projects among projects, steps within
    * their project. Lower is sooner. Position 1 among the active projects is
    * today's move.

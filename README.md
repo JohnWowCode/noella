@@ -150,6 +150,36 @@ owed to disk across a tab switch.
 - **The stance:** three active projects. Not enforced — you're an adult — but
   never hidden either, because too many actives is the actual disease.
 
+## Designed against ADHD failure modes
+
+The research is consistent that tools built for neurotypical brains fail here
+for predictable reasons: they assume you will remember to open them, tolerate
+setup, and keep going after a missed day. Several things in Noella follow from
+that, and two of them are corrections to earlier versions of this app.
+
+- **Nothing punishes a missed day.** There is no streak counter that resets to
+  zero. The ledger shows moves this week, moves in eight weeks, and your *best
+  run* — a record of what you are capable of, which a bad week cannot take
+  away. A broken streak is a well-known reason people abandon a system
+  outright, and with rejection sensitivity it lands harder than intended.
+- **The quiet-projects list asks rather than accuses**, and it can be deferred.
+  It used to have no dismiss, on the theory that leaving it unanswered was the
+  only wrong answer. An undismissable list of your own failures is answered by
+  closing the tab. "Not now" defers it a week.
+- **One next step, at a size nothing else matches.** Long lists are
+  overwhelming and vague tasks do not start; the front door shows exactly one
+  thing and hides the rest.
+- **`Start · 5 min`.** Task initiation is the hard part, and a five-minute
+  commitment is cheap enough to say yes to. The clock keeps running across
+  navigation and reload.
+- **Time is on screen rather than guessed at.** Estimate a step at 5/15/30/60
+  minutes; the timer records what it actually took and shows both. Estimation
+  runs short, and the only fix is seeing your own guess beside your own result.
+- **Capture takes no decisions.** No colour, project or title required —
+  anything unfiled is counted rather than lost, so dumping a thought is safe.
+- **Deleting is undoable** and the app is installable, so it is where you left
+  it rather than somewhere you have to remember to go.
+
 ## Priorities
 
 `/projects` is a ranked list, not a pile. Every project shows its position —

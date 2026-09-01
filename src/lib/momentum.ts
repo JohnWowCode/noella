@@ -44,6 +44,22 @@ export function ledger(notes: Note[], todayKey: string, days = 56): DayCell[] {
   return cells;
 }
 
+/**
+ * The longest run in the window. Shown instead of a current streak that reads
+ * zero: a counter that resets to nothing after one missed day punishes the
+ * exact failure mode this is meant to help with, and a broken streak is a
+ * common reason people abandon a system outright.
+ */
+export function bestRun(cells: DayCell[]): number {
+  let best = 0;
+  let run = 0;
+  for (const c of cells) {
+    run = c.moves > 0 ? run + 1 : 0;
+    if (run > best) best = run;
+  }
+  return best;
+}
+
 /** Consecutive days with at least one move, counting back from today. */
 export function streak(cells: DayCell[]): number {
   let n = 0;
@@ -93,6 +109,9 @@ export function drifting(notes: Note[], todayKey: string): Note[] {
         isProject(n) &&
         n.archivedAt === null &&
         n.projectStatus !== "done" &&
+        // Deferred on purpose: "not now" is a legitimate answer, and the list
+        // is only useful if it is answerable rather than permanent.
+        (n.snoozedUntil === null || n.snoozedUntil <= todayKey) &&
         quietDays(notes, n, todayKey) >= DRIFT_DAYS,
     )
     .sort((a, b) => quietDays(notes, b, todayKey) - quietDays(notes, a, todayKey));

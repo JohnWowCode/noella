@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { daysBetween, fromKey, useTodayKey } from "@/lib/clock";
+import { dateKey, daysBetween, fromKey, useTodayKey } from "@/lib/clock";
 import { billLines, formatMoney } from "@/lib/money";
 import {
   ACTIVE_LIMIT,
-  DRIFT_DAYS,
+  bestRun,
   drifting,
   ledger,
   movesThisWeek,
@@ -25,6 +25,7 @@ import { useNoella } from "@/lib/store/provider";
 import type { Note } from "@/lib/types";
 import { Footer, Header, NavLink } from "./Chrome";
 import { Progress } from "./ProjectPanel";
+import { Timer } from "./Timer";
 import { ThemeToggle } from "./ThemeToggle";
 
 const WEEKDAY = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -105,7 +106,8 @@ export function Focus() {
                 {WEEKDAY[today.getDay()]} {today.getDate()} {MONTH[today.getMonth()]}
               </span>
               <span className="ml-auto tabular-nums">
-                {days > 0 ? `${days} day streak` : "no streak"} · {week} this week
+                {week} {week === 1 ? "move" : "moves"} this week
+                {days > 1 && ` · ${days} in a row`}
               </span>
             </div>
 
@@ -122,8 +124,8 @@ export function Focus() {
                   <span aria-hidden>·</span>
                   <span>{others.length}</span>
                   {active.length > ACTIVE_LIMIT && (
-                    <span className="ml-auto bg-ink px-1.5 py-0.5 text-paper">
-                      {active.length} active — you can move {ACTIVE_LIMIT}
+                    <span className="ml-auto normal-case tracking-normal text-mute">
+                      {active.length} active · {ACTIVE_LIMIT} is usually the limit
                     </span>
                   )}
                 </h2>
@@ -163,11 +165,11 @@ export function Focus() {
             {drift.length > 0 && (
               <Block>
                 <h2 className="label mb-3 flex items-center gap-2 text-mute">
-                  <span>Drifting</span>
+                  <span>Still want these?</span>
                   <span aria-hidden>·</span>
                   <span>{drift.length}</span>
                   <span className="ml-auto normal-case tracking-normal">
-                    quiet {DRIFT_DAYS}+ days
+                    no wrong answer
                   </span>
                 </h2>
                 <div className="flex flex-col gap-2">
@@ -196,7 +198,7 @@ export function Focus() {
               </Block>
             )}
 
-            <Ledger cells={cells} streakDays={days} week={week} />
+            <Ledger cells={cells} week={week} />
           </>
         )}
       </main>
@@ -279,6 +281,8 @@ function TheMove({ project, notes }: { project: Note; notes: Note[] }) {
           />
         </form>
       )}
+
+      {step && <Timer step={step} onColor={onColor} />}
     </section>
   );
 }
@@ -330,8 +334,13 @@ function AlsoActive({ project, notes }: { project: Note; notes: Note[] }) {
 }
 
 /**
- * A loop you stopped working on. The three answers are all fine; leaving it
- * unanswered is the only bad one, which is why there is no dismiss.
+ * A project that has gone quiet.
+ *
+ * This used to have no dismiss, on the theory that leaving it unanswered was
+ * the only wrong answer. That is a bad bet for anyone who finds a standing
+ * list of their own failures a reason to stop opening an app — and an
+ * undismissable one is answered by closing the tab, not by deciding. "Not now"
+ * is a real answer, so it is offered, and the row asks rather than accuses.
  */
 function Drifting({ project, quiet }: { project: Note; quiet: number }) {
   const { patchNote } = useNoella();
@@ -340,7 +349,9 @@ function Drifting({ project, quiet }: { project: Note; quiet: number }) {
     <article className="flex flex-col gap-3 border border-rule bg-field px-4 py-3.5 sm:flex-row sm:items-center sm:gap-x-3">
       <span className="label sm:flex-1">{projectTitle(project)}</span>
       <span className="label flex items-center gap-3">
-        <span className="tabular-nums opacity-55">{quiet}d quiet</span>
+        <span className="tabular-nums opacity-55">
+          last touched {quiet}d ago
+        </span>
       </span>
       <span className="flex flex-wrap items-center gap-1.5">
         <button
@@ -368,6 +379,17 @@ function Drifting({ project, quiet }: { project: Note; quiet: number }) {
         >
           Drop
         </button>
+        <button
+          type="button"
+          onClick={() => {
+            const until = new Date();
+            until.setDate(until.getDate() + 7);
+            patchNote(project.id, { snoozedUntil: dateKey(until) });
+          }}
+          className="label border border-rule px-2 py-1 text-mute hover:bg-ink hover:text-paper"
+        >
+          Not now
+        </button>
       </span>
     </article>
   );
@@ -380,14 +402,13 @@ function Drifting({ project, quiet }: { project: Note; quiet: number }) {
  */
 function Ledger({
   cells,
-  streakDays,
   week,
 }: {
   cells: { key: string; moves: number }[];
-  streakDays: number;
   week: number;
 }) {
   const total = cells.reduce((n, c) => n + c.moves, 0);
+  const best = bestRun(cells);
 
   return (
     <Block>
@@ -418,9 +439,9 @@ function Ledger({
         </div>
 
         <dl className="flex flex-1 flex-wrap items-baseline justify-between gap-x-8 gap-y-4">
-          <Figure value={streakDays} unit={streakDays === 1 ? "day" : "days"} label="streak" />
           <Figure value={week} unit="moves" label="this week" />
           <Figure value={total} unit="moves" label="8 weeks" />
+          <Figure value={best} unit={best === 1 ? "day" : "days"} label="best run" />
         </dl>
       </div>
     </Block>

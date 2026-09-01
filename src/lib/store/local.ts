@@ -35,6 +35,9 @@ function migrate(snapshot: Snapshot): Snapshot {
     parentId: n.parentId ?? null,
     bill: n.bill ?? null,
     order: typeof n.order === "number" ? n.order : 0,
+    estimateMinutes: n.estimateMinutes ?? null,
+    actualMinutes: n.actualMinutes ?? null,
+    snoozedUntil: n.snoozedUntil ?? null,
   }));
 
   const colors = [...snapshot.colors];
@@ -161,6 +164,9 @@ export class LocalStore implements Store {
       projectStatus: null,
       parentId: input.parentId ?? null,
       bill: null,
+      estimateMinutes: null,
+      actualMinutes: null,
+      snoozedUntil: null,
       // New steps land at the bottom of their project's list.
       order: input.parentId
         ? this.snapshot.notes.filter((n) => n.parentId === input.parentId).length
