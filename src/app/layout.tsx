@@ -24,7 +24,6 @@ const literata = localFont({
 export const metadata: Metadata = {
   title: "Noella",
   description: "A wall of notes. Colour is the filing system.",
-  manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "Noella", statusBarStyle: "default" },
 };
 

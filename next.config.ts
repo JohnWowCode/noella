@@ -2,14 +2,19 @@ import type { NextConfig } from "next";
 
 /**
  * Noella has no server side: no API routes, no server actions, no dynamic
- * params. Every page prerenders, and all the data lives in the browser. So it
- * can be published as a plain folder of files that any static host will serve
- * — which is a much smaller ask than wiring up a hosting platform.
+ * params. Every page prerenders and the data lives in the browser, so it can
+ * ship as a plain folder that any static host will serve. No platform is
+ * required, and none is assumed.
  *
- * `npm run export` turns that on and writes ./out. The normal `npm run build`
- * is untouched, so deploying to Vercel or running a real server still works.
+ * STATIC_EXPORT=1   write ./out instead of a server build
+ * BASE_PATH=/repo   serve from a subdirectory, which is what GitHub Pages does
  */
+const basePath = process.env.BASE_PATH ?? "";
+
 const nextConfig: NextConfig = {
+  // Read by the client so the service worker registers at the right URL.
+  env: { NEXT_PUBLIC_BASE_PATH: basePath },
+  ...(basePath ? { basePath, assetPrefix: basePath } : {}),
   ...(process.env.STATIC_EXPORT
     ? {
         output: "export" as const,

@@ -1,6 +1,6 @@
 # Getting Noella onto your phone
 
-Noella has no server. Every page is prerendered and all your data lives in your
+Noella has no server. Every page is prerendered and your notes live in your
 browser, so publishing it is just putting a folder of files somewhere.
 
 ```bash
@@ -8,64 +8,88 @@ npm install
 npm run export     # writes ./out — about 1.3 MB
 ```
 
-That folder **is** the app. Pick whichever of these sounds least annoying.
+That folder **is** the app. It does not care where it is hosted.
 
 ---
 
-## The lazy one — no account, 30 seconds
+## Option 1 — GitHub Pages, automatic
 
-1. Go to **[netlify.com/drop](https://app.netlify.com/drop)**
+Uses the repository you already have. No new account, no third party, and it
+republishes every time you push.
+
+**One-time setup, two clicks:**
+
+1. Repository **Settings → Pages**
+2. Under **Source**, choose **GitHub Actions**
+
+That's it. The workflow at `.github/workflows/pages.yml` is already committed.
+Push anything and it builds and publishes to:
+
+```
+https://<your-username>.github.io/noella/
+```
+
+Pages serves from a subdirectory, which the build handles — the workflow passes
+`BASE_PATH=/noella` so every asset, the manifest and the service worker resolve
+correctly there. Verified: the whole app, offline included, runs under a
+subfolder.
+
+---
+
+## Option 2 — drag a folder, 30 seconds
+
+If you want a URL right now without touching settings:
+
+1. **[netlify.com/drop](https://app.netlify.com/drop)**
 2. Drag the `out` folder onto the page
-3. You get a URL. Open it on your phone.
 
-No signup, no git, no settings. If you want to keep the URL, make a free
-account afterwards and it stays.
-
-To update later: run `npm run export` again and drag the new folder on.
+No signup. You get a URL immediately. Make a free account afterwards if you want
+to keep it. To update, run `npm run export` and drag the new folder on.
 
 ---
 
-## The one that updates itself — Vercel
+## Option 3 — anywhere else
 
-Worth it once you're using it daily, because it redeploys whenever you push.
+`out` is plain HTML, CSS, JS and images. It will work on Cloudflare Pages,
+Codeberg Pages, an S3 bucket, a Raspberry Pi running nginx, or any web host you
+already pay for. Upload the contents of `out` and you are done.
 
-1. **vercel.com → Add New → Project → import `noella`**
-2. When it asks which branch, pick the one your work is on
-3. Deploy. Nothing to configure — no environment variables, no build settings.
-
-Vercel runs `npm run build` (the normal one, not the export) and serves it. Both
-work; the export just also happens to work anywhere else.
+The only requirements are that it serves `index.html` from directories and that
+it is on **HTTPS** — browsers refuse to install a web app or run a service
+worker without it.
 
 ---
 
-## Check it before you publish
+## Check it first
 
 ```bash
 npx serve out
 ```
 
-Then open `http://localhost:3000`. This serves the folder the same dumb way a
-static host does, so if it works here it works there.
+Opens on `http://localhost:3000`, serving the folder the same dumb way a static
+host does. If it works here it works there.
+
+To see your phone's view without publishing, `npx serve out -l 3000` and visit
+your laptop's IP from your phone on the same wifi. Good enough to feel it,
+though install-to-home-screen and offline need real HTTPS.
 
 ---
 
 ## Once it's on HTTPS
 
-Three things switch on that only work on a real domain:
-
 - **Install it.** Open it on your phone, then "Add to Home Screen". It opens
   without browser chrome and behaves like an app.
-- **It works with no signal.** The service worker caches the pages; your notes
+- **It works with no signal.** The service worker caches the pages. Your notes
   were always local anyway.
-- **Share into it.** Once installed, Noella appears in the Android share sheet.
-  Share a link or some text and the capture box opens with it already filled in.
+- **Share into it.** Once installed, Noella appears in the Android share sheet —
+  share a link or some text and the capture box opens with it filled in.
 
 ## Where your notes actually live
 
-In the browser you use it in — not on the host. That means:
+In the browser you use it in, not on the host. So:
 
 - Publishing does **not** upload your notes anywhere.
 - Your phone and your laptop are separate walls until there is a real backend.
-- **Use `Export`** now and then. It writes one JSON file with your images
-  inlined, and `Import` restores it. That is also how you move a wall from your
-  laptop to your phone.
+- **Use `Export`.** It writes one JSON file with your images inlined, and
+  `Import` restores it. That is your backup, and it is also how you move a wall
+  from your laptop to your phone.

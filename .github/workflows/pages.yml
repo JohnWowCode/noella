@@ -1,0 +1,52 @@
+# Publishes Noella to GitHub Pages on every push.
+#
+# No third-party platform and no account beyond the GitHub one you already
+# have. Pages serves from https://<user>.github.io/<repo>/, a subdirectory,
+# which is why BASE_PATH is set from the repository name.
+#
+# One-time setup: repository Settings → Pages → Source → GitHub Actions.
+name: Publish
+
+on:
+  push:
+    branches: ["**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let a running deploy finish rather than cancelling it mid-flight.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run export
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}
+      # Pages will not serve paths starting with an underscore without this.
+      - run: touch out/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

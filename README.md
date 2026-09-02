@@ -19,10 +19,10 @@ npm run dev      # http://localhost:3000
 
 Nothing to configure. No account, no server, no keys.
 
-**To put it on your phone:** `npm run export` writes `./out`, which is the whole
-app as a folder of files — drag it onto [netlify.com/drop](https://app.netlify.com/drop)
-and you have a URL in about thirty seconds. See [DEPLOY.md](DEPLOY.md) for that
-and the auto-updating version.
+**To put it on your phone:** `npm run export` writes `./out` — the whole app as
+a folder of files, hostable anywhere. A GitHub Pages workflow is already
+committed, so turning Pages on in repository settings publishes it on every
+push, no other account needed. See [DEPLOY.md](DEPLOY.md).
 
 ## Where the data lives
 

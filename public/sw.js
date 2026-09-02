@@ -7,7 +7,14 @@
  * and everything else is cache-first with a background refresh.
  */
 
-const VERSION = "noella-v2";
+const VERSION = "noella-v4";
+
+/**
+ * Where this copy of the app lives. Derived from the registration scope rather
+ * than hardcoded, so the same file works at the domain root and under a
+ * subdirectory like /noella/ on GitHub Pages.
+ */
+const BASE = new URL(self.registration.scope).pathname.replace(/\/$/, "");
 
 /**
  * Both URL shapes on purpose. A server build serves /wall; a static export
@@ -16,15 +23,32 @@ const VERSION = "noella-v2";
  * then answered /wall/ with the home page — so each entry is added on its own
  * and a miss is simply skipped.
  */
-const SHELL = ["/", "/wall", "/wall/", "/projects", "/projects/", "/money", "/money/"];
+/**
+ * A static export serves /wall/ and 308s the bare path; a server build serves
+ * /wall. Rather than requesting both and guaranteeing a failed request for
+ * every route, each page is tried as a directory first and only falls back.
+ */
+const ROUTES = ["", "/wall", "/projects", "/money"];
+
+async function cacheShell(cache) {
+  for (const route of ROUTES) {
+    const candidates = [`${BASE}${route}/`, `${BASE}${route}` || "/"];
+    for (const url of candidates) {
+      try {
+        await cache.add(url);
+        break;
+      } catch {
+        // Try the other shape; if neither works the page simply is not cached.
+      }
+    }
+  }
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(VERSION)
-      .then((cache) =>
-        Promise.all(SHELL.map((url) => cache.add(url).catch(() => undefined))),
-      )
+      .then(cacheShell)
       .then(() => self.skipWaiting()),
   );
 });

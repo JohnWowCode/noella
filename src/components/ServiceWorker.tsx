@@ -9,7 +9,8 @@ export function ServiceWorker() {
     if (window.location.protocol !== "https:" && window.location.hostname !== "localhost") {
       return;
     }
-    navigator.serviceWorker.register("/sw.js").catch(() => {
+    const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+    navigator.serviceWorker.register(`${base}/sw.js`).catch(() => {
       // Offline support is a bonus; the app works without it.
     });
   }, []);
