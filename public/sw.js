@@ -7,15 +7,24 @@
  * and everything else is cache-first with a background refresh.
  */
 
-const VERSION = "noella-v1";
-const SHELL = ["/", "/wall", "/projects", "/money"];
+const VERSION = "noella-v2";
+
+/**
+ * Both URL shapes on purpose. A server build serves /wall; a static export
+ * serves /wall/ and 308s the bare path. addAll rejects the whole batch if any
+ * single request redirects or 404s, which silently left the cache empty and
+ * then answered /wall/ with the home page — so each entry is added on its own
+ * and a miss is simply skipped.
+ */
+const SHELL = ["/", "/wall", "/wall/", "/projects", "/projects/", "/money", "/money/"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(VERSION)
-      .then((cache) => cache.addAll(SHELL))
-      .catch(() => undefined)
+      .then((cache) =>
+        Promise.all(SHELL.map((url) => cache.add(url).catch(() => undefined))),
+      )
       .then(() => self.skipWaiting()),
   );
 });
@@ -46,10 +55,12 @@ self.addEventListener("fetch", (event) => {
           caches.open(VERSION).then((c) => c.put(request, copy));
           return response;
         })
+        // Offline: answer with the page that was asked for. Falling back to
+        // the home page would render Today at /wall/, which is worse than
+        // failing honestly.
         .catch(() =>
           caches
-            .match(request)
-            .then((hit) => hit || caches.match("/"))
+            .match(request, { ignoreSearch: true })
             .then((hit) => hit || Response.error()),
         ),
     );

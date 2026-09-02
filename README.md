@@ -19,6 +19,11 @@ npm run dev      # http://localhost:3000
 
 Nothing to configure. No account, no server, no keys.
 
+**To put it on your phone:** `npm run export` writes `./out`, which is the whole
+app as a folder of files — drag it onto [netlify.com/drop](https://app.netlify.com/drop)
+and you have a URL in about thirty seconds. See [DEPLOY.md](DEPLOY.md) for that
+and the auto-updating version.
+
 ## Where the data lives
 
 Right now: **your browser**. `LocalStore` (`src/lib/store/local.ts`) keeps notes

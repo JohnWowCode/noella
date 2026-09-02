@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "export": "STATIC_EXPORT=1 next build"
   },
   "dependencies": {
     "geist": "^1.7.2",
