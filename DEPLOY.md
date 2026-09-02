@@ -17,13 +17,19 @@ That folder **is** the app. It does not care where it is hosted.
 Uses the repository you already have. No new account, no third party, and it
 republishes every time you push.
 
-**One-time setup, two clicks:**
+**One-time setup — one switch, and it is the only thing not already done:**
 
-1. Repository **Settings → Pages**
+1. Open **https://github.com/JohnWowCode/noella/settings/pages**
 2. Under **Source**, choose **GitHub Actions**
+3. Go to the **Actions** tab, open the latest **Publish** run, and hit
+   **Re-run failed jobs**
 
-That's it. The workflow at `.github/workflows/pages.yml` is already committed.
-Push anything and it builds and publishes to:
+The workflow is committed and the build half already passes. Until Pages is
+switched on, the deploy step fails with `Failed to create deployment
+(status: 404) … Ensure GitHub Pages has been enabled` — that error means only
+the switch is missing, not that anything is broken.
+
+After that, every push republishes to:
 
 ```
 https://<your-username>.github.io/noella/
