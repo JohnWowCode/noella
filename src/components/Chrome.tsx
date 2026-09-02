@@ -1,69 +1,58 @@
 "use client";
 
 import Link from "next/link";
-import { dayStamp } from "@/lib/format";
-import { useNoella } from "@/lib/store/provider";
+import { usePathname } from "next/navigation";
 
-/** NOELLA, and a flat statement of what it currently contains. */
-export function Header({
-  right,
-}: {
-  right?: React.ReactNode;
-}) {
-  const { notes, colors } = useNoella();
-  const live = notes.filter((n) => n.archivedAt === null);
-  const open = live.filter((n) => n.isTask && n.doneAt === null).length;
-  const active = live.filter((n) => n.projectStatus === "active").length;
-
+/**
+ * The masthead, and nothing else.
+ *
+ * It used to carry a running tally — "12 notes · 2 active · 3 open" — on every
+ * screen, next to a nav of outlined buttons. Three numbers you did not ask for,
+ * above three numbers you did. The counts live where they mean something now:
+ * moves on Today, filters on the wall.
+ */
+export function Header({ right }: { right?: React.ReactNode }) {
   return (
-    <header className="border-b border-rule">
-      <div className="mx-auto flex max-w-3xl flex-wrap items-center gap-x-5 gap-y-3 px-5 py-4 sm:px-6">
-        <Link href="/" className="font-mono text-[15px] tracking-[0.2em]">
+    <header className="border-b border-rule-soft">
+      <div className="mx-auto flex max-w-3xl flex-wrap items-center gap-x-5 gap-y-3 px-5 py-5 sm:px-6">
+        <Link
+          href="/"
+          className="font-mono text-[16px] font-medium tracking-[0.22em]"
+        >
           NOELLA
         </Link>
-        {/* A row of zeros is a worse greeting than nothing at all. */}
-        {live.length > 0 && (
-          <span className="label hidden text-mute sm:inline">
-            {live.filter((n) => n.parentId === null).length} notes
-            {active > 0 && ` · ${active} active`}
-            {open > 0 && ` · ${open} open`}
-          </span>
-        )}
-        <div className="ml-auto flex items-center gap-2">{right}</div>
+        <div className="ml-auto flex items-center gap-1">{right}</div>
       </div>
     </header>
   );
 }
 
+/**
+ * A quiet line, not a status bar.
+ *
+ * "Noella · 41 rows · localStorage · no server · 2 Sep" was a debug readout at
+ * the bottom of a writing app. Where your notes live is worth one sentence,
+ * once, because it is genuinely reassuring; the row count is not.
+ */
 export function Footer() {
-  const { notes, label, ready } = useNoella();
-  // Archived rows still exist in the store, so they are counted separately
-  // rather than left to look like a disagreement with the header.
-  const archived = notes.filter((n) => n.archivedAt !== null).length;
-  // Gated on `ready` so the server and the first client render agree.
   return (
-    <footer className="mt-14 border-t border-rule">
-      <div className="label mx-auto flex max-w-3xl flex-wrap items-center gap-x-2.5 gap-y-1.5 px-5 py-6 text-mute sm:px-6">
-        <span>Noella</span>
-        <span aria-hidden>·</span>
-        <span>{notes.length} rows</span>
-        {archived > 0 && (
-          <>
-            <span aria-hidden>·</span>
-            <span>{archived} archived</span>
-          </>
-        )}
-        <span aria-hidden>·</span>
-        <span>{label}</span>
-        <span aria-hidden>·</span>
-        <span>no server</span>
-        <span aria-hidden>·</span>
-        <span>{ready ? dayStamp(new Date().toISOString()) : "…"}</span>
+    <footer className="mt-16 border-t border-rule-soft">
+      <div className="mx-auto max-w-3xl px-5 py-7 sm:px-6">
+        <p className="prose-note text-[14px] text-mute">
+          Everything here lives on this device. No server, no account, nothing
+          leaves.
+        </p>
       </div>
     </footer>
   );
 }
 
+/**
+ * Nav as words, not as buttons.
+ *
+ * Three outlined boxes in the corner read as three decisions. Underlining where
+ * you already are turns them back into signposts.
+ */
 export function NavLink({
   href,
   children,
@@ -71,10 +60,20 @@ export function NavLink({
   href: string;
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
+  // The export serves /wall/ as well as /wall, so compare on the trimmed path.
+  const here = (pathname ?? "/").replace(/\/+$/, "") || "/";
+  const current = here === href.replace(/\/+$/, "") || (href === "/" && here === "/");
+
   return (
     <Link
       href={href}
-      className="label rounded-lg border border-rule px-3 py-2 hover:bg-ink hover:text-paper"
+      aria-current={current ? "page" : undefined}
+      className={`label rounded-lg px-2.5 py-2 ${
+        current
+          ? "text-ink underline decoration-1 underline-offset-[6px]"
+          : "text-mute hover:text-ink"
+      }`}
     >
       {children}
     </Link>

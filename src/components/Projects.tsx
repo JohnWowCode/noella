@@ -47,8 +47,9 @@ export function Projects() {
       <Header
         right={
           <>
-            <NavLink href="/wall">Wall</NavLink>
             <NavLink href="/">Today</NavLink>
+            <NavLink href="/wall">Wall</NavLink>
+            <NavLink href="/projects">Projects</NavLink>
             <ThemeToggle />
           </>
         }

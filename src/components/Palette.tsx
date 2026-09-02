@@ -86,7 +86,6 @@ export function Palette() {
       go("Today", "/", "the move"),
       go("The wall", "/wall", "everything"),
       go("Projects", "/projects", "priorities"),
-      go("Bills", "/money", "money"),
     );
 
     if (todaysStep && active[0]) {

@@ -22,9 +22,18 @@ interface Props {
   colorId: string | null;
   onColorId: (id: string | null) => void;
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
+  placeholder?: string;
 }
 
-export function Compose({ colorId, onColorId, inputRef }: Props) {
+/**
+ * The one writing surface, on every screen that has one.
+ *
+ * It opens folded: a box and a prompt, nothing else. The colour row, the image
+ * button and the keyboard hints only appear once you are actually in it — a
+ * dozen swatches and four buttons under an empty box is a form, and a form is
+ * a reason not to write the thing down.
+ */
+export function Compose({ colorId, onColorId, inputRef, placeholder }: Props) {
   const { colors, addNote, attachImage } = useNoella();
   const [body, setBody] = useState("");
   const [restored, setRestored] = useState(false);
@@ -115,6 +124,9 @@ export function Compose({ colorId, onColorId, inputRef }: Props) {
 
   const selected = colors.find((c) => c.id === colorId) ?? null;
   const ready = body.trim().length > 0 || pending.length > 0;
+  // Unfolded once there is intent: you are typing, you have typed, or you have
+  // already chosen a world. Never merely because the page loaded.
+  const open = focused || ready || colorId !== null;
 
   return (
     <section
@@ -149,15 +161,11 @@ export function Compose({ colorId, onColorId, inputRef }: Props) {
         }}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        rows={3}
+        rows={open ? 3 : 2}
         spellCheck
-        placeholder={
-          dragging
-            ? "Drop the image."
-            : "Type the thing. Pick a colour if you feel like it."
-        }
+        placeholder={dragging ? "Drop the image." : (placeholder ?? "Write it down.")}
         aria-label="New note"
-        className="prose-note block w-full resize-none bg-transparent px-6 py-5
+        className="prose-note block w-full resize-none bg-transparent px-6 py-5 text-[19px]
                    outline-none placeholder:text-mute"
       />
 
@@ -178,6 +186,7 @@ export function Compose({ colorId, onColorId, inputRef }: Props) {
         </div>
       )}
 
+      {open && (
       <div className="flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-rule px-6 py-4">
         <div className="flex flex-wrap items-center gap-2">
           {colors.map((c, i) => (
@@ -196,7 +205,7 @@ export function Compose({ colorId, onColorId, inputRef }: Props) {
             onClick={() => onColorId(null)}
             aria-pressed={colorId === null}
             title="No colour"
-            className={`label ml-1 border border-rule px-2 py-1.5 ${
+            className={`label ml-1 rounded-lg border border-rule px-2.5 py-1.5 ${
               colorId === null ? "bg-ink text-paper" : "text-mute hover:text-ink"
             }`}
           >
@@ -204,8 +213,7 @@ export function Compose({ colorId, onColorId, inputRef }: Props) {
           </button>
         </div>
 
-        <div className="label ml-auto flex items-center gap-4 text-mute">
-          <span className="hidden lg:inline">⌘1–9 colour · ⌘0 none</span>
+        <div className="label ml-auto flex items-center gap-3 text-mute">
           <input
             ref={fileRef}
             type="file"
@@ -220,7 +228,7 @@ export function Compose({ colorId, onColorId, inputRef }: Props) {
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
-            className="label border border-rule px-2 py-1.5 text-ink hover:bg-ink hover:text-paper"
+            className="label rounded-lg border border-rule px-2.5 py-1.5 text-ink hover:bg-ink hover:text-paper"
           >
             + Image
           </button>
@@ -228,7 +236,7 @@ export function Compose({ colorId, onColorId, inputRef }: Props) {
             type="button"
             onClick={save}
             disabled={!ready}
-            className="label border border-rule px-2.5 py-1.5 text-ink
+            className="label rounded-lg border border-rule px-3 py-1.5 text-ink
                        enabled:hover:bg-ink enabled:hover:text-paper
                        disabled:cursor-not-allowed disabled:text-mute"
           >
@@ -236,6 +244,7 @@ export function Compose({ colorId, onColorId, inputRef }: Props) {
           </button>
         </div>
       </div>
+      )}
     </section>
   );
 }

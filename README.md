@@ -58,8 +58,8 @@ To move to Postgres, apply `supabase/migrations/0001_init.sql`, write a
 `SupabaseStore` against the same interface, and swap the one line in
 `src/lib/store/provider.tsx` that constructs `new LocalStore()`. No component
 changes. The migration already carries `owner_id`, `visibility`, RLS, full-text
-search, the `note_images` manifest, the bill columns, a `settings` table and
-the public-read policy, so sharing later is a feature flag rather than a schema
+search, the `note_images` manifest, list cadence and amounts, a `settings`
+table and the public-read policy, so sharing later is a feature flag rather than a schema
 rewrite.
 
 ## Using it
@@ -127,7 +127,7 @@ Measured on a wall of 2,000 notes, before and after a pass:
 
 The wall renders a page of 40 and extends as you reach the bottom, so the cost
 is flat: 500 notes and 2,000 notes now behave identically. Cards are wildly
-different heights — images, step checklists, bill editors — so windowing them
+different heights — images, step checklists, list panels — so windowing them
 would have been guesswork; paging is exact.
 
 Persisting is coalesced too. Writing is a full re-serialise of every note, which
@@ -355,16 +355,17 @@ voice telling you your wall is empty is funny once and cold every time after.
 
 ```
 src/
-  app/            layout (fonts, theme boot, PWA), / (Wall),
-                  /projects, /money, /today
+  app/            layout (fonts, theme boot, PWA), / (Today),
+                  /wall, /projects
   fonts/          vendored Literata variable woff2 + OFL licence
-  components/     Wall, Compose, QuickCapture, NoteCard, NoteImages,
+  components/     Focus, Wall, Compose, QuickCapture, NoteCard, NoteImages,
                   Swatch, TagIndex, DataMenu, Projects, ProjectPanel,
-                  Money, BillPanel, Today, Chrome
+                  ListPanel, Timer, Palette, Chrome
   lib/
     notes.ts      hashtag + task-marker parsing, search matching
     projects.ts   status ladder, steps, progress, next action
-    money.ts      bill recurrence, periods, what is owed now
+    momentum.ts   ledger, streaks, drift, estimate calibration
+    recurrence.ts list cadences, period keys, what is still open
     clock.ts      today as a stable snapshot, local calendar days
     images.ts     downscale/encode + IndexedDB blob store
     format.ts     seq labels, absolute timestamps

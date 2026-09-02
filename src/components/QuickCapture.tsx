@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { imageFilesFrom, isImageFile } from "@/lib/images";
 import { useNoella } from "@/lib/store/provider";
@@ -8,6 +9,12 @@ import { Swatch } from "./Swatch";
 
 const COLOR_KEY = "noella.capture.color";
 
+/** Screens that already put a writing box at the top of the page. */
+const HAS_BOX = new Set(["/", "/wall"]);
+
+/** How far you have to scroll away from that box before the button comes back. */
+const AWAY = 320;
+
 /**
  * One button, every screen. Capture has to be reachable from Today and
  * Projects too — an idea does not wait until you have navigated to the wall.
@@ -15,7 +22,9 @@ const COLOR_KEY = "noella.capture.color";
  */
 export function QuickCapture() {
   const { ready, colors, addNote, attachImage } = useNoella();
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const [body, setBody] = useState("");
   const [colorId, setColorId] = useState<string | null>(null);
   const [pending, setPending] = useState<NoteImage[]>([]);
@@ -73,6 +82,12 @@ export function QuickCapture() {
     };
   }, []);
 
+  // `/wall/` under a static export, `/wall` under a server build, and neither
+  // carries the GitHub Pages base path — usePathname already strips it, which
+  // reading window.location.pathname directly did not.
+  const here = (pathname ?? "/").replace(/\/+$/, "") || "/";
+  const inline = HAS_BOX.has(here);
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const el = e.target as HTMLElement | null;
@@ -81,16 +96,29 @@ export function QuickCapture() {
         el?.tagName === "TEXTAREA" ||
         el?.isContentEditable;
       if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
-      // On the wall `n` focuses the compose box, which is already the fastest
-      // path there; everywhere else it opens this.
-      if (e.key === "n" && window.location.pathname !== "/wall") {
+      // Where the page has its own box, `n` belongs to that box — the screen
+      // focuses it itself. This is only for the screens that have none.
+      if (e.key === "n" && !inline) {
         e.preventDefault();
         setOpen(true);
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [inline]);
+
+  /*
+   * The floating button is a second answer to a question the page has already
+   * answered. Where there is a box at the top, the button stays out of the way
+   * until you have scrolled far enough that the box is gone.
+   */
+  useEffect(() => {
+    if (!inline) return;
+    const onScroll = () => setScrolled(window.scrollY > AWAY);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [inline]);
 
   useEffect(() => {
     if (open) areaRef.current?.focus();
@@ -127,13 +155,13 @@ export function QuickCapture() {
 
   return (
     <>
-      {!open && (
+      {!open && (!inline || scrolled) && (
         <button
           type="button"
           onClick={() => setOpen(true)}
           aria-label="Capture a note"
-          className="label fixed right-5 bottom-5 z-40 border border-rule bg-ink
-                     rounded-full px-5 py-4 text-paper shadow-lg hover:bg-paper hover:text-ink sm:right-8 sm:bottom-8"
+          className="label fixed right-5 bottom-5 z-40 rounded-full border border-rule
+                     bg-ink px-5 py-4 text-paper shadow-lg hover:bg-paper hover:text-ink sm:right-8 sm:bottom-8"
         >
           + Note
         </button>
@@ -142,8 +170,8 @@ export function QuickCapture() {
       {saved && (
         <p
           role="status"
-          className="label fixed right-5 bottom-5 z-40 border border-rule bg-field
-                     px-4 py-3.5 sm:right-8 sm:bottom-8"
+          className="label fixed right-5 bottom-5 z-40 rounded-full border border-rule
+                     bg-field px-5 py-4 sm:right-8 sm:bottom-8"
         >
           Saved
         </p>
@@ -167,7 +195,7 @@ export function QuickCapture() {
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="label ml-auto border border-rule px-2.5 py-1.5 hover:bg-ink hover:text-paper"
+              className="label ml-auto rounded-lg border border-rule px-2.5 py-1.5 hover:bg-ink hover:text-paper"
             >
               Close
             </button>
@@ -195,7 +223,7 @@ export function QuickCapture() {
                 choose(e.key === "0" ? null : (colors[Number(e.key) - 1]?.id ?? null));
               }
             }}
-            placeholder="What is it?"
+            placeholder="What's on your mind?"
             aria-label="Note"
             className="prose-note flex-1 resize-none bg-transparent px-5 py-5 text-[20px]
                        outline-none placeholder:text-mute sm:px-8"
@@ -218,7 +246,7 @@ export function QuickCapture() {
                 type="button"
                 onClick={() => choose(null)}
                 aria-pressed={colorId === null}
-                className={`label ml-1 border border-rule px-2 py-1.5 ${
+                className={`label ml-1 rounded-lg border border-rule px-2.5 py-1.5 ${
                   colorId === null
                     ? "bg-ink text-paper"
                     : "text-mute hover:text-ink"
@@ -235,7 +263,7 @@ export function QuickCapture() {
                 type="button"
                 onClick={save}
                 disabled={!body.trim() && pending.length === 0}
-                className="label border border-rule px-3 py-2 text-ink
+                className="label rounded-lg border border-rule px-3 py-2 text-ink
                            enabled:hover:bg-ink enabled:hover:text-paper
                            disabled:cursor-not-allowed disabled:text-mute"
               >

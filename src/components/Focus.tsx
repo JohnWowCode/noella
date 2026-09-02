@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { dateKey, fromKey, useTodayKey } from "@/lib/clock";
+import { seqLabel, stamp } from "@/lib/format";
 import { formatMoney, listState } from "@/lib/recurrence";
 import {
   ACTIVE_LIMIT,
@@ -15,6 +16,8 @@ import {
   streak,
 } from "@/lib/momentum";
 import {
+  isList,
+  isProject,
   nextActionOf,
   progressOf,
   projectTitle,
@@ -25,6 +28,7 @@ import {
 import { useNoella } from "@/lib/store/provider";
 import type { Note } from "@/lib/types";
 import { Footer, Header, NavLink } from "./Chrome";
+import { Compose } from "./Compose";
 import { Progress } from "./ProjectPanel";
 import { Timer } from "./Timer";
 import { ThemeToggle } from "./ThemeToggle";
@@ -32,6 +36,9 @@ import { ThemeToggle } from "./ThemeToggle";
 const WEEKDAY = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const MONTH = ["January", "February", "March", "April", "May", "June", "July",
   "August", "September", "October", "November", "December"];
+
+/** Enough of the wall to prove the box works. Not enough to become a feed. */
+const LATELY = 4;
 
 /**
  * The front door.
@@ -44,6 +51,32 @@ const MONTH = ["January", "February", "March", "April", "May", "June", "July",
 export function Focus() {
   const { ready, notes, settings } = useNoella();
   const todayKey = useTodayKey();
+  const [composeColor, setComposeColor] = useState<string | null>(null);
+  const composeRef = useRef<HTMLTextAreaElement>(null);
+
+  // `n` from anywhere on this screen lands the cursor in the box. There is now
+  // a box to land in — this screen used to open with nowhere to write.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const el = e.target as HTMLElement | null;
+      if (
+        el?.tagName === "INPUT" ||
+        el?.tagName === "TEXTAREA" ||
+        el?.isContentEditable ||
+        e.metaKey ||
+        e.ctrlKey ||
+        e.altKey
+      ) {
+        return;
+      }
+      if (e.key === "n") {
+        e.preventDefault();
+        composeRef.current?.focus();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const active = useMemo(
     () => projectsOf(notes).filter((p) => p.projectStatus === "active"),
@@ -87,6 +120,27 @@ export function Focus() {
   }, [notes, todayKey]);
 
   const loose = useMemo(() => unfiled(notes), [notes]);
+  /*
+   * Plain notes, newest first.
+   *
+   * Steps live inside their project. Projects and lists are excluded too —
+   * they already have bands of their own further up this page, and showing
+   * them again here made the screen repeat itself three rows running.
+   */
+  const top = useMemo(
+    () =>
+      notes
+        .filter(
+          (n) =>
+            n.archivedAt === null &&
+            n.parentId === null &&
+            !isProject(n) &&
+            !isList(n),
+        )
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    [notes],
+  );
+  const lately = useMemo(() => top.slice(0, LATELY), [top]);
   const calibration = useMemo(() => estimateFactor(notes), [notes]);
   const days = streak(cells);
   const week = movesThisWeek(cells);
@@ -97,6 +151,7 @@ export function Focus() {
       <Header
         right={
           <>
+            <NavLink href="/">Today</NavLink>
             <NavLink href="/wall">Wall</NavLink>
             <NavLink href="/projects">Projects</NavLink>
             <ThemeToggle />
@@ -113,10 +168,24 @@ export function Focus() {
               <span>
                 {WEEKDAY[today.getDay()]} {today.getDate()} {MONTH[today.getMonth()]}
               </span>
-              <span className="ml-auto tabular-nums">
-                {week} {week === 1 ? "move" : "moves"} this week
-                {days > 1 && ` · ${days} in a row`}
-              </span>
+              {week > 0 && (
+                <span className="ml-auto tabular-nums">
+                  {week} {week === 1 ? "move" : "moves"} this week
+                  {days > 1 && ` · ${days} in a row`}
+                </span>
+              )}
+            </div>
+
+            {/* The whole point of the front door. You open the app and the
+                first thing under your thumb is somewhere to put the thought —
+                not a button that opens somewhere to put the thought. */}
+            <div className="mt-4">
+              <Compose
+                colorId={composeColor}
+                onColorId={setComposeColor}
+                inputRef={composeRef}
+                placeholder="What's on your mind?"
+              />
             </div>
 
             {focus ? (
@@ -127,16 +196,14 @@ export function Focus() {
 
             {others.length > 0 && (
               <Block>
-                <h2 className="label mb-3 flex items-center gap-2 text-mute">
-                  <span>Also active</span>
-                  <span aria-hidden>·</span>
-                  <span>{others.length}</span>
+                <Heading count={others.length}>
+                  Also going
                   {active.length > ACTIVE_LIMIT && (
-                    <span className="ml-auto normal-case tracking-normal text-mute">
-                      {active.length} active · {ACTIVE_LIMIT} is usually the limit
+                    <span className="label ml-auto font-normal text-mute">
+                      {ACTIVE_LIMIT} at a time is usually the limit
                     </span>
                   )}
-                </h2>
+                </Heading>
                 <div className="flex flex-col gap-2">
                   {others.map((p) => (
                     <AlsoActive key={p.id} project={p} notes={notes} />
@@ -147,22 +214,22 @@ export function Focus() {
 
             {due.length > 0 && (
               <Block>
-                <h2 className="label mb-3 text-mute">Coming round again</h2>
+                <Heading count={due.length}>Coming round again</Heading>
                 <div className="flex flex-col gap-2">
                   {due.map(({ list, state }) => (
                     <Link
                       key={list.id}
                       href={`/wall#note-${list.id}`}
-                      className="label flex items-baseline gap-3 rounded-xl border border-rule bg-field px-4 py-3.5 hover:bg-ink hover:text-paper"
+                      className="flex items-baseline gap-3 rounded-xl border border-rule bg-field px-4 py-3.5 hover:bg-ink hover:text-paper"
                     >
-                      <span className="normal-case tracking-normal">
+                      <span className="prose-note text-[16px] leading-snug">
                         {projectTitle(list)}
                       </span>
-                      <span className="ml-auto tabular-nums">
+                      <span className="label ml-auto shrink-0 tabular-nums opacity-70">
                         {state.settled.length}/{state.items.length}
                       </span>
                       {state.outstanding > 0 && (
-                        <span className="tabular-nums opacity-65">
+                        <span className="label shrink-0 tabular-nums opacity-70">
                           {formatMoney(state.outstanding, settings.currency)}
                         </span>
                       )}
@@ -174,14 +241,12 @@ export function Focus() {
 
             {drift.length > 0 && (
               <Block>
-                <h2 className="label mb-3 flex items-center gap-2 text-mute">
-                  <span>Still want these?</span>
-                  <span aria-hidden>·</span>
-                  <span>{drift.length}</span>
-                  <span className="ml-auto normal-case tracking-normal">
+                <Heading count={drift.length}>
+                  Still want these?
+                  <span className="label ml-auto font-normal text-mute">
                     no wrong answer
                   </span>
-                </h2>
+                </Heading>
                 <div className="flex flex-col gap-2">
                   {drift.map((p) => (
                     <Drifting
@@ -194,21 +259,50 @@ export function Focus() {
               </Block>
             )}
 
-            {loose.length > 0 && (
+            {/* What you actually wrote, where you wrote it. Without this the
+                box above swallows the note and gives nothing back. */}
+            {lately.length > 0 && (
+              <Block>
+                <Heading>
+                  Lately
+                  {top.length > LATELY && (
+                    <Link
+                      href="/wall"
+                      className="label ml-auto font-normal text-mute underline decoration-1 underline-offset-4 hover:text-ink"
+                    >
+                      all {top.length} →
+                    </Link>
+                  )}
+                </Heading>
+                <div className="flex flex-col gap-2">
+                  {lately.map((n) => (
+                    <Jot key={n.id} note={n} />
+                  ))}
+                </div>
+              </Block>
+            )}
+
+            {loose.length > LATELY && (
               <Block>
                 <Link
                   href="/wall"
-                  className="label flex items-center gap-3 rounded-xl border border-rule bg-field px-4 py-3.5 text-mute hover:bg-ink hover:text-paper"
+                  className="flex items-center gap-3 rounded-xl border border-rule bg-field px-4 py-3.5 hover:bg-ink hover:text-paper"
                 >
-                  <span>{loose.length} unfiled</span>
-                  <span className="ml-auto normal-case tracking-normal">
-                    jotted, no world yet →
+                  <span className="prose-note text-[16px]">
+                    {loose.length} {loose.length === 1 ? "note" : "notes"} with
+                    nowhere to live yet
                   </span>
+                  <span className="label ml-auto shrink-0 opacity-70">Sort →</span>
                 </Link>
               </Block>
             )}
 
-            <Ledger cells={cells} week={week} calibration={calibration} />
+            {/* Eight weeks of empty squares and three zeroes is not
+                encouragement, it is an audit. It appears once there is
+                something in it. */}
+            {cells.some((c) => c.moves > 0) && (
+              <Ledger cells={cells} week={week} calibration={calibration} />
+            )}
           </>
         )}
       </main>
@@ -359,11 +453,11 @@ function Drifting({ project, quiet }: { project: Note; quiet: number }) {
 
   return (
     <article className="flex flex-col gap-3 rounded-xl border border-rule bg-field px-4 py-3.5 sm:flex-row sm:items-center sm:gap-x-3">
-      <span className="label sm:flex-1">{projectTitle(project)}</span>
-      <span className="label flex items-center gap-3">
-        <span className="tabular-nums opacity-55">
-          last touched {quiet}d ago
-        </span>
+      <span className="prose-note text-[16px] leading-snug sm:flex-1">
+        {projectTitle(project)}
+      </span>
+      <span className="label tabular-nums text-mute">
+        quiet {quiet}d
       </span>
       <span className="flex flex-wrap items-center gap-1.5">
         <button
@@ -426,10 +520,10 @@ function Ledger({
 
   return (
     <Block>
-      <h2 className="label mb-3 flex items-center gap-2 text-mute">
-        <span>Ledger</span>
-        <span className="ml-auto normal-case tracking-normal">last 8 weeks</span>
-      </h2>
+      <Heading>
+        Ledger
+        <span className="label ml-auto font-normal text-mute">last 8 weeks</span>
+      </Heading>
       <div className="flex flex-wrap items-center gap-x-8 gap-y-6 rounded-2xl border border-rule bg-field px-5 py-5">
         <div className="grid grid-flow-col grid-rows-7 gap-[3px]">
           {cells.map((c) => (
@@ -571,16 +665,72 @@ function Block({ children }: { children: React.ReactNode }) {
   return <section className="mt-11">{children}</section>;
 }
 
+/**
+ * A band's name, in the serif, bold, at a size you can read across a room.
+ *
+ * These were 11px uppercase mono with the count spliced in between two
+ * interpuncts — five glyphs of punctuation to say "three of these".
+ */
+function Heading({
+  children,
+  count,
+}: {
+  children: React.ReactNode;
+  count?: number;
+}) {
+  return (
+    <h2 className="title mb-3 flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+      {children}
+      {count !== undefined && (
+        <span className="label font-normal text-mute tabular-nums">{count}</span>
+      )}
+    </h2>
+  );
+}
+
+/**
+ * One thing you wrote, shown back to you.
+ *
+ * A note lands on the wall the moment you save it, and the wall is a screen
+ * away — so the box on this page used to swallow your thought and show you
+ * nothing. Four lines of your own handwriting is the whole difference between
+ * a form and a desk.
+ */
+function Jot({ note }: { note: Note }) {
+  const { colorOf } = useNoella();
+  const color = colorOf(note);
+  const first = note.body.split("\n")[0] || seqLabel(note.seq);
+
+  return (
+    <Link
+      href={`/wall#note-${note.id}`}
+      className="flex items-baseline gap-3 rounded-xl border border-rule bg-field px-4 py-3 hover:border-ink"
+    >
+      <span
+        aria-hidden
+        className="h-2.5 w-2.5 shrink-0 translate-y-px rounded-full border border-rule"
+        style={{ backgroundColor: color?.hex ?? "transparent" }}
+      />
+      <span
+        className={`prose-note line-clamp-2 min-w-0 flex-1 text-[16px] leading-snug ${
+          note.doneAt ? "line-through opacity-45" : ""
+        }`}
+      >
+        {first}
+      </span>
+      <span className="label shrink-0 text-mute">{stamp(note.createdAt)}</span>
+    </Link>
+  );
+}
+
 function NothingFocused({ hasProjects }: { hasProjects: boolean }) {
   return (
     <section className="mt-6 rounded-2xl border border-rule bg-field px-6 py-10 sm:px-8">
-      <p className="prose-note text-[22px] leading-tight sm:text-[26px]">
-        Nothing on today.
-      </p>
-      <p className="label mt-4 text-mute">
+      <p className="display text-[26px] sm:text-[32px]">Nothing on today.</p>
+      <p className="prose-note mt-3 max-w-md text-[16px] text-mute">
         {hasProjects
           ? "Make a project active and it lands here as today's move."
-          : "Jot something on the wall, make it a project, give it one small step."}
+          : "Write something in the box above. When one of them turns into real work, make it a project and give it one small step."}
       </p>
       <Link
         href={hasProjects ? "/projects" : "/wall"}

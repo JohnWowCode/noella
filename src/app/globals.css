@@ -106,12 +106,19 @@
   }
 }
 
-/* Chrome speaks in flat machine language. */
+/*
+ * Chrome speaks in flat machine language — but quietly, and less of it.
+ *
+ * At 11px with 0.08em tracking this was the hardest thing on the page to read,
+ * and it was used for everything: headings, counts, buttons, whole sentences.
+ * It is now reserved for actual machine chrome (counts, keys, stamps) and set
+ * a size up, because "minimal" cannot mean "squint".
+ */
 @utility label {
   font-family: var(--font-geist-mono), ui-monospace, monospace;
-  font-size: 11px;
-  line-height: 1.1;
-  letter-spacing: 0.08em;
+  font-size: 12px;
+  line-height: 1.15;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
@@ -122,4 +129,30 @@
   font-size: 18px;
   line-height: 1.62;
   text-wrap: pretty;
+}
+
+/*
+ * Headings, in the same voice you write in.
+ *
+ * Everything that was not a note body used to be uppercase mono. Uppercase
+ * throws away word shape, mono throws away proportion, and 11px throws away
+ * the rest — so the screen was least readable exactly where it was telling you
+ * what things were. Headings are the serif now, set bold. The chrome stops
+ * shouting and starts speaking.
+ */
+@utility title {
+  font-family: var(--font-literata), Georgia, serif;
+  font-size: 19px;
+  font-weight: 640;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+/* A statement: the move, the empty screen, the one thing being asked. */
+@utility display {
+  font-family: var(--font-literata), Georgia, serif;
+  font-weight: 560;
+  line-height: 1.12;
+  letter-spacing: -0.022em;
+  text-wrap: balance;
 }

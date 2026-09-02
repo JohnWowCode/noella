@@ -44,18 +44,15 @@ export function Swatch({
     </button>
   );
 
-  if (count === undefined) return button;
+  // A column of twelve zeros under twelve colours is the emptiest possible
+  // reading of a wall. Only a world you have actually used says how much is
+  // in it; the rest are just colours you have not picked yet.
+  if (count === undefined || count === 0) return button;
 
   return (
-    <span className="flex flex-col items-center gap-1">
+    <span className="flex flex-col items-center gap-1.5">
       {button}
-      <span
-        className={`label text-[9px] tabular-nums ${
-          count === 0 ? "text-mute/45" : "text-mute"
-        }`}
-      >
-        {count}
-      </span>
+      <span className="label text-[10px] text-mute tabular-nums">{count}</span>
     </span>
   );
 }

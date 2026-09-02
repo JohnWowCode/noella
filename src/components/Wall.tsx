@@ -172,11 +172,12 @@ export function Wall() {
               }}
               placeholder="Search  /"
               aria-label="Search notes"
-              className="label w-32 border border-rule bg-field px-2.5 py-2
-                         outline-none placeholder:text-mute focus:w-48"
+              className="label w-28 rounded-lg border border-rule bg-field px-3 py-2
+                         outline-none placeholder:text-mute focus:w-44"
             />
-            <NavLink href="/projects">Projects</NavLink>
             <NavLink href="/">Today</NavLink>
+            <NavLink href="/wall">Wall</NavLink>
+            <NavLink href="/projects">Projects</NavLink>
             <ThemeToggle />
           </>
         }
@@ -187,6 +188,7 @@ export function Wall() {
           colorId={composeColor}
           onColorId={setComposeColor}
           inputRef={composeRef}
+          placeholder="Write it down."
         />
 
         {/* Filter row. Hidden until there is something worth filtering — on an
@@ -194,7 +196,9 @@ export function Wall() {
             directly beneath the twelve in the compose box. */}
         {live.length > 0 && (
         <div className="mt-7 flex flex-wrap items-start gap-x-4 gap-y-3">
-          <span className="label mt-2.5 text-mute">Filter</span>
+          {/* Filtering by colour needs a note with a colour on it. Until then
+              this is twelve buttons that all return the same empty result. */}
+          {counts.size > 0 && (
           <div className="flex flex-wrap items-start gap-2">
             {colors.map((c, i) => (
               <Swatch
@@ -208,12 +212,13 @@ export function Wall() {
               />
             ))}
           </div>
+          )}
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => setOnlyOpen((v) => !v)}
               aria-pressed={onlyOpen}
-              className={`label border border-rule px-2.5 py-1.5 ${
+              className={`label rounded-lg border border-rule px-2.5 py-1.5 ${
                 onlyOpen ? "bg-ink text-paper" : "text-mute hover:text-ink"
               }`}
             >
@@ -224,7 +229,7 @@ export function Wall() {
                 type="button"
                 onClick={() => setOnlyLists((v) => !v)}
                 aria-pressed={onlyLists}
-                className={`label border border-rule px-2.5 py-1.5 ${
+                className={`label rounded-lg border border-rule px-2.5 py-1.5 ${
                   onlyLists ? "bg-ink text-paper" : "text-mute hover:text-ink"
                 }`}
               >
@@ -236,7 +241,7 @@ export function Wall() {
                 type="button"
                 onClick={() => setOnlyUnfiled((v) => !v)}
                 aria-pressed={onlyUnfiled}
-                className={`label border border-rule px-2.5 py-1.5 ${
+                className={`label rounded-lg border border-rule px-2.5 py-1.5 ${
                   onlyUnfiled ? "bg-ink text-paper" : "text-mute hover:text-ink"
                 }`}
               >
@@ -248,7 +253,7 @@ export function Wall() {
                 type="button"
                 onClick={() => setOnlyProjects((v) => !v)}
                 aria-pressed={onlyProjects}
-                className={`label border border-rule px-2.5 py-1.5 ${
+                className={`label rounded-lg border border-rule px-2.5 py-1.5 ${
                   onlyProjects ? "bg-ink text-paper" : "text-mute hover:text-ink"
                 }`}
               >
@@ -260,7 +265,7 @@ export function Wall() {
                 type="button"
                 onClick={() => setShowArchive((v) => !v)}
                 aria-pressed={showArchive}
-                className={`label border border-rule px-2.5 py-1.5 ${
+                className={`label rounded-lg border border-rule px-2.5 py-1.5 ${
                   showArchive ? "bg-ink text-paper" : "text-mute hover:text-ink"
                 }`}
               >
@@ -279,7 +284,7 @@ export function Wall() {
                   setOnlyLists(false);
                   setOnlyUnfiled(false);
                 }}
-                className="label border border-rule px-2.5 py-1.5 hover:bg-ink hover:text-paper"
+                className="label rounded-lg border border-rule px-2.5 py-1.5 hover:bg-ink hover:text-paper"
               >
                 Clear · esc
               </button>
@@ -332,23 +337,18 @@ export function Wall() {
             <button
               type="button"
               onClick={loadMore}
-              className="label w-full border border-rule bg-field px-4 py-4 text-mute hover:bg-ink hover:text-paper"
+              className="label w-full rounded-xl border border-rule bg-field px-4 py-4 text-mute hover:bg-ink hover:text-paper"
             >
               {more} more
             </button>
           </div>
         )}
 
+        {/* "12 OF 12 SHOWN · 12 TOTAL" was arithmetic about a list you can
+            see. Backup is the only thing here worth a permanent control. */}
         {ready && notes.length > 0 && (
-          <div className="label mt-5 flex flex-wrap items-center gap-x-3 gap-y-2 text-mute">
-            <span>
-              {shown.length} of {visible.length} shown
-              {visible.length !== (showArchive ? archivedCount : live.length) &&
-                ` · ${showArchive ? archivedCount : live.length} total`}
-            </span>
-            <span className="ml-auto">
-              <DataMenu />
-            </span>
+          <div className="mt-8 flex justify-end">
+            <DataMenu />
           </div>
         )}
       </main>
@@ -428,7 +428,7 @@ function WorldBand({
 
 function Empty({ children }: { children: React.ReactNode }) {
   return (
-    <p className="label rounded-xl border border-rule bg-field px-6 py-14 text-center text-mute">
+    <p className="prose-note rounded-xl border border-rule bg-field px-6 py-14 text-center text-[16px] text-mute">
       {children}
     </p>
   );
@@ -445,13 +445,14 @@ function Empty({ children }: { children: React.ReactNode }) {
 function FirstRun() {
   return (
     <div className="rounded-xl border border-rule bg-field px-6 py-10 sm:px-10 sm:py-12">
-      <p className="prose-note text-[21px] leading-snug sm:text-[24px]">
-        Write anything up there. A thought, a job, half an idea.
+      <p className="display text-[26px] sm:text-[32px]">
+        Write anything up there.
       </p>
-      <p className="prose-note mt-4 max-w-lg text-[16px] leading-relaxed text-mute">
-        Colours are worlds — tap one if you know where a note belongs, or don&apos;t
-        and sort it later. Anything that turns into real work can become a
-        project; anything that repeats can become a list.
+      <p className="prose-note mt-4 max-w-lg text-[17px] leading-relaxed text-mute">
+        A thought, a job, half an idea. Colours are worlds — pick one if you
+        know where it belongs, or don&apos;t and sort it later. Anything that
+        turns into real work can become a project; anything that comes back
+        every month can become a list.
       </p>
     </div>
   );

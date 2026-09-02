@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { seqLabel, stamp } from "@/lib/format";
 import { imageFilesFrom } from "@/lib/images";
-import { wordCount } from "@/lib/notes";
 import { isList, isProject, projectTitle, stepsOf } from "@/lib/projects";
 import { useNoella } from "@/lib/store/provider";
 import type { Note } from "@/lib/types";
@@ -33,6 +32,7 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
   const [viewing, setViewing] = useState<number | null>(null);
   const [moving, setMoving] = useState(false);
   const [recolouring, setRecolouring] = useState(false);
+  const [menu, setMenu] = useState(false);
   const areaRef = useRef<HTMLTextAreaElement>(null);
 
   const color = colorOf(note);
@@ -150,22 +150,8 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
             </>
           )
         )}
-        {/* A word count says something about a paragraph of thinking and
-            nothing at all about a project title or a bill. */}
-        {!project && !list && wordCount(note.body) > 3 && (
-          <>
-            <span>{wordCount(note.body)} words</span>
-            <Dot />
-          </>
-        )}
-        {note.images.length > 0 && (
-          <>
-            <span>
-              {note.images.length} {note.images.length === 1 ? "image" : "images"}
-            </span>
-            <Dot />
-          </>
-        )}
+        {/* Word count and image count both left. A number counting the words
+            you can see, above the words you can see, is not information. */}
         <span>{stamp(note.createdAt)}</span>
         {note.pinned && (
           <>
@@ -182,33 +168,69 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
 
         <span
           data-card-actions
-          className="ml-auto flex items-center gap-2.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100"
+          className="ml-auto flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100"
         >
           <Action onClick={() => setEditing((v) => !v)}>
             {editing ? "Done" : "Edit"}
           </Action>
+          <Action
+            onClick={() => {
+              setMenu((v) => !v);
+              setRecolouring(false);
+              setMoving(false);
+            }}
+            pressed={menu}
+            label="More actions"
+          >
+            ⋯
+          </Action>
+        </span>
+      </header>
+
+      {/*
+        Everything else, once asked for.
+
+        Nine actions used to sit in the header as nine underlined words, on
+        every card, appearing together on hover: Edit Pin Colour Project List
+        File Task Archive Del. That is not a card with actions, it is a toolbar
+        with a note attached — and picking one meant reading all nine first.
+      */}
+      {menu && (
+        <div className="mt-3 flex flex-wrap items-center gap-1.5 rounded-lg border border-current/25 px-2 py-2">
           <Action onClick={() => patchNote(note.id, { pinned: !note.pinned })}>
             {note.pinned ? "Unpin" : "Pin"}
           </Action>
-          <Action onClick={() => setRecolouring((v) => !v)}>Colour</Action>
+          <Action
+            onClick={() => {
+              setRecolouring((v) => !v);
+              setMoving(false);
+            }}
+            pressed={recolouring}
+          >
+            Colour
+          </Action>
           {!list && (
             <Action
               onClick={() =>
-                patchNote(note.id, {
-                  projectStatus: project ? null : "idea",
-                })
+                patchNote(note.id, { projectStatus: project ? null : "idea" })
               }
             >
-              {project ? "Unproject" : "Project"}
+              {project ? "Unproject" : "Make a project"}
             </Action>
           )}
           {!project && (
             <Action onClick={() => patchNote(note.id, { isList: !list })}>
-              {list ? "Unlist" : "List"}
+              {list ? "Unlist" : "Make a list"}
             </Action>
           )}
           {!project && targets.length > 0 && (
-            <Action onClick={() => setMoving((v) => !v)}>
+            <Action
+              onClick={() => {
+                setMoving((v) => !v);
+                setRecolouring(false);
+              }}
+              pressed={moving}
+            >
               {note.parentId ? "Unfile" : "File"}
             </Action>
           )}
@@ -250,10 +272,10 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
               removeNote(note.id);
             }}
           >
-            Del
+            Delete
           </Action>
-        </span>
-      </header>
+        </div>
+      )}
 
       {recolouring && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -409,15 +431,25 @@ function Dot() {
 function Action({
   onClick,
   children,
+  pressed,
+  label,
 }: {
   onClick: () => void;
   children: React.ReactNode;
+  pressed?: boolean;
+  label?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="label underline decoration-1 underline-offset-2 hover:no-underline"
+      aria-pressed={pressed}
+      aria-label={label}
+      className={`label rounded-md px-2 py-1.5 ${
+        pressed
+          ? "bg-current/15"
+          : "opacity-70 hover:bg-current/10 hover:opacity-100"
+      }`}
     >
       {children}
     </button>

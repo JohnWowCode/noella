@@ -47,16 +47,24 @@ create table public.notes (
   -- its steps with it, because a step alone means nothing.
   parent_id   uuid references public.notes (id) on delete cascade,
 
-  -- A bill is a note you promoted. Recurrence is never expanded into rows:
-  -- bill_paid_periods holds the buckets already settled ('2026-07'), so next
-  -- month resets itself. A payments table is the natural upgrade if this ever
-  -- needs amounts-actually-paid or a history.
-  bill_amount   numeric(12, 2) check (bill_amount >= 0),
-  bill_cadence  text check (bill_cadence in ('monthly', 'weekly', 'yearly', 'once')),
-  -- Read per cadence: day of month, day of week, 'MM-DD', or 'YYYY-MM-DD'.
-  bill_due_on   text,
-  bill_paid_periods text[] not null default '{}',
-  bill_autopay  boolean not null default false,
+  -- A list is a note you promoted, like a project, but inert: no status, no
+  -- claim on today. Give it a cadence and its items un-tick when the period
+  -- turns, which is all a bill ever was — a list of things that come back
+  -- every month. Bills had five columns of their own here; they now have none.
+  is_list       boolean not null default false,
+  list_cadence  text check (list_cadence in ('weekly', 'monthly', 'yearly')),
+  -- Optional money on a list item, so a recurring list can total itself.
+  amount        numeric(12, 2) check (amount >= 0),
+
+  -- What you guessed against what it took. Nothing corrects a bad estimate
+  -- like seeing your own guess next to your own result.
+  estimate_minutes integer check (estimate_minutes > 0),
+  actual_minutes   integer check (actual_minutes >= 0),
+  -- Drift can be deferred; a permanent list of failures is a reason to stop
+  -- opening the app. Local date key, 'YYYY-MM-DD'.
+  snoozed_until text,
+  -- Hand-set priority among siblings. Lower is sooner; rank one is today.
+  "order"     integer not null default 0,
   pinned      boolean not null default false,
   visibility  text not null default 'private'
               check (visibility in ('private', 'unlisted', 'public')),
@@ -70,13 +78,13 @@ create table public.notes (
   -- A project cannot also be somebody's step; the tree stays one level deep.
   constraint notes_project_or_step
     check (project_status is null or parent_id is null),
-  -- A bill is either fully described or not a bill at all.
-  constraint notes_bill_complete
-    check (
-      (bill_amount is null and bill_cadence is null and bill_due_on is null)
-      or (bill_amount is not null and bill_cadence is not null
-          and bill_due_on is not null)
-    )
+  -- A note is a project or a list, never both. Both are promotions of the
+  -- same row, and the two panels answer different questions.
+  constraint notes_project_or_list
+    check (project_status is null or is_list = false),
+  -- A cadence is a property of a list. Nothing else recurs.
+  constraint notes_cadence_needs_list
+    check (list_cadence is null or is_list)
 );
 
 create index notes_owner_created_idx on public.notes (owner_id, created_at desc);
@@ -84,8 +92,10 @@ create index notes_parent_idx on public.notes (parent_id, created_at)
   where parent_id is not null;
 create index notes_project_idx on public.notes (owner_id, project_status)
   where project_status is not null;
-create index notes_bill_idx on public.notes (owner_id)
-  where bill_amount is not null;
+create index notes_list_idx on public.notes (owner_id)
+  where is_list;
+-- Ranking reads siblings in order, so the order column is part of the key.
+create index notes_rank_idx on public.notes (owner_id, parent_id, "order");
 
 -- App-wide preferences, one row per owner. Travels with an export.
 create table public.settings (
