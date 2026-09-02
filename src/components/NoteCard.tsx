@@ -6,11 +6,12 @@ import { imageFilesFrom } from "@/lib/images";
 import { wordCount } from "@/lib/notes";
 import { fromKey, useTodayKey } from "@/lib/clock";
 import { formatMoney, isBill, newBill } from "@/lib/money";
-import { isProject, projectTitle, stepsOf } from "@/lib/projects";
+import { isList, isProject, projectTitle, stepsOf } from "@/lib/projects";
 import { useNoella } from "@/lib/store/provider";
 import type { Note } from "@/lib/types";
 import { Lightbox, NoteImages } from "./NoteImages";
 import { BillPanel } from "./BillPanel";
+import { ListPanel } from "./ListPanel";
 import { ProjectPanel } from "./ProjectPanel";
 
 interface Props {
@@ -44,7 +45,8 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
   const archived = note.archivedAt !== null;
   const project = isProject(note);
   const bill = isBill(note) ? note.bill : null;
-  const steps = project ? stepsOf(notes, note.id) : [];
+  const list = isList(note);
+  const steps = project || list ? stepsOf(notes, note.id) : [];
   // Other projects this note could be filed under.
   const targets = notes.filter(
     (n) => isProject(n) && n.id !== note.id && n.archivedAt === null,
@@ -121,7 +123,12 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
         )}
         <span>{seqLabel(note.seq)}</span>
         <Dot />
-        {bill ? (
+        {list ? (
+          <>
+            <span>list · {steps.length} items</span>
+            <Dot />
+          </>
+        ) : bill ? (
           <>
             <span>
               bill · {formatMoney(bill.amount, settings.currency)}
@@ -194,7 +201,7 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
             {note.pinned ? "Unpin" : "Pin"}
           </Action>
           <Action onClick={() => setRecolouring((v) => !v)}>Colour</Action>
-          {!bill && (
+          {!bill && !list && (
             <Action
               onClick={() =>
                 patchNote(note.id, {
@@ -205,7 +212,12 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
               {project ? "Unproject" : "Project"}
             </Action>
           )}
-          {!project && (
+          {!bill && !project && (
+            <Action onClick={() => patchNote(note.id, { isList: !list })}>
+              {list ? "Unlist" : "List"}
+            </Action>
+          )}
+          {!project && !list && (
             <Action
               onClick={() =>
                 patchNote(note.id, { bill: bill ? null : newBill() })
@@ -243,9 +255,13 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
               if (
                 steps.length > 0 &&
                 !window.confirm(
-                  `Delete this project and its ${steps.length} ${
-                    steps.length === 1 ? "step" : "steps"
-                  }?`,
+                  list
+                    ? `Delete this list and its ${steps.length} ${
+                        steps.length === 1 ? "item" : "items"
+                      }?`
+                    : `Delete this project and its ${steps.length} ${
+                        steps.length === 1 ? "step" : "steps"
+                      }?`,
                 )
               ) {
                 return;
@@ -352,6 +368,8 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
       {project && (
         <ProjectPanel project={note} steps={steps} onColor={onColor} />
       )}
+
+      {list && <ListPanel list={note} items={steps} onColor={onColor} />}
 
       {bill && todayKey && (
         <BillPanel

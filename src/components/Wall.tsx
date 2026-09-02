@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { matches } from "@/lib/notes";
-import { isProject, unfiled } from "@/lib/projects";
+import { isList, isProject, unfiled } from "@/lib/projects";
 import { colorLabel, useNoella } from "@/lib/store/provider";
 import { Footer, Header, NavLink } from "./Chrome";
 import { Compose } from "./Compose";
@@ -23,6 +23,7 @@ export function Wall() {
   const [composeColor, setComposeColor] = useState<string | null>(null);
   const [onlyOpen, setOnlyOpen] = useState(false);
   const [onlyProjects, setOnlyProjects] = useState(false);
+  const [onlyLists, setOnlyLists] = useState(false);
   const [onlyUnfiled, setOnlyUnfiled] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
 
@@ -90,6 +91,7 @@ export function Wall() {
         (tag === null || n.tags.includes(tag)) &&
         (!onlyOpen || (n.isTask && n.doneAt === null)) &&
         (!onlyProjects || isProject(n)) &&
+        (!onlyLists || isList(n)) &&
         (!onlyUnfiled || unfiledIds.has(n.id)) &&
         matches(n, query),
     );
@@ -98,13 +100,13 @@ export function Wall() {
       if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
       return b.createdAt.localeCompare(a.createdAt);
     });
-  }, [notes, world, tag, onlyOpen, onlyProjects, onlyUnfiled, unfiledIds, query, showArchive]);
+  }, [notes, world, tag, onlyOpen, onlyProjects, onlyLists, onlyUnfiled, unfiledIds, query, showArchive]);
 
   // Any change to what is being shown starts the list again from the top.
   // Adjusted during render rather than in an effect, so the first paint after
   // a filter change is already the short list instead of the old long one.
   const filterSignature = [
-    query, world, tag, onlyOpen, onlyProjects, onlyUnfiled, showArchive,
+    query, world, tag, onlyOpen, onlyProjects, onlyLists, onlyUnfiled, showArchive,
   ].join("\u0000");
   const [lastSignature, setLastSignature] = useState(filterSignature);
   if (filterSignature !== lastSignature) {
@@ -135,6 +137,7 @@ export function Wall() {
     [notes],
   );
   const projectCount = useMemo(() => live.filter(isProject).length, [live]);
+  const listCount = useMemo(() => live.filter(isList).length, [live]);
   const counts = useMemo(() => {
     const m = new Map<string, number>();
     for (const n of live) {
@@ -149,6 +152,7 @@ export function Wall() {
     query !== "" ||
     onlyOpen ||
     onlyProjects ||
+    onlyLists ||
     onlyUnfiled;
 
   return (
@@ -213,6 +217,18 @@ export function Wall() {
             >
               Open tasks
             </button>
+            {listCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setOnlyLists((v) => !v)}
+                aria-pressed={onlyLists}
+                className={`label border border-rule px-2.5 py-1.5 ${
+                  onlyLists ? "bg-ink text-paper" : "text-mute hover:text-ink"
+                }`}
+              >
+                Lists {listCount}
+              </button>
+            )}
             {unfiledIds.size > 0 && (
               <button
                 type="button"
@@ -258,6 +274,7 @@ export function Wall() {
                   setQuery("");
                   setOnlyOpen(false);
                   setOnlyProjects(false);
+                  setOnlyLists(false);
                   setOnlyUnfiled(false);
                 }}
                 className="label border border-rule px-2.5 py-1.5 hover:bg-ink hover:text-paper"

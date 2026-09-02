@@ -41,6 +41,12 @@ export interface Note {
   /** Non-null means this note is a bill. Recurrence, not a row per month. */
   bill: Bill | null;
   /**
+   * A list is a note you promoted, like a project, but inert: no status, no
+   * drift, no claim on today. Somewhere to keep twenty things without any of
+   * them becoming a demand.
+   */
+  isList: boolean;
+  /**
    * Minutes you guessed this would take, and minutes it actually took.
    * ADHD time estimation is systematically short, and the only way to correct
    * for that is to see your own guess next to your own result.

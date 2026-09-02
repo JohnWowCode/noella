@@ -22,6 +22,22 @@ export function isProject(note: Note): boolean {
   return note.projectStatus !== null;
 }
 
+export function isList(note: Note): boolean {
+  return note.isList;
+}
+
+/**
+ * Lists, newest first. Deliberately not part of projectsOf: a list must never
+ * reach Today, be counted against the active limit, or be asked whether you
+ * still want it. Long lists overwhelm when they are presented as a demand —
+ * so a list is storage, and the front door stays one thing.
+ */
+export function listsOf(notes: Note[]): Note[] {
+  return notes
+    .filter((n) => n.isList && n.archivedAt === null)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
 export function isStep(note: Note): boolean {
   return note.parentId !== null;
 }
@@ -78,7 +94,8 @@ export function unfiled(notes: Note[]): Note[] {
       n.colorId === null &&
       n.projectStatus === null &&
       n.parentId === null &&
-      n.bill === null,
+      n.bill === null &&
+      !n.isList,
   );
 }
 

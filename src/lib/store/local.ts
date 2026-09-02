@@ -38,6 +38,7 @@ function migrate(snapshot: Snapshot): Snapshot {
     estimateMinutes: n.estimateMinutes ?? null,
     actualMinutes: n.actualMinutes ?? null,
     snoozedUntil: n.snoozedUntil ?? null,
+    isList: n.isList ?? false,
   }));
 
   const colors = [...snapshot.colors];
@@ -167,6 +168,7 @@ export class LocalStore implements Store {
       estimateMinutes: null,
       actualMinutes: null,
       snoozedUntil: null,
+      isList: false,
       // New steps land at the bottom of their project's list unless placed.
       order:
         input.order ??

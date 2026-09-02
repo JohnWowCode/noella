@@ -194,6 +194,24 @@ that, and two of them are corrections to earlier versions of this app.
 - **Deleting is undoable** and the app is installable, so it is where you left
   it rather than somewhere you have to remember to go.
 
+## Lists
+
+`List` on any note turns it into one. A list is deliberately **less** than a
+project: no status, no drift, no progress meter, and it never reaches Today.
+
+That restraint is the point. Long lists overwhelm when they are presented as a
+demand — the research is consistent that 3–5 items is the ceiling for a list
+you are being asked to act on. So the front door stays one thing, and a list is
+just somewhere to keep twenty things without any of them becoming a claim on
+your day.
+
+- Ticked items **sink to the bottom** rather than vanishing, so a list you are
+  working through shows that you are working through it.
+- `Copy as text` puts the whole thing on your clipboard as markdown
+  checkboxes — the honest version of sharing, given there is no server. Real
+  collaboration needs the Postgres backend that is written and waiting.
+- `Lists n` on the wall narrows to just them.
+
 ## Priorities
 
 `/projects` is a ranked list, not a pile. Every project shows its position —
