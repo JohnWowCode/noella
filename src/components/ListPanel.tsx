@@ -1,21 +1,28 @@
 "use client";
 
 import { useState } from "react";
-import { reorder } from "@/lib/order";
-import { stepsOf } from "@/lib/projects";
+import { fromKey, useTodayKey } from "@/lib/clock";
+import {
+  CADENCES,
+  daysLeftInPeriod,
+  describeCadence,
+  formatMoney,
+  isSettled,
+  listState,
+} from "@/lib/recurrence";
 import { useNoella } from "@/lib/store/provider";
 import type { Note } from "@/lib/types";
 
 /**
- * A plain list.
+ * A list, and — if you give it a cadence — a recurring one.
  *
- * Deliberately less than a project: no status ladder, no drift, no progress
- * meter, and it never reaches Today. A long list presented as a demand is the
- * thing that makes people freeze, so this one makes no demand at all — it is
- * somewhere to put twenty things and forget them until you want them.
+ * Bills used to be their own kind of note with their own screen. They are not:
+ * a bill is a thing on a list that comes back every month. Giving a list a
+ * cadence covers rent as easily as it covers a weekly tidy, and it deleted a
+ * whole tab.
  *
- * Ticked items sink to the bottom rather than vanishing, because a list you
- * are working through should show that you are working through it.
+ * Ticked items sink rather than vanish, so a list you are working through
+ * shows that you are working through it.
  */
 export function ListPanel({
   list,
@@ -26,14 +33,16 @@ export function ListPanel({
   items: Note[];
   onColor: boolean;
 }) {
-  const { addNote, patchNote, removeNote } = useNoella();
+  const { addNote, patchNote, removeNote, settings } = useNoella();
   const [draft, setDraft] = useState("");
   const [copied, setCopied] = useState(false);
+  const todayKey = useTodayKey();
 
-  const edge = onColor ? "border-current/30" : "border-rule-soft";
-  const open = items.filter((i) => i.doneAt === null);
-  const done = items.filter((i) => i.doneAt !== null);
-  const ordered = [...open, ...done];
+  const edge = onColor ? "border-current/25" : "border-rule-soft";
+  const today = todayKey ? fromKey(todayKey) : new Date();
+  const cadence = list.listCadence;
+  const state = listState(items, cadence, today);
+  const ordered = [...state.open, ...state.settled];
 
   function add() {
     const body = draft.trim();
@@ -42,15 +51,15 @@ export function ListPanel({
     setDraft("");
   }
 
-  /**
-   * Real collaboration needs a server this app does not have. Handing someone
-   * the list as text is the honest version of it, and covers most of what
-   * "send this to someone" actually means.
-   */
+  /** Real collaboration needs a server; handing someone the text does not. */
   async function copy() {
     const text = [
       list.body.split("\n")[0],
-      ...ordered.map((i) => `- [${i.doneAt ? "x" : " "}] ${i.body}`),
+      ...ordered.map(
+        (i) =>
+          `- [${isSettled(i, cadence, today) ? "x" : " "}] ${i.body}` +
+          (i.amount ? ` — ${formatMoney(i.amount, settings.currency)}` : ""),
+      ),
     ].join("\n");
     try {
       await navigator.clipboard.writeText(text);
@@ -62,88 +71,120 @@ export function ListPanel({
   }
 
   return (
-    <div className={`mt-4 border-t ${edge} pt-4`}>
+    <div className={`mt-5 border-t ${edge} pt-5`}>
       <div className="label flex flex-wrap items-center gap-x-3 gap-y-2">
-        <span className="opacity-60">
-          {open.length} to go
-          {done.length > 0 && ` · ${done.length} done`}
+        <span className="flex items-center gap-1.5">
+          {CADENCES.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() =>
+                patchNote(list.id, { listCadence: cadence === c ? null : c })
+              }
+              aria-pressed={cadence === c}
+              className={`rounded border border-current px-2 py-1 ${
+                cadence === c
+                  ? onColor
+                    ? "bg-[#111] text-white"
+                    : "bg-ink text-paper"
+                  : "opacity-45 hover:opacity-100"
+              }`}
+            >
+              {c}
+            </button>
+          ))}
         </span>
+
+        {state.total > 0 && (
+          <span className="tabular-nums opacity-70">
+            {formatMoney(state.total, settings.currency)}
+            {cadence && ` ${describeCadence(cadence)}`}
+          </span>
+        )}
+
         <button
           type="button"
           onClick={copy}
-          className={`ml-auto border border-current px-2 py-1 ${
+          className={`ml-auto rounded border border-current px-2 py-1 ${
             onColor
               ? "hover:bg-[#111] hover:text-white"
               : "hover:bg-ink hover:text-paper"
           }`}
         >
-          {copied ? "Copied" : "Copy as text"}
+          {copied ? "Copied" : "Copy"}
         </button>
       </div>
 
+      {/* The satisfying part: how much of this is behind you. */}
+      {items.length > 0 && (
+        <div className="label mt-4 flex items-center gap-3">
+          <span className="h-2 flex-1 overflow-hidden rounded-full border border-current/30">
+            <span
+              className={`block h-full rounded-full ${onColor ? "bg-[#111]" : "bg-ink"}`}
+              style={{ width: `${(state.settled.length / items.length) * 100}%` }}
+            />
+          </span>
+          <span className="tabular-nums opacity-70">
+            {state.settled.length}/{items.length}
+          </span>
+          {cadence && state.open.length > 0 && (
+            <span className="opacity-55">
+              resets in {daysLeftInPeriod(cadence, today)}d
+            </span>
+          )}
+          {cadence && state.open.length === 0 && (
+            <span className="opacity-70">all done</span>
+          )}
+        </div>
+      )}
+
       {ordered.length > 0 && (
-        <ul className={`mt-3 border ${edge}`}>
-          {ordered.map((item, i) => (
-            <li
-              key={item.id}
-              className={`group/item flex items-start gap-3 border-b ${edge} px-3 py-2.5 last:border-b-0`}
-            >
-              <button
-                type="button"
-                onClick={() =>
-                  patchNote(item.id, {
-                    doneAt: item.doneAt ? null : new Date().toISOString(),
-                  })
-                }
-                aria-label={item.doneAt ? "Untick item" : "Tick item"}
-                className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center border border-current text-[10px] leading-none"
+        <ul className={`mt-4 overflow-hidden rounded-lg border ${edge}`}>
+          {ordered.map((item, i) => {
+            const done = isSettled(item, cadence, today);
+            return (
+              <li
+                key={item.id}
+                className={`group/item flex items-center gap-3 border-b ${edge} px-4 py-3 last:border-b-0`}
               >
-                {item.doneAt ? "×" : ""}
-              </button>
-              <span
-                className={`flex-1 text-[15px] leading-snug ${
-                  item.doneAt ? "line-through opacity-45" : ""
-                }`}
-              >
-                {item.body}
-              </span>
-              <span className="flex shrink-0 items-center gap-2 opacity-0 transition-opacity group-hover/item:opacity-70 focus-within:opacity-100">
                 <button
                   type="button"
-                  onClick={() => {
-                    for (const patch of reorder(ordered, item.id, -1)) {
-                      patchNote(patch.id, { order: patch.order });
-                    }
-                  }}
-                  disabled={i === 0}
-                  aria-label="Move item up"
-                  className="label disabled:opacity-30"
+                  onClick={() =>
+                    patchNote(item.id, {
+                      doneAt: done ? null : new Date().toISOString(),
+                    })
+                  }
+                  aria-label={done ? "Untick" : "Tick"}
+                  className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border text-[11px] leading-none ${
+                    done
+                      ? onColor
+                        ? "border-current bg-[#111] text-white"
+                        : "border-ink bg-ink text-paper"
+                      : "border-current/50 hover:border-current"
+                  }`}
                 >
-                  ↑
+                  {done ? "✓" : ""}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    for (const patch of reorder(ordered, item.id, 1)) {
-                      patchNote(patch.id, { order: patch.order });
-                    }
-                  }}
-                  disabled={i === ordered.length - 1}
-                  aria-label="Move item down"
-                  className="label disabled:opacity-30"
+                <span
+                  className={`flex-1 text-[15px] leading-snug ${
+                    done ? "line-through opacity-40" : ""
+                  }`}
                 >
-                  ↓
-                </button>
+                  {item.body}
+                </span>
+                <AmountField item={item} onColor={onColor} />
                 <button
                   type="button"
                   onClick={() => removeNote(item.id)}
-                  className="label underline decoration-1 underline-offset-2"
+                  aria-label="Remove item"
+                  className="label shrink-0 opacity-0 transition-opacity group-hover/item:opacity-60 hover:!opacity-100 focus:opacity-100"
                 >
-                  Del
+                  ×
                 </button>
-              </span>
-            </li>
-          ))}
+                <span className="sr-only">{i + 1}</span>
+              </li>
+            );
+          })}
         </ul>
       )}
 
@@ -157,26 +198,78 @@ export function ListPanel({
               add();
             }
           }}
-          placeholder="Add an item, then Enter"
+          placeholder="Add something, then Enter"
           aria-label={`Add to ${list.body.split("\n")[0]}`}
-          className={`flex-1 border ${edge} bg-transparent px-3 py-2 text-[15px]
-                      outline-none placeholder:opacity-55`}
+          className={`flex-1 rounded-lg border ${edge} bg-transparent px-4 py-2.5 text-[15px]
+                      outline-none placeholder:opacity-50`}
         />
         <button
           type="button"
           onClick={add}
           disabled={!draft.trim()}
-          className={`label border border-current px-2.5 py-2 ${
+          className={`label rounded-lg border border-current px-3 py-2.5 ${
             onColor
               ? "enabled:hover:bg-[#111] enabled:hover:text-white"
               : "enabled:hover:bg-ink enabled:hover:text-paper"
-          } disabled:opacity-40`}
+          } disabled:opacity-35`}
         >
-          + Item
+          Add
         </button>
       </div>
     </div>
   );
 }
 
-export { stepsOf as itemsOf };
+/** Money is optional on any item, and invisible until you give it some. */
+function AmountField({ item, onColor }: { item: Note; onColor: boolean }) {
+  const { patchNote, settings } = useNoella();
+  const [editing, setEditing] = useState(false);
+
+  if (!editing && item.amount === null) {
+    return (
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        aria-label="Add an amount"
+        className="label shrink-0 opacity-0 transition-opacity group-hover/item:opacity-50 hover:!opacity-100 focus:opacity-100"
+      >
+        {settings.currency}
+      </button>
+    );
+  }
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        className="label shrink-0 tabular-nums opacity-70 hover:opacity-100"
+      >
+        {formatMoney(item.amount as number, settings.currency)}
+      </button>
+    );
+  }
+
+  return (
+    <input
+      autoFocus
+      type="number"
+      inputMode="decimal"
+      step="0.01"
+      defaultValue={item.amount ?? ""}
+      onBlur={(e) => {
+        const v = e.target.value.trim();
+        patchNote(item.id, { amount: v === "" ? null : Number(v) });
+        setEditing(false);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") e.currentTarget.blur();
+        if (e.key === "Escape") setEditing(false);
+      }}
+      aria-label="Amount"
+      className={`w-20 shrink-0 rounded-md border bg-transparent px-2 py-1 text-right text-[14px] outline-none ${
+        onColor ? "border-current/40" : "border-rule-soft"
+      }`}
+    />
+  );
+}

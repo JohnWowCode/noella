@@ -4,13 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { seqLabel, stamp } from "@/lib/format";
 import { imageFilesFrom } from "@/lib/images";
 import { wordCount } from "@/lib/notes";
-import { fromKey, useTodayKey } from "@/lib/clock";
-import { formatMoney, isBill, newBill } from "@/lib/money";
 import { isList, isProject, projectTitle, stepsOf } from "@/lib/projects";
 import { useNoella } from "@/lib/store/provider";
 import type { Note } from "@/lib/types";
 import { Lightbox, NoteImages } from "./NoteImages";
-import { BillPanel } from "./BillPanel";
 import { ListPanel } from "./ListPanel";
 import { ProjectPanel } from "./ProjectPanel";
 
@@ -30,9 +27,7 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
     patchNote,
     removeNote,
     attachImage,
-    settings,
   } = useNoella();
-  const todayKey = useTodayKey();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(note.body);
   const [viewing, setViewing] = useState<number | null>(null);
@@ -44,7 +39,6 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
   const done = note.doneAt !== null;
   const archived = note.archivedAt !== null;
   const project = isProject(note);
-  const bill = isBill(note) ? note.bill : null;
   const list = isList(note);
   const steps = project || list ? stepsOf(notes, note.id) : [];
   // Other projects this note could be filed under.
@@ -97,7 +91,7 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
         e.preventDefault();
         void addImages(imageFilesFrom(e.dataTransfer));
       }}
-      className={`group scroll-mt-4 border border-rule px-6 py-5 ${
+      className={`group scroll-mt-4 rounded-xl border border-rule px-6 py-5 ${
         onColor ? "" : "bg-field"
       } ${archived ? "opacity-60" : ""}`}
       style={surface}
@@ -125,13 +119,9 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
         <Dot />
         {list ? (
           <>
-            <span>list · {steps.length} items</span>
-            <Dot />
-          </>
-        ) : bill ? (
-          <>
             <span>
-              bill · {formatMoney(bill.amount, settings.currency)}
+              {note.listCadence ? `${note.listCadence} list` : "list"} ·{" "}
+              {steps.length}
             </span>
             <Dot />
           </>
@@ -162,7 +152,7 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
         )}
         {/* A word count says something about a paragraph of thinking and
             nothing at all about a project title or a bill. */}
-        {!project && !bill && wordCount(note.body) > 3 && (
+        {!project && !list && wordCount(note.body) > 3 && (
           <>
             <span>{wordCount(note.body)} words</span>
             <Dot />
@@ -201,7 +191,7 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
             {note.pinned ? "Unpin" : "Pin"}
           </Action>
           <Action onClick={() => setRecolouring((v) => !v)}>Colour</Action>
-          {!bill && !list && (
+          {!list && (
             <Action
               onClick={() =>
                 patchNote(note.id, {
@@ -212,18 +202,9 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
               {project ? "Unproject" : "Project"}
             </Action>
           )}
-          {!bill && !project && (
+          {!project && (
             <Action onClick={() => patchNote(note.id, { isList: !list })}>
               {list ? "Unlist" : "List"}
-            </Action>
-          )}
-          {!project && !list && (
-            <Action
-              onClick={() =>
-                patchNote(note.id, { bill: bill ? null : newBill() })
-              }
-            >
-              {bill ? "Unbill" : "Bill"}
             </Action>
           )}
           {!project && targets.length > 0 && (
@@ -370,15 +351,6 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
       )}
 
       {list && <ListPanel list={note} items={steps} onColor={onColor} />}
-
-      {bill && todayKey && (
-        <BillPanel
-          note={note}
-          bill={bill}
-          today={fromKey(todayKey)}
-          onColor={onColor}
-        />
-      )}
 
       {(note.tags.length > 0 || color !== null) && (
         <footer className="label mt-4 flex flex-wrap items-center gap-2">

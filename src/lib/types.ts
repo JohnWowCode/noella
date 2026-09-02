@@ -1,5 +1,5 @@
 import type { NoteImage } from "./images";
-import type { Bill } from "./money";
+import type { Cadence } from "./recurrence";
 import type { ProjectStatus } from "./projects";
 
 export type Visibility = "private" | "unlisted" | "public";
@@ -38,14 +38,20 @@ export interface Note {
   projectStatus: ProjectStatus | null;
   /** Set on a step: the id of the project note it belongs to. */
   parentId: string | null;
-  /** Non-null means this note is a bill. Recurrence, not a row per month. */
-  bill: Bill | null;
   /**
    * A list is a note you promoted, like a project, but inert: no status, no
    * drift, no claim on today. Somewhere to keep twenty things without any of
    * them becoming a demand.
    */
   isList: boolean;
+  /**
+   * Set on a list to make it recur: its items un-tick when the period turns.
+   * A bill is exactly this — a list of things that come back every month —
+   * which is why bills are not a separate kind of note.
+   */
+  listCadence: Cadence | null;
+  /** Optional money on a list item, so a recurring list can total itself. */
+  amount: number | null;
   /**
    * Minutes you guessed this would take, and minutes it actually took.
    * ADHD time estimation is systematically short, and the only way to correct

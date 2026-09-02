@@ -49,7 +49,6 @@ export function Projects() {
           <>
             <NavLink href="/wall">Wall</NavLink>
             <NavLink href="/">Today</NavLink>
-            <NavLink href="/money">Bills</NavLink>
             <ThemeToggle />
           </>
         }
@@ -141,7 +140,7 @@ function Row({
 
   return (
     <article
-      className={`border border-rule px-5 py-4 ${onColor ? "" : "bg-field"}`}
+      className={`rounded-xl border border-rule px-5 py-4 ${onColor ? "" : "bg-field"}`}
       style={onColor ? { backgroundColor: color.hex, color: "#111111" } : undefined}
     >
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-2">
@@ -252,7 +251,7 @@ function Row({
 
 function Empty({ children }: { children: React.ReactNode }) {
   return (
-    <p className="label border border-rule bg-field px-6 py-14 text-center text-mute">
+    <p className="label rounded-xl border border-rule bg-field px-6 py-14 text-center text-mute">
       {children}
     </p>
   );

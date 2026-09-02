@@ -176,7 +176,6 @@ export function Wall() {
                          outline-none placeholder:text-mute focus:w-48"
             />
             <NavLink href="/projects">Projects</NavLink>
-            <NavLink href="/money">Bills</NavLink>
             <NavLink href="/">Today</NavLink>
             <ThemeToggle />
           </>
@@ -190,7 +189,10 @@ export function Wall() {
           inputRef={composeRef}
         />
 
-        {/* Filter row. Tap a swatch to enter that world; the count is its weight. */}
+        {/* Filter row. Hidden until there is something worth filtering — on an
+            empty wall it was twelve swatches with a zero under each, sitting
+            directly beneath the twelve in the compose box. */}
+        {live.length > 0 && (
         <div className="mt-7 flex flex-wrap items-start gap-x-4 gap-y-3">
           <span className="label mt-2.5 text-mute">Filter</span>
           <div className="flex flex-wrap items-start gap-2">
@@ -284,8 +286,9 @@ export function Wall() {
             )}
           </div>
         </div>
+        )}
 
-        <TagIndex notes={notes} active={tag} onPick={setTag} />
+        {live.length > 0 && <TagIndex notes={notes} active={tag} onPick={setTag} />}
 
         {/* Entering a world: the app takes on its identity. */}
         {activeWorld && (
@@ -303,13 +306,13 @@ export function Wall() {
         <section className="mt-6 flex flex-col gap-3">
           {!ready ? (
             <Empty>Reading local store…</Empty>
+          ) : notes.length === 0 ? (
+            <FirstRun />
           ) : visible.length === 0 ? (
             <Empty>
               {showArchive
                 ? "Nothing archived yet."
-                : notes.length === 0
-                  ? "Nothing here yet. Type something above — anything."
-                  : "Nothing matches. Try a different world, or clear it."}
+                : "Nothing matches. Try a different world, or clear it."}
             </Empty>
           ) : (
             shown.map((n) => (
@@ -336,7 +339,7 @@ export function Wall() {
           </div>
         )}
 
-        {ready && (
+        {ready && notes.length > 0 && (
           <div className="label mt-5 flex flex-wrap items-center gap-x-3 gap-y-2 text-mute">
             <span>
               {shown.length} of {visible.length} shown
@@ -425,8 +428,31 @@ function WorldBand({
 
 function Empty({ children }: { children: React.ReactNode }) {
   return (
-    <p className="label border border-rule bg-field px-6 py-14 text-center text-mute">
+    <p className="label rounded-xl border border-rule bg-field px-6 py-14 text-center text-mute">
       {children}
     </p>
+  );
+}
+
+/**
+ * What a brand new wall says.
+ *
+ * It used to be an outlined box reading "no rows", under two rows of colour
+ * swatches and a filter with nothing to filter. Somebody opening this for the
+ * first time should be told what the thing is for, in a sentence, and then
+ * left alone with the box they are meant to type in.
+ */
+function FirstRun() {
+  return (
+    <div className="rounded-xl border border-rule bg-field px-6 py-10 sm:px-10 sm:py-12">
+      <p className="prose-note text-[21px] leading-snug sm:text-[24px]">
+        Write anything up there. A thought, a job, half an idea.
+      </p>
+      <p className="prose-note mt-4 max-w-lg text-[16px] leading-relaxed text-mute">
+        Colours are worlds — tap one if you know where a note belongs, or don&apos;t
+        and sort it later. Anything that turns into real work can become a
+        project; anything that repeats can become a list.
+      </p>
+    </div>
   );
 }

@@ -9,8 +9,8 @@ import { Swatch } from "./Swatch";
 const COLOR_KEY = "noella.capture.color";
 
 /**
- * One button, every screen. Capture has to be reachable from Today, Projects
- * and Money too — an idea does not wait until you have navigated to the wall.
+ * One button, every screen. Capture has to be reachable from Today and
+ * Projects too — an idea does not wait until you have navigated to the wall.
  * Opens on `n` anywhere, on the floating button, and on a share from the OS.
  */
 export function QuickCapture() {
@@ -133,7 +133,7 @@ export function QuickCapture() {
           onClick={() => setOpen(true)}
           aria-label="Capture a note"
           className="label fixed right-5 bottom-5 z-40 border border-rule bg-ink
-                     px-4 py-3.5 text-paper hover:bg-paper hover:text-ink sm:right-8 sm:bottom-8"
+                     rounded-full px-5 py-4 text-paper shadow-lg hover:bg-paper hover:text-ink sm:right-8 sm:bottom-8"
         >
           + Note
         </button>

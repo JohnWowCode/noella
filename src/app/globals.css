@@ -11,12 +11,16 @@
  * full strength turn a step checklist into a buzzing grid.
  */
 :root {
-  --paper: #f4f2ed;
-  --field: #fffefb;
-  --ink: #111111;
-  --mute: #6f6b64;
-  --rule: #111111;
-  --rule-soft: #d3cec4;
+  /* Warmer and a shade deeper than before: pure-ish white read as clinical,
+     and the surfaces need somewhere to sit above. */
+  --paper: #efece4;
+  --field: #fbf9f4;
+  --ink: #1a1714;
+  --mute: #7c766c;
+  /* Structural edges are no longer full-strength black. Every card outlined in
+     #111 is what made a wall of notes look like a form to fill in. */
+  --rule: #cdc6b8;
+  --rule-soft: #e2dcd0;
 }
 
 /*
@@ -27,12 +31,12 @@
  * rule is pulled back off white.
  */
 [data-theme="dark"] {
-  --paper: #0a0a0b;
-  --field: #191a1d;
-  --ink: #ededed;
-  --mute: #918d86;
-  --rule: #c6c6c4;
-  --rule-soft: #34363a;
+  --paper: #131316;
+  --field: #1d1e22;
+  --ink: #eeece8;
+  --mute: #948f87;
+  --rule: #34363c;
+  --rule-soft: #26282c;
 }
 
 @theme inline {
@@ -54,12 +58,6 @@
 }
 
 @layer base {
-  /* 0px corners. Everywhere. No exceptions. */
-  *,
-  *::before,
-  *::after {
-    border-radius: 0 !important;
-  }
 
   html {
     background: var(--paper);

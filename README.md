@@ -108,7 +108,7 @@ Put the ones you reach for most in the first nine.
 `⌘K` from anywhere. It is why the screens can stay quiet — no screen needs a
 visible control for every action.
 
-- **Go** — Today, the wall, projects, bills.
+- **Go** — Today, the wall, projects.
 - **Do** — tick off today's move without navigating to it, export a backup.
 - **Projects** — pick any project to make it today's, from any screen.
 - **Notes** — search the whole wall; results carry their world's colour.
@@ -267,29 +267,31 @@ The wall's `Projects n` filter narrows to just projects. Nothing about this is
 a separate system — search, colour, archive and export all work on projects and
 steps exactly as they do on any other note.
 
-## Bills
+## Lists, and the recurring kind
 
-Same pattern: **a bill is a note you promoted.** Hit `Bill` on a card, set an
-amount, how often, and when. Rent lives on the wall with everything else.
+`List` on any note turns it into one. A list is deliberately **less** than a
+project: no status, no drift, no progress meter, and it never reaches Today.
+Long lists overwhelm when they are presented as a demand — the ceiling for a
+list you are being asked to act on is about five items — so the front door
+stays one thing and a list is just somewhere to keep twenty.
 
-- Cadence is `monthly` (a day of the month), `weekly`, `yearly` or `once`.
-  Monthly on the 31st lands on the last day of shorter months rather than
-  skipping them.
-- **Nothing is expanded into rows.** A bill records the *periods* it has been
-  settled for — `2026-07` — so next month resets itself and the store never
-  accumulates twelve copies of rent a year.
-- **`/money`** shows what you're committed to every month, what's still owed
-  right now, and how many are late. Pay from the row.
-- **Today** lists what wants money in the next seven days, plus anything late.
-  Bills on **autopay** are excluded — they're money you're committed to, not a
-  thing to do.
-- Adding "rent, 3rd of the month" on the 30th does **not** announce that you're
-  already late for this month. A bill can only have missed periods that fell
-  due after you wrote it down.
-- One currency per wall, set at the bottom of `/money`.
+Give a list a **cadence** — weekly, monthly, yearly — and its items un-tick
+when the period turns. That is all a bill is: a thing on a list that comes back
+every month. Rent, the phone, a subscription, a weekly tidy — same mechanism,
+no separate screen. **Bills used to be their own tab and their own kind of
+note; they were folded into this and the tab was deleted.**
 
-It is not a budgeting app: no categories (colour already does that), no charts,
-no reconciliation, no bank connection.
+- Items take an **optional amount**, so a recurring list totals itself:
+  `$1,504.49 every month`.
+- A progress bar shows what is behind you, and a recurring list says when it
+  resets.
+- Nothing is stored to track the period. An item carries when it was ticked,
+  and "done this period" is whether that moment falls in the period you are in
+  — so the month turning over costs nothing.
+- Ticked items **sink to the bottom** rather than vanishing.
+- `Copy` puts the whole list on your clipboard as markdown checkboxes.
+- Anything with something still outstanding turns up on Today under
+  **Coming round again**.
 
 ## Capture from anywhere
 

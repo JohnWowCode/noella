@@ -128,7 +128,7 @@ export function Compose({ colorId, onColorId, inputRef }: Props) {
         setDragging(false);
         void take(imageFilesFrom(e.dataTransfer));
       }}
-      className={`border bg-field ${dragging ? "border-ink" : "border-rule"}`}
+      className={`overflow-hidden rounded-2xl border bg-field ${dragging ? "border-ink" : "border-rule"}`}
       style={
         focused || dragging
           ? { boxShadow: `5px 5px 0 0 ${selected ? selected.hex : "var(--ink)"}` }

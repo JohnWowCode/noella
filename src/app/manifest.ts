@@ -30,7 +30,6 @@ export default function manifest(): MetadataRoute.Manifest {
     shortcuts: [
       { name: "The wall", url: `${base}/wall` },
       { name: "Projects", url: `${base}/projects` },
-      { name: "Bills", url: `${base}/money` },
     ],
   };
 }

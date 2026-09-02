@@ -198,7 +198,7 @@ export function Palette() {
       onClick={close}
     >
       <div
-        className="w-full max-w-xl border border-rule bg-paper shadow-[6px_6px_0_0_var(--ink)]"
+        className="w-full max-w-xl overflow-hidden rounded-2xl border border-rule bg-paper shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <input

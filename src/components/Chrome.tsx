@@ -21,10 +21,14 @@ export function Header({
         <Link href="/" className="font-mono text-[15px] tracking-[0.2em]">
           NOELLA
         </Link>
-        <span className="label hidden text-mute sm:inline">
-          {live.filter((n) => n.parentId === null).length} notes ·{" "}
-          {colors.length} worlds · {active} active · {open} open
-        </span>
+        {/* A row of zeros is a worse greeting than nothing at all. */}
+        {live.length > 0 && (
+          <span className="label hidden text-mute sm:inline">
+            {live.filter((n) => n.parentId === null).length} notes
+            {active > 0 && ` · ${active} active`}
+            {open > 0 && ` · ${open} open`}
+          </span>
+        )}
         <div className="ml-auto flex items-center gap-2">{right}</div>
       </div>
     </header>
@@ -70,7 +74,7 @@ export function NavLink({
   return (
     <Link
       href={href}
-      className="label border border-rule px-2.5 py-2 hover:bg-ink hover:text-paper"
+      className="label rounded-lg border border-rule px-3 py-2 hover:bg-ink hover:text-paper"
     >
       {children}
     </Link>

@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { dateKey, daysBetween, fromKey, useTodayKey } from "@/lib/clock";
-import { billLines, formatMoney } from "@/lib/money";
+import { dateKey, fromKey, useTodayKey } from "@/lib/clock";
+import { formatMoney, listState } from "@/lib/recurrence";
 import {
   ACTIVE_LIMIT,
   bestRun,
@@ -68,15 +68,22 @@ export function Focus() {
     () => (todayKey ? ledger(notes, todayKey) : []),
     [notes, todayKey],
   );
+  // Recurring lists that still want something this period. Plain lists never
+  // appear here — a list is storage, not a demand.
   const due = useMemo(() => {
     if (!todayKey) return [];
-    return billLines(notes, fromKey(todayKey)).filter(
-      (l) =>
-        !l.dueSettled &&
-        !l.bill.autopay &&
-        l.dueKey !== null &&
-        daysBetween(todayKey, l.dueKey) <= 7,
-    );
+    const today = fromKey(todayKey);
+    return notes
+      .filter((n) => n.isList && n.listCadence && n.archivedAt === null)
+      .map((list) => ({
+        list,
+        state: listState(
+          notes.filter((i) => i.parentId === list.id && i.archivedAt === null),
+          list.listCadence,
+          today,
+        ),
+      }))
+      .filter((entry) => entry.state.open.length > 0);
   }, [notes, todayKey]);
 
   const loose = useMemo(() => unfiled(notes), [notes]);
@@ -92,7 +99,6 @@ export function Focus() {
           <>
             <NavLink href="/wall">Wall</NavLink>
             <NavLink href="/projects">Projects</NavLink>
-            <NavLink href="/money">Bills</NavLink>
             <ThemeToggle />
           </>
         }
@@ -141,23 +147,25 @@ export function Focus() {
 
             {due.length > 0 && (
               <Block>
-                <h2 className="label mb-3 text-mute">Money this week</h2>
-                <div className="flex flex-col gap-px">
-                  {due.map((l) => (
+                <h2 className="label mb-3 text-mute">Coming round again</h2>
+                <div className="flex flex-col gap-2">
+                  {due.map(({ list, state }) => (
                     <Link
-                      key={l.note.id}
-                      href="/money"
-                      className="label flex items-baseline gap-3 border border-rule bg-field px-4 py-3 hover:bg-ink hover:text-paper"
+                      key={list.id}
+                      href={`/wall#note-${list.id}`}
+                      className="label flex items-baseline gap-3 rounded-xl border border-rule bg-field px-4 py-3.5 hover:bg-ink hover:text-paper"
                     >
                       <span className="normal-case tracking-normal">
-                        {projectTitle(l.note)}
+                        {projectTitle(list)}
                       </span>
                       <span className="ml-auto tabular-nums">
-                        {formatMoney(l.bill.amount, settings.currency)}
+                        {state.settled.length}/{state.items.length}
                       </span>
-                      <span className="opacity-60">
-                        {l.overdue ? "late" : `in ${daysBetween(todayKey, l.dueKey!)}d`}
-                      </span>
+                      {state.outstanding > 0 && (
+                        <span className="tabular-nums opacity-65">
+                          {formatMoney(state.outstanding, settings.currency)}
+                        </span>
+                      )}
                     </Link>
                   ))}
                 </div>
@@ -190,7 +198,7 @@ export function Focus() {
               <Block>
                 <Link
                   href="/wall"
-                  className="label flex items-center gap-3 border border-rule bg-field px-4 py-3.5 text-mute hover:bg-ink hover:text-paper"
+                  className="label flex items-center gap-3 rounded-xl border border-rule bg-field px-4 py-3.5 text-mute hover:bg-ink hover:text-paper"
                 >
                   <span>{loose.length} unfiled</span>
                   <span className="ml-auto normal-case tracking-normal">
@@ -223,7 +231,7 @@ function TheMove({ project, notes }: { project: Note; notes: Note[] }) {
 
   return (
     <section
-      className={`mt-6 border border-rule px-6 py-7 sm:px-8 sm:py-9 ${
+      className={`mt-6 rounded-2xl border border-rule px-6 py-7 sm:px-8 sm:py-9 ${
         onColor ? "" : "bg-field"
       }`}
       style={onColor ? { backgroundColor: color.hex, color: "#111111" } : undefined}
@@ -297,7 +305,7 @@ function AlsoActive({ project, notes }: { project: Note; notes: Note[] }) {
   const step = nextActionOf(stepsOf(notes, project.id));
 
   return (
-    <article className="flex items-start gap-3 border border-rule bg-field px-4 py-3.5">
+    <article className="flex items-start gap-3 rounded-xl border border-rule bg-field px-4 py-3.5">
       {step ? (
         <button
           type="button"
@@ -350,7 +358,7 @@ function Drifting({ project, quiet }: { project: Note; quiet: number }) {
   const { patchNote } = useNoella();
 
   return (
-    <article className="flex flex-col gap-3 border border-rule bg-field px-4 py-3.5 sm:flex-row sm:items-center sm:gap-x-3">
+    <article className="flex flex-col gap-3 rounded-xl border border-rule bg-field px-4 py-3.5 sm:flex-row sm:items-center sm:gap-x-3">
       <span className="label sm:flex-1">{projectTitle(project)}</span>
       <span className="label flex items-center gap-3">
         <span className="tabular-nums opacity-55">
@@ -422,7 +430,7 @@ function Ledger({
         <span>Ledger</span>
         <span className="ml-auto normal-case tracking-normal">last 8 weeks</span>
       </h2>
-      <div className="flex flex-wrap items-center gap-x-8 gap-y-6 border border-rule bg-field px-5 py-5">
+      <div className="flex flex-wrap items-center gap-x-8 gap-y-6 rounded-2xl border border-rule bg-field px-5 py-5">
         <div className="grid grid-flow-col grid-rows-7 gap-[3px]">
           {cells.map((c) => (
             <span
@@ -565,7 +573,7 @@ function Block({ children }: { children: React.ReactNode }) {
 
 function NothingFocused({ hasProjects }: { hasProjects: boolean }) {
   return (
-    <section className="mt-6 border border-rule bg-field px-6 py-10 sm:px-8">
+    <section className="mt-6 rounded-2xl border border-rule bg-field px-6 py-10 sm:px-8">
       <p className="prose-note text-[22px] leading-tight sm:text-[26px]">
         Nothing on today.
       </p>

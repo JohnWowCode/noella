@@ -94,7 +94,6 @@ export function unfiled(notes: Note[]): Note[] {
       n.colorId === null &&
       n.projectStatus === null &&
       n.parentId === null &&
-      n.bill === null &&
       !n.isList,
   );
 }

@@ -7,7 +7,7 @@
  * and everything else is cache-first with a background refresh.
  */
 
-const VERSION = "noella-v4";
+const VERSION = "noella-v5";
 
 /**
  * Where this copy of the app lives. Derived from the registration scope rather
@@ -28,7 +28,7 @@ const BASE = new URL(self.registration.scope).pathname.replace(/\/$/, "");
  * /wall. Rather than requesting both and guaranteeing a failed request for
  * every route, each page is tried as a directory first and only falls back.
  */
-const ROUTES = ["", "/wall", "/projects", "/money"];
+const ROUTES = ["", "/wall", "/projects"];
 
 async function cacheShell(cache) {
   for (const route of ROUTES) {
