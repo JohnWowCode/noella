@@ -82,10 +82,10 @@ export function ListPanel({
                 patchNote(list.id, { listCadence: cadence === c ? null : c })
               }
               aria-pressed={cadence === c}
-              className={`rounded border border-current px-2 py-1 ${
+              className={` border border-current px-2 py-1 ${
                 cadence === c
                   ? onColor
-                    ? "bg-[#111] text-white"
+                    ? "bg-[var(--on)] text-[var(--on-inv)]"
                     : "bg-ink text-paper"
                   : "opacity-45 hover:opacity-100"
               }`}
@@ -105,9 +105,9 @@ export function ListPanel({
         <button
           type="button"
           onClick={copy}
-          className={`ml-auto rounded border border-current px-2 py-1 ${
+          className={`ml-auto border border-current px-2 py-1 ${
             onColor
-              ? "hover:bg-[#111] hover:text-white"
+              ? "hover:bg-[var(--on)] hover:text-[var(--on-inv)]"
               : "hover:bg-ink hover:text-paper"
           }`}
         >
@@ -118,9 +118,9 @@ export function ListPanel({
       {/* The satisfying part: how much of this is behind you. */}
       {items.length > 0 && (
         <div className="label mt-4 flex items-center gap-3">
-          <span className="h-2 flex-1 overflow-hidden rounded-full border border-current/30">
+          <span className="h-2 flex-1 overflow-hidden border border-current/30">
             <span
-              className={`block h-full rounded-full ${onColor ? "bg-[#111]" : "bg-ink"}`}
+              className={`block h-full ${onColor ? "bg-[var(--on)]" : "bg-ink"}`}
               style={{ width: `${(state.settled.length / items.length) * 100}%` }}
             />
           </span>
@@ -139,7 +139,7 @@ export function ListPanel({
       )}
 
       {ordered.length > 0 && (
-        <ul className={`mt-4 overflow-hidden rounded-lg border ${edge}`}>
+        <ul className={`mt-4 overflow-hidden border ${edge}`}>
           {ordered.map((item, i) => {
             const done = isSettled(item, cadence, today);
             return (
@@ -155,10 +155,10 @@ export function ListPanel({
                     })
                   }
                   aria-label={done ? "Untick" : "Tick"}
-                  className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border text-[11px] leading-none ${
+                  className={`grid h-5 w-5 shrink-0 place-items-center border text-[11px] leading-none ${
                     done
                       ? onColor
-                        ? "border-current bg-[#111] text-white"
+                        ? "border-current bg-[var(--on)] text-[var(--on-inv)]"
                         : "border-ink bg-ink text-paper"
                       : "border-current/50 hover:border-current"
                   }`}
@@ -200,16 +200,16 @@ export function ListPanel({
           }}
           placeholder="Add something, then Enter"
           aria-label={`Add to ${list.body.split("\n")[0]}`}
-          className={`flex-1 rounded-lg border ${edge} bg-transparent px-4 py-2.5 text-[15px]
+          className={`flex-1 border ${edge} bg-transparent px-4 py-2.5 text-[15px]
                       outline-none placeholder:opacity-50`}
         />
         <button
           type="button"
           onClick={add}
           disabled={!draft.trim()}
-          className={`label rounded-lg border border-current px-3 py-2.5 ${
+          className={`label border border-current px-3 py-2.5 ${
             onColor
-              ? "enabled:hover:bg-[#111] enabled:hover:text-white"
+              ? "enabled:hover:bg-[var(--on)] enabled:hover:text-[var(--on-inv)]"
               : "enabled:hover:bg-ink enabled:hover:text-paper"
           } disabled:opacity-35`}
         >
@@ -267,7 +267,7 @@ function AmountField({ item, onColor }: { item: Note; onColor: boolean }) {
         if (e.key === "Escape") setEditing(false);
       }}
       aria-label="Amount"
-      className={`w-20 shrink-0 rounded-md border bg-transparent px-2 py-1 text-right text-[14px] outline-none ${
+      className={`w-20 shrink-0 border bg-transparent px-2 py-1 text-right text-[14px] outline-none ${
         onColor ? "border-current/40" : "border-rule-soft"
       }`}
     />

@@ -84,6 +84,17 @@ export interface NewNote {
   parentId?: string | null;
   /** Explicit position among siblings. Used to insert a step above another. */
   order?: number;
+  /*
+   * What it is, decided as you write it.
+   *
+   * These used to be reachable only by making a plain note and then finding
+   * "Make a project" behind a hover-only menu on the card — which meant that
+   * for anyone on a phone, or anyone who never hovered a card, projects
+   * effectively did not exist. Deciding at the keyboard is one action.
+   */
+  projectStatus?: ProjectStatus | null;
+  isList?: boolean;
+  isTask?: boolean;
 }
 
 export type { NoteImage };

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useNoella } from "@/lib/store/provider";
+import { formatDuration, isVideo } from "@/lib/images";
 import type { NoteImage } from "@/lib/types";
 
 /** Resolves an image id to a blob URL, once, after mount. */
@@ -63,6 +64,34 @@ function Thumb({
   // space before the blob resolves, so nothing shifts — and only its height is
   // capped, so a tall reference can't swallow the wall. In a grid they are
   // squared off and cropped, because there the point is the set, not the frame.
+  /*
+   * A clip plays where it sits, with its own controls, and is deliberately not
+   * a button: wrapping a video in a button means every attempt to scrub or
+   * pause opens a lightbox instead.
+   */
+  if (isVideo(image)) {
+    return (
+      <div
+        className={`border border-current/25 ${single ? "" : "aspect-square overflow-hidden"}`}
+        style={single ? { aspectRatio: `${image.width} / ${image.height}` } : undefined}
+      >
+        {url ? (
+          <video
+            src={url}
+            controls
+            playsInline
+            preload="metadata"
+            className="h-full w-full bg-black object-contain"
+          />
+        ) : (
+          <span className="label grid h-full w-full place-items-center opacity-40">
+            {image.duration ? formatDuration(image.duration) : "…"}
+          </span>
+        )}
+      </div>
+    );
+  }
+
   if (single) {
     return (
       <button
@@ -130,6 +159,7 @@ export function Lightbox({
 }) {
   const image = images[index];
   const url = useImageUrl(image?.id ?? "");
+  const video = image ? isVideo(image) : false;
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -187,14 +217,23 @@ export function Lightbox({
         </button>
       </div>
       <div className="flex flex-1 items-center justify-center overflow-auto p-5">
-        {url && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={url}
-            alt={image.alt ?? ""}
-            className="max-h-full max-w-full object-contain"
-          />
-        )}
+        {url &&
+          (video ? (
+            <video
+              src={url}
+              controls
+              autoPlay
+              playsInline
+              className="max-h-full max-w-full object-contain"
+            />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={url}
+              alt={image.alt ?? ""}
+              className="max-h-full max-w-full object-contain"
+            />
+          ))}
       </div>
     </div>
   );

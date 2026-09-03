@@ -82,11 +82,7 @@ export function Palette() {
         close();
       },
     });
-    out.push(
-      go("Today", "/", "the move"),
-      go("The wall", "/wall", "everything"),
-      go("Projects", "/projects", "priorities"),
-    );
+    out.push(go("Home", "/", "everything, one screen"));
 
     if (todaysStep && active[0]) {
       out.push({
@@ -156,7 +152,7 @@ export function Palette() {
           hint: seqLabel(n.seq),
           swatch: n.colorId,
           run: () => {
-            router.push(`/wall#note-${n.id}`);
+            router.push(`/#note-${n.id}`);
             close();
           },
         });
@@ -197,7 +193,7 @@ export function Palette() {
       onClick={close}
     >
       <div
-        className="w-full max-w-xl overflow-hidden rounded-2xl border border-rule bg-paper shadow-2xl"
+        className="w-full max-w-xl overflow-hidden border border-rule bg-paper shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <input

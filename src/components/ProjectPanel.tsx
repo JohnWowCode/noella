@@ -17,7 +17,7 @@ export function ProjectPanel({
 }: {
   project: Note;
   steps: Note[];
-  /** Cards on a colour draw in #111 and borrow the fill; plain cards use tokens. */
+  /** Cards on a colour draw in their computed ink; plain cards use tokens. */
   onColor: boolean;
 }) {
   const { addNote, patchNote, removeNote } = useNoella();
@@ -50,7 +50,7 @@ export function ProjectPanel({
               className={`label border border-current px-2 py-1 ${
                 s === status
                   ? onColor
-                    ? "bg-[#111] text-white"
+                    ? "bg-[var(--on)] text-[var(--on-inv)]"
                     : "bg-ink text-paper"
                   : "opacity-55 hover:opacity-100"
               }`}
@@ -166,7 +166,7 @@ export function ProjectPanel({
           disabled={!draft.trim()}
           className={`label border border-current px-2.5 py-2 ${
             onColor
-              ? "enabled:hover:bg-[#111] enabled:hover:text-white"
+              ? "enabled:hover:bg-[var(--on)] enabled:hover:text-[var(--on-inv)]"
               : "enabled:hover:bg-ink enabled:hover:text-paper"
           } disabled:opacity-40`}
         >
@@ -195,7 +195,7 @@ export function Progress({
       aria-label={`${done} of ${total} steps done`}
     >
       <span
-        className={`block h-full ${onColor ? "bg-[#111]" : "bg-ink"}`}
+        className={`block h-full ${onColor ? "bg-[var(--on)]" : "bg-ink"}`}
         style={{ width: `${pct}%` }}
       />
     </span>

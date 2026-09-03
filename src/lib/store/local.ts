@@ -163,14 +163,14 @@ export class LocalStore implements Store {
       colorId: input.colorId,
       tags: parseTags(body),
       images: input.images ?? [],
-      projectStatus: null,
+      projectStatus: input.projectStatus ?? null,
       parentId: input.parentId ?? null,
       listCadence: null,
       amount: null,
       estimateMinutes: null,
       actualMinutes: null,
       snoozedUntil: null,
-      isList: false,
+      isList: input.isList ?? false,
       // New steps land at the bottom of their project's list unless placed.
       order:
         input.order ??
@@ -178,8 +178,9 @@ export class LocalStore implements Store {
           ? this.snapshot.notes.filter((n) => n.parentId === input.parentId)
               .length
           : 0),
-      // A step is a thing to do, so it arrives checkable.
-      isTask: isTask || input.parentId != null,
+      // A step is a thing to do, so it arrives checkable. So is anything you
+      // explicitly said was a task, and anything written with [] in the body.
+      isTask: isTask || input.isTask === true || input.parentId != null,
       doneAt: done ? now : null,
       pinned: false,
       visibility: "private",

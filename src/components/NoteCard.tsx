@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { seqLabel, stamp } from "@/lib/format";
 import { imageFilesFrom } from "@/lib/images";
 import { isList, isProject, projectTitle, stepsOf } from "@/lib/projects";
+import { swatchName } from "@/lib/store/defaults";
 import { useNoella } from "@/lib/store/provider";
+import { surfaceStyle } from "@/lib/surface";
 import type { Note } from "@/lib/types";
 import { Lightbox, NoteImages } from "./NoteImages";
 import { ListPanel } from "./ListPanel";
@@ -77,11 +79,10 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
     }
   }
 
-  // Colour is a flat full fill, and #111 always clears contrast on it.
+  // A flat full fill. What reads on it is computed per colour, because the
+  // palette now runs from the palest yellow to a near-black violet.
   const onColor = color !== null;
-  const surface = onColor
-    ? { backgroundColor: color.hex, color: "#111111" }
-    : undefined;
+  const surface = onColor ? surfaceStyle(color) : undefined;
 
   return (
     <article
@@ -91,7 +92,7 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
         e.preventDefault();
         void addImages(imageFilesFrom(e.dataTransfer));
       }}
-      className={`group scroll-mt-4 rounded-xl border border-rule px-6 py-5 ${
+      className={`group scroll-mt-4 border border-rule px-6 py-5 ${
         onColor ? "" : "bg-field"
       } ${archived ? "opacity-60" : ""}`}
       style={surface}
@@ -131,7 +132,7 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
               className={
                 note.projectStatus === "active"
                   ? onColor
-                    ? "bg-[#111] px-1.5 py-0.5 text-white"
+                    ? "bg-[var(--on)] px-1.5 py-0.5 text-[var(--on-inv)]"
                     : "bg-ink px-1.5 py-0.5 text-paper"
                   : ""
               }
@@ -153,12 +154,6 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
         {/* Word count and image count both left. A number counting the words
             you can see, above the words you can see, is not information. */}
         <span>{stamp(note.createdAt)}</span>
-        {note.pinned && (
-          <>
-            <Dot />
-            <span>pinned</span>
-          </>
-        )}
         {archived && (
           <>
             <Dot />
@@ -166,10 +161,25 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
           </>
         )}
 
-        <span
-          data-card-actions
-          className="ml-auto flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100"
-        >
+        {/*
+          Always visible, never on hover.
+
+          Everything on a card used to appear only when the pointer was over
+          it, which on a phone means never — and a favourite you cannot see is
+          not a favourite. The star and the menu are simply here.
+        */}
+        <span className="ml-auto flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => patchNote(note.id, { pinned: !note.pinned })}
+            aria-pressed={note.pinned}
+            aria-label={note.pinned ? "Remove from favourites" : "Add to favourites"}
+            className={`px-1.5 py-1 text-[15px] leading-none ${
+              note.pinned ? "opacity-100" : "opacity-35 hover:opacity-100"
+            }`}
+          >
+            {note.pinned ? "★" : "☆"}
+          </button>
           <Action onClick={() => setEditing((v) => !v)}>
             {editing ? "Done" : "Edit"}
           </Action>
@@ -196,10 +206,7 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
         with a note attached — and picking one meant reading all nine first.
       */}
       {menu && (
-        <div className="mt-3 flex flex-wrap items-center gap-1.5 rounded-lg border border-current/25 px-2 py-2">
-          <Action onClick={() => patchNote(note.id, { pinned: !note.pinned })}>
-            {note.pinned ? "Unpin" : "Pin"}
-          </Action>
+        <div className="mt-3 flex flex-wrap items-center gap-1.5 border border-current/25 px-2 py-2">
           <Action
             onClick={() => {
               setRecolouring((v) => !v);
@@ -278,31 +285,40 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
       )}
 
       {recolouring && (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          {colors.map((c, i) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => {
-                patchNote(note.id, {
-                  colorId: c.id === note.colorId ? null : c.id,
-                });
-                setRecolouring(false);
-              }}
-              aria-label={`File in ${c.name ?? `World ${i + 1}`}`}
-              className={`h-7 w-7 border border-rule ${
-                c.id === note.colorId ? "ring-2 ring-inset ring-ink" : ""
-              }`}
-              style={{ backgroundColor: c.hex }}
-            />
-          ))}
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          {/* Same twelve-by-three block as the compose box, so moving a note
+              between folders looks like filing it in the first place. */}
+          <div
+            className="grid gap-[3px]"
+            style={{
+              gridTemplateColumns: `repeat(${Math.max(1, Math.round(colors.length / 3))}, minmax(0, 1fr))`,
+            }}
+          >
+            {colors.map((c, i) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => {
+                  patchNote(note.id, {
+                    colorId: c.id === note.colorId ? null : c.id,
+                  });
+                  setRecolouring(false);
+                }}
+                aria-label={`File in ${c.name ?? swatchName(i)}`}
+                className={`h-6 w-6 border border-current/25 ${
+                  c.id === note.colorId ? "ring-2 ring-inset ring-current" : ""
+                }`}
+                style={{ backgroundColor: c.hex }}
+              />
+            ))}
+          </div>
           <button
             type="button"
             onClick={() => {
               patchNote(note.id, { colorId: null });
               setRecolouring(false);
             }}
-            className="label border border-current px-2 py-1.5 hover:bg-[#111] hover:text-white"
+            className="label border border-current px-2 py-1.5 hover:bg-[var(--on)] hover:text-[var(--on-inv)]"
           >
             None
           </button>
@@ -319,7 +335,7 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
                 patchNote(note.id, { parentId: null });
                 setMoving(false);
               }}
-              className="border border-current px-2 py-1 hover:bg-[#111] hover:text-white"
+              className="border border-current px-2 py-1 hover:bg-[var(--on)] hover:text-[var(--on-inv)]"
             >
               Nothing
             </button>
@@ -332,7 +348,7 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
                 patchNote(note.id, { parentId: p.id, isTask: true });
                 setMoving(false);
               }}
-              className="max-w-56 truncate border border-current px-2 py-1 normal-case tracking-normal hover:bg-[#111] hover:text-white"
+              className="max-w-56 truncate border border-current px-2 py-1 normal-case tracking-normal hover:bg-[var(--on)] hover:text-[var(--on-inv)]"
             >
               {projectTitle(p)}
             </button>
@@ -380,10 +396,10 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
             <button
               type="button"
               onClick={() => onEnterWorld(color.id)}
-              className="border border-current px-2 py-1.5 hover:bg-[#111] hover:text-white"
+              className="border border-current px-2 py-1.5 hover:bg-[var(--on)] hover:text-[var(--on-inv)]"
             >
               {color.emoji ? `${color.emoji} ` : ""}
-              {color.name ?? "Enter world"}
+              {color.name ?? swatchName(colors.indexOf(color))}
             </button>
           )}
           {note.tags.map((t) =>
@@ -392,7 +408,7 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
                 key={t}
                 type="button"
                 onClick={() => onTag(t)}
-                className={`border border-current px-2 py-1.5 hover:bg-[#111] hover:text-white ${
+                className={`border border-current px-2 py-1.5 hover:bg-[var(--on)] hover:text-[var(--on-inv)] ${
                   onColor ? "opacity-70" : "text-mute"
                 }`}
               >
@@ -445,7 +461,7 @@ function Action({
       onClick={onClick}
       aria-pressed={pressed}
       aria-label={label}
-      className={`label rounded-md px-2 py-1.5 ${
+      className={`label px-2 py-1.5 ${
         pressed
           ? "bg-current/15"
           : "opacity-70 hover:bg-current/10 hover:opacity-100"

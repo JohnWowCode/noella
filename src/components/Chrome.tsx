@@ -69,7 +69,7 @@ export function NavLink({
     <Link
       href={href}
       aria-current={current ? "page" : undefined}
-      className={`label rounded-lg px-2.5 py-2 ${
+      className={`label px-2.5 py-2 ${
         current
           ? "text-ink underline decoration-1 underline-offset-[6px]"
           : "text-mute hover:text-ink"

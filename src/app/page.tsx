@@ -1,5 +1,5 @@
-import { Focus } from "@/components/Focus";
+import { Home } from "@/components/Home";
 
 export default function Page() {
-  return <Focus />;
+  return <Home />;
 }

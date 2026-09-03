@@ -1,6 +1,11 @@
 /**
- * Image handling. Bytes never touch localStorage — a single phone photo would
- * blow its ~5 MB cap — so blobs live in IndexedDB and notes only carry ids.
+ * Pictures and video. Bytes never touch localStorage — a single phone photo
+ * would blow its ~5 MB cap — so blobs live in IndexedDB and notes carry ids.
+ *
+ * A note can hold either. Stills are downscaled and re-encoded; video is kept
+ * exactly as it arrived, because re-encoding it in a browser tab costs minutes
+ * and there is nothing to gain — the file already went through a real encoder
+ * on the way out of the camera.
  */
 
 export interface NoteImage {
@@ -10,7 +15,24 @@ export interface NoteImage {
   mime: string;
   bytes: number;
   alt: string | null;
+  /**
+   * Absent on everything stored before video existed, which is exactly the
+   * shape of the data: no field, therefore a still.
+   */
+  kind?: "image" | "video";
+  /** Seconds. Video only, and only when the browser would tell us. */
+  duration?: number;
 }
+
+export function isVideo(media: NoteImage): boolean {
+  return media.kind === "video";
+}
+
+/**
+ * Big enough for anything shot on a phone, small enough that one clip cannot
+ * quietly fill the origin's storage quota and start failing every later write.
+ */
+export const MAX_VIDEO_BYTES = 128 * 1024 * 1024;
 
 /** Longest edge, in CSS pixels. Phone photos arrive far larger than any wall needs. */
 const MAX_EDGE = 1600;
@@ -107,10 +129,76 @@ export function isImageFile(file: File): boolean {
   return file.type.startsWith("image/");
 }
 
-/** Pulls image files out of a paste or drop, ignoring everything else. */
-export function imageFilesFrom(data: DataTransfer | null): File[] {
+export function isVideoFile(file: File): boolean {
+  return file.type.startsWith("video/");
+}
+
+export function isMediaFile(file: File): boolean {
+  return isImageFile(file) || isVideoFile(file);
+}
+
+/**
+ * Reads a clip's shape without decoding it.
+ *
+ * The dimensions matter for the same reason they do for stills: they reserve
+ * the right space in the layout before the blob URL resolves, so a note does
+ * not jump as its video arrives.
+ */
+export async function prepareVideo(file: File): Promise<{
+  meta: NoteImage;
+  blob: Blob;
+}> {
+  if (file.size > MAX_VIDEO_BYTES) {
+    throw new Error("video too large");
+  }
+  const url = URL.createObjectURL(file);
+  try {
+    const shape = await new Promise<{ w: number; h: number; d: number }>(
+      (resolve, reject) => {
+        const el = document.createElement("video");
+        el.preload = "metadata";
+        el.muted = true;
+        el.onloadedmetadata = () =>
+          resolve({
+            w: el.videoWidth || 16,
+            h: el.videoHeight || 9,
+            d: Number.isFinite(el.duration) ? el.duration : 0,
+          });
+        el.onerror = () => reject(new Error("unreadable video"));
+        el.src = url;
+      },
+    );
+    return {
+      meta: {
+        id: uid(),
+        width: shape.w,
+        height: shape.h,
+        mime: file.type,
+        bytes: file.size,
+        alt: null,
+        kind: "video",
+        duration: shape.d,
+      },
+      blob: file,
+    };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+/** Pulls anything we can hold out of a paste or drop, ignoring the rest. */
+export function mediaFilesFrom(data: DataTransfer | null): File[] {
   if (!data) return [];
-  return Array.from(data.files).filter(isImageFile);
+  return Array.from(data.files).filter(isMediaFile);
+}
+
+/** Kept as the old name so existing call sites read the same. */
+export const imageFilesFrom = mediaFilesFrom;
+
+/** mm:ss, because a clip is always short enough for that to be the whole story. */
+export function formatDuration(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
 export function formatBytes(n: number): string {

@@ -1,5 +1,5 @@
-import { Projects } from "@/components/Projects";
+import { Moved } from "@/components/Moved";
 
 export default function Page() {
-  return <Projects />;
+  return <Moved />;
 }

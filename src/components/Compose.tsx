@@ -1,12 +1,27 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { formatBytes, imageFilesFrom, isImageFile } from "@/lib/images";
+import {
+  formatBytes,
+  isVideo,
+  mediaFilesFrom,
+  isMediaFile,
+} from "@/lib/images";
+import { swatchName } from "@/lib/store/defaults";
 import { useNoella } from "@/lib/store/provider";
-import type { NoteImage } from "@/lib/types";
-import { Swatch } from "./Swatch";
+import type { NewNote, NoteImage } from "@/lib/types";
 
 const DRAFT_KEY = "noella.draft";
+
+/** What you are writing. Decided here, once, instead of hunted for later. */
+const KINDS = [
+  { id: "note", label: "Note", hint: "a thought, a scrap, a picture" },
+  { id: "task", label: "To do", hint: "one thing to tick off" },
+  { id: "project", label: "Project", hint: "a folder with steps" },
+  { id: "list", label: "List", hint: "a folder of items" },
+] as const;
+
+export type Kind = (typeof KINDS)[number]["id"];
 
 function readDraft(): string {
   if (typeof window === "undefined") return "";
@@ -18,7 +33,6 @@ function readDraft(): string {
 }
 
 interface Props {
-  /** Sticky colour: consecutive notes in the same world cost one keystroke. */
   colorId: string | null;
   onColorId: (id: string | null) => void;
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
@@ -26,26 +40,27 @@ interface Props {
 }
 
 /**
- * The one writing surface, on every screen that has one.
+ * The one place anything gets written.
  *
- * It opens folded: a box and a prompt, nothing else. The colour row, the image
- * button and the keyboard hints only appear once you are actually in it — a
- * dozen swatches and four buttons under an empty box is a form, and a form is
- * a reason not to write the thing down.
+ * Two things it must never do. It must not make you choose what a thing is
+ * after the fact — a project used to require writing a note, hovering the
+ * card, opening a menu and finding "Make a project", which on a touch screen
+ * was not reachable at all. And it must not move under the pointer: the
+ * control row was previously hidden until the textarea had focus, so pressing
+ * a colour blurred the textarea, unmounted the row, and the click landed on
+ * nothing. Every control here holds focus on mousedown for that reason.
  */
 export function Compose({ colorId, onColorId, inputRef, placeholder }: Props) {
   const { colors, addNote, attachImage } = useNoella();
   const [body, setBody] = useState("");
+  const [kind, setKind] = useState<Kind>("note");
   const [restored, setRestored] = useState(false);
-  const [focused, setFocused] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [pending, setPending] = useState<NoteImage[]>([]);
   const [busy, setBusy] = useState(0);
+  const [tooBig, setTooBig] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // localStorage is an external system, so the draft is pulled in after mount:
-  // the first render matches the server, then the draft lands. The value is
-  // captured synchronously, before the persist effect below can clear it.
   useEffect(() => {
     let live = true;
     const saved = readDraft();
@@ -59,7 +74,6 @@ export function Compose({ colorId, onColorId, inputRef, placeholder }: Props) {
     };
   }, []);
 
-  // Every keystroke persists the draft. Nothing is ever lost to a closed tab.
   useEffect(() => {
     if (!restored) return;
     try {
@@ -71,15 +85,18 @@ export function Compose({ colorId, onColorId, inputRef, placeholder }: Props) {
   }, [body, restored]);
 
   async function take(files: File[]) {
-    const images = files.filter(isImageFile);
-    if (images.length === 0) return;
-    setBusy((n) => n + images.length);
-    for (const file of images) {
+    const media = files.filter(isMediaFile);
+    if (media.length === 0) return;
+    setBusy((n) => n + media.length);
+    for (const file of media) {
       try {
         const meta = await attachImage(file);
         setPending((prev) => [...prev, meta]);
       } catch {
-        // Unreadable or unsupported file. Skip it rather than block the note.
+        // Almost always an oversized clip; say so rather than dropping it
+        // silently, which reads as the app being broken.
+        setTooBig(true);
+        window.setTimeout(() => setTooBig(false), 4000);
       } finally {
         setBusy((n) => n - 1);
       }
@@ -88,7 +105,11 @@ export function Compose({ colorId, onColorId, inputRef, placeholder }: Props) {
 
   function save() {
     if (!body.trim() && pending.length === 0) return;
-    addNote({ body: body.trim(), colorId, images: pending });
+    const input: NewNote = { body: body.trim(), colorId, images: pending };
+    if (kind === "project") input.projectStatus = "idea";
+    if (kind === "list") input.isList = true;
+    if (kind === "task") input.isTask = true;
+    addNote(input);
     setBody("");
     setPending([]);
     inputRef.current?.focus();
@@ -101,32 +122,20 @@ export function Compose({ colorId, onColorId, inputRef, placeholder }: Props) {
       save();
       return;
     }
-    // Cmd/Ctrl+1..9 files into a world, ⌘0 clears. These *set* rather than
-    // toggle: the colour is sticky between notes, so pressing the same key
-    // twice has to keep meaning "this world", not undo it.
     if (mod && /^[0-9]$/.test(e.key)) {
-      if (e.key === "0") {
-        e.preventDefault();
-        onColorId(null);
-        return;
-      }
-      const target = colors[Number(e.key) - 1];
-      if (target) {
-        e.preventDefault();
-        onColorId(target.id);
-      }
+      e.preventDefault();
+      if (e.key === "0") onColorId(null);
+      else onColorId(colors[Number(e.key) - 1]?.id ?? null);
       return;
     }
-    if (e.key === "Escape") {
-      e.currentTarget.blur();
-    }
+    if (e.key === "Escape") e.currentTarget.blur();
   }
 
-  const selected = colors.find((c) => c.id === colorId) ?? null;
+  /** Keeps the caret where it is, so nothing shifts and no click is lost. */
+  const hold = (e: React.MouseEvent) => e.preventDefault();
+
   const ready = body.trim().length > 0 || pending.length > 0;
-  // Unfolded once there is intent: you are typing, you have typed, or you have
-  // already chosen a world. Never merely because the page loaded.
-  const open = focused || ready || colorId !== null;
+  const active = KINDS.find((k) => k.id === kind) ?? KINDS[0];
 
   return (
     <section
@@ -138,39 +147,56 @@ export function Compose({ colorId, onColorId, inputRef, placeholder }: Props) {
       onDrop={(e) => {
         e.preventDefault();
         setDragging(false);
-        void take(imageFilesFrom(e.dataTransfer));
+        void take(mediaFilesFrom(e.dataTransfer));
       }}
-      className={`overflow-hidden rounded-2xl border bg-field ${dragging ? "border-ink" : "border-rule"}`}
-      style={
-        focused || dragging
-          ? { boxShadow: `5px 5px 0 0 ${selected ? selected.hex : "var(--ink)"}` }
-          : undefined
-      }
+      className={`border-2 bg-field ${dragging ? "border-ink" : "border-ink/85"}`}
     >
+      <div className="flex flex-wrap items-stretch border-b border-rule">
+        {KINDS.map((k) => (
+          <button
+            key={k.id}
+            type="button"
+            onMouseDown={hold}
+            onClick={() => setKind(k.id)}
+            aria-pressed={kind === k.id}
+            title={k.hint}
+            className={`label flex-1 border-r border-rule px-3 py-3 last:border-r-0 ${
+              kind === k.id
+                ? "bg-ink text-paper"
+                : "text-mute hover:bg-ink/8 hover:text-ink"
+            }`}
+          >
+            {k.label}
+          </button>
+        ))}
+      </div>
+
       <textarea
         ref={inputRef}
         value={body}
         onChange={(e) => setBody(e.target.value)}
         onKeyDown={onKeyDown}
         onPaste={(e) => {
-          const files = imageFilesFrom(e.clipboardData);
+          const files = mediaFilesFrom(e.clipboardData);
           if (files.length > 0) {
             e.preventDefault();
             void take(files);
           }
         }}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        rows={open ? 3 : 2}
+        rows={3}
         spellCheck
-        placeholder={dragging ? "Drop the image." : (placeholder ?? "Write it down.")}
+        placeholder={
+          dragging
+            ? "Drop it."
+            : (placeholder ?? `${active.label} — ${active.hint}`)
+        }
         aria-label="New note"
-        className="prose-note block w-full resize-none bg-transparent px-6 py-5 text-[19px]
+        className="prose-note block w-full resize-none bg-transparent px-5 py-4 text-[19px]
                    outline-none placeholder:text-mute"
       />
 
-      {(pending.length > 0 || busy > 0) && (
-        <div className="flex flex-wrap items-center gap-2 border-t border-rule px-6 py-4">
+      {(pending.length > 0 || busy > 0 || tooBig) && (
+        <div className="flex flex-wrap items-center gap-2 border-t border-rule px-5 py-3">
           {pending.map((img) => (
             <PendingThumb
               key={img.id}
@@ -180,44 +206,23 @@ export function Compose({ colorId, onColorId, inputRef, placeholder }: Props) {
               }
             />
           ))}
-          {busy > 0 && (
-            <span className="label text-mute">Resizing {busy}…</span>
+          {busy > 0 && <span className="label text-mute">Adding {busy}…</span>}
+          {tooBig && (
+            <span role="status" className="label text-mute">
+              That file was too big to keep on the device.
+            </span>
           )}
         </div>
       )}
 
-      {open && (
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-rule px-6 py-4">
-        <div className="flex flex-wrap items-center gap-2">
-          {colors.map((c, i) => (
-            <Swatch
-              key={c.id}
-              color={c}
-              index={i}
-              selected={c.id === colorId}
-              onSelect={() => onColorId(c.id === colorId ? null : c.id)}
-              size="sm"
-              purpose="file"
-            />
-          ))}
-          <button
-            type="button"
-            onClick={() => onColorId(null)}
-            aria-pressed={colorId === null}
-            title="No colour"
-            className={`label ml-1 rounded-lg border border-rule px-2.5 py-1.5 ${
-              colorId === null ? "bg-ink text-paper" : "text-mute hover:text-ink"
-            }`}
-          >
-            None
-          </button>
-        </div>
+      <div className="border-t border-rule px-5 py-4">
+        <Palette colorId={colorId} onColorId={onColorId} hold={hold} />
 
-        <div className="label ml-auto flex items-center gap-3 text-mute">
+        <div className="mt-4 flex flex-wrap items-center gap-2">
           <input
             ref={fileRef}
             type="file"
-            accept="image/*"
+            accept="image/*,video/*"
             multiple
             className="sr-only"
             onChange={(e) => {
@@ -227,25 +232,92 @@ export function Compose({ colorId, onColorId, inputRef, placeholder }: Props) {
           />
           <button
             type="button"
+            onMouseDown={hold}
             onClick={() => fileRef.current?.click()}
-            className="label rounded-lg border border-rule px-2.5 py-1.5 text-ink hover:bg-ink hover:text-paper"
+            className="label border border-rule px-3 py-2 hover:bg-ink hover:text-paper"
           >
-            + Image
+            Photo or video
           </button>
           <button
             type="button"
+            onMouseDown={hold}
             onClick={save}
             disabled={!ready}
-            className="label rounded-lg border border-rule px-3 py-1.5 text-ink
-                       enabled:hover:bg-ink enabled:hover:text-paper
-                       disabled:cursor-not-allowed disabled:text-mute"
+            className="label ml-auto border-2 border-ink bg-ink px-4 py-2 text-paper
+                       enabled:hover:bg-transparent enabled:hover:text-ink
+                       disabled:cursor-not-allowed disabled:border-rule disabled:bg-transparent
+                       disabled:text-mute"
           >
-            ⌘↵ Save
+            Keep it · ⌘↵
           </button>
         </div>
       </div>
-      )}
     </section>
+  );
+}
+
+/**
+ * Thirty-six worlds as a block, not a row.
+ *
+ * Laid out twelve across and three down, so each column is one hue in its
+ * light, medium and deep form and the whole thing reads as a palette you could
+ * pick from rather than a very long line of buttons.
+ */
+function Palette({
+  colorId,
+  onColorId,
+  hold,
+}: {
+  colorId: string | null;
+  onColorId: (id: string | null) => void;
+  hold: (e: React.MouseEvent) => void;
+}) {
+  const { colors } = useNoella();
+  // The store hands them over as twelve mediums, twelve lights, twelve darks.
+  // Laid out in rows of twelve, that puts one hue in each column and one
+  // intensity in each row without reordering anything.
+  const hues = Math.max(1, Math.round(colors.length / 3));
+
+  return (
+    <div className="flex flex-wrap items-start gap-x-4 gap-y-3">
+      <div
+        className="grid gap-[3px]"
+        style={{ gridTemplateColumns: `repeat(${hues}, minmax(0, 1fr))` }}
+      >
+        {colors.map((c, index) => (
+          <button
+            key={c.id}
+            type="button"
+            onMouseDown={hold}
+            onClick={() => onColorId(c.id === colorId ? null : c.id)}
+            aria-pressed={c.id === colorId}
+            title={c.name ?? swatchName(index)}
+            className={`h-6 w-6 border ${
+              c.id === colorId
+                ? "border-ink ring-2 ring-ink ring-inset"
+                : "border-rule-soft hover:border-ink"
+            }`}
+            style={{ backgroundColor: c.hex }}
+          >
+            <span className="sr-only">
+              File in {c.name ?? swatchName(index)}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <button
+        type="button"
+        onMouseDown={hold}
+        onClick={() => onColorId(null)}
+        aria-pressed={colorId === null}
+        className={`label border border-rule px-2.5 py-1.5 ${
+          colorId === null ? "bg-ink text-paper" : "text-mute hover:text-ink"
+        }`}
+      >
+        No world
+      </button>
+    </div>
   );
 }
 
@@ -271,15 +343,18 @@ function PendingThumb({
 
   return (
     <span className="flex items-center gap-2 border border-rule px-2 py-1.5">
-      {url && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={url} alt="" className="h-8 w-8 object-cover" />
-      )}
+      {url &&
+        (isVideo(image) ? (
+          <video src={url} className="h-8 w-8 bg-black object-cover" muted />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={url} alt="" className="h-8 w-8 object-cover" />
+        ))}
       <span className="label text-mute">{formatBytes(image.bytes)}</span>
       <button
         type="button"
         onClick={onRemove}
-        aria-label="Remove image"
+        aria-label="Remove"
         className="label px-1 hover:bg-ink hover:text-paper"
       >
         ×

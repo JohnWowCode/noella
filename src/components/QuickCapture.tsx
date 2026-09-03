@@ -2,15 +2,15 @@
 
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { imageFilesFrom, isImageFile } from "@/lib/images";
+import { isMediaFile, mediaFilesFrom } from "@/lib/images";
 import { useNoella } from "@/lib/store/provider";
 import type { NoteImage } from "@/lib/types";
-import { Swatch } from "./Swatch";
+import { swatchName } from "@/lib/store/defaults";
 
 const COLOR_KEY = "noella.capture.color";
 
-/** Screens that already put a writing box at the top of the page. */
-const HAS_BOX = new Set(["/", "/wall"]);
+/** Every screen has a writing box at the top of it now. There is one screen. */
+const HAS_BOX = new Set(["/"]);
 
 /** How far you have to scroll away from that box before the button comes back. */
 const AWAY = 320;
@@ -69,7 +69,8 @@ export function QuickCapture() {
       .filter(Boolean)
       .join("\n")
       .trim();
-    if (!shared) return;
+    // ?capture=1 is the home-screen shortcut: no content, just open the sheet.
+    if (!shared && params.get("capture") === null) return;
     // Drop the params first, so a refresh cannot capture the same thing twice.
     window.history.replaceState({}, "", window.location.pathname);
     Promise.resolve().then(() => {
@@ -125,7 +126,7 @@ export function QuickCapture() {
   }, [open]);
 
   async function take(files: File[]) {
-    const images = files.filter(isImageFile);
+    const images = files.filter(isMediaFile);
     if (images.length === 0) return;
     setBusy((n) => n + images.length);
     for (const file of images) {
@@ -160,7 +161,7 @@ export function QuickCapture() {
           type="button"
           onClick={() => setOpen(true)}
           aria-label="Capture a note"
-          className="label fixed right-5 bottom-5 z-40 rounded-full border border-rule
+          className="label fixed right-5 bottom-5 z-40 border border-rule
                      bg-ink px-5 py-4 text-paper shadow-lg hover:bg-paper hover:text-ink sm:right-8 sm:bottom-8"
         >
           + Note
@@ -170,7 +171,7 @@ export function QuickCapture() {
       {saved && (
         <p
           role="status"
-          className="label fixed right-5 bottom-5 z-40 rounded-full border border-rule
+          className="label fixed right-5 bottom-5 z-40 border border-rule
                      bg-field px-5 py-4 sm:right-8 sm:bottom-8"
         >
           Saved
@@ -186,7 +187,7 @@ export function QuickCapture() {
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             e.preventDefault();
-            void take(imageFilesFrom(e.dataTransfer));
+            void take(mediaFilesFrom(e.dataTransfer));
           }}
         >
           <div className="label flex items-center gap-3 border-b border-rule px-5 py-4">
@@ -195,7 +196,7 @@ export function QuickCapture() {
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="label ml-auto rounded-lg border border-rule px-2.5 py-1.5 hover:bg-ink hover:text-paper"
+              className="label ml-auto border border-rule px-2.5 py-1.5 hover:bg-ink hover:text-paper"
             >
               Close
             </button>
@@ -206,7 +207,7 @@ export function QuickCapture() {
             value={body}
             onChange={(e) => setBody(e.target.value)}
             onPaste={(e) => {
-              const files = imageFilesFrom(e.clipboardData);
+              const files = mediaFilesFrom(e.clipboardData);
               if (files.length > 0) {
                 e.preventDefault();
                 void take(files);
@@ -230,29 +231,46 @@ export function QuickCapture() {
           />
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-3 border-t border-rule px-5 py-4 sm:px-8">
-            <div className="flex flex-wrap items-center gap-2">
-              {colors.map((c, i) => (
-                <Swatch
-                  key={c.id}
-                  color={c}
-                  index={i}
-                  selected={c.id === colorId}
-                  onSelect={() => choose(c.id === colorId ? null : c.id)}
-                  size="sm"
-                  purpose="file"
-                />
-              ))}
+            <div className="flex flex-wrap items-center gap-3">
+              <div
+                className="grid gap-[3px]"
+                style={{
+                  gridTemplateColumns: `repeat(${Math.max(1, Math.round(colors.length / 3))}, minmax(0, 1fr))`,
+                }}
+              >
+                {colors.map((c, i) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => choose(c.id === colorId ? null : c.id)}
+                    aria-pressed={c.id === colorId}
+                    title={c.name ?? swatchName(i)}
+                    className={`h-6 w-6 border ${
+                      c.id === colorId
+                        ? "border-ink ring-2 ring-ink ring-inset"
+                        : "border-rule-soft hover:border-ink"
+                    }`}
+                    style={{ backgroundColor: c.hex }}
+                  >
+                    <span className="sr-only">
+                      File in {c.name ?? swatchName(i)}
+                    </span>
+                  </button>
+                ))}
+              </div>
               <button
                 type="button"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => choose(null)}
                 aria-pressed={colorId === null}
-                className={`label ml-1 rounded-lg border border-rule px-2.5 py-1.5 ${
+                className={`label border border-rule px-2.5 py-1.5 ${
                   colorId === null
                     ? "bg-ink text-paper"
                     : "text-mute hover:text-ink"
                 }`}
               >
-                None
+                No world
               </button>
             </div>
 
@@ -263,7 +281,7 @@ export function QuickCapture() {
                 type="button"
                 onClick={save}
                 disabled={!body.trim() && pending.length === 0}
-                className="label rounded-lg border border-rule px-3 py-2 text-ink
+                className="label border border-rule px-3 py-2 text-ink
                            enabled:hover:bg-ink enabled:hover:text-paper
                            disabled:cursor-not-allowed disabled:text-mute"
               >

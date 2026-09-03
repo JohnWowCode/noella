@@ -97,6 +97,20 @@
   textarea {
     field-sizing: content;
   }
+
+  /*
+   * Square. Not a wireframe — a ledger.
+   *
+   * Rounded corners were tried and read as soft and app-like when what this
+   * wants to be is official: a thing you keep records in. One rule rather than
+   * a radius token, because a single rounded control among ninety square ones
+   * is the only way this goes wrong.
+   */
+  *,
+  *::before,
+  *::after {
+    border-radius: 0;
+  }
 }
 
 /* Touch devices never hover, so per-card actions stay visible there. */

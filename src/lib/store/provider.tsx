@@ -9,7 +9,7 @@ import {
   useState,
 } from "react";
 import { seqLabel } from "../format";
-import { prepareImage } from "../images";
+import { isVideoFile, prepareImage, prepareVideo } from "../images";
 import {
   DEFAULT_SETTINGS,
   type Color,
@@ -146,9 +146,15 @@ export function NoellaProvider({ children }: { children: React.ReactNode }) {
     [store],
   );
 
+  /**
+   * Stills are downscaled and re-encoded; video is stored as it arrived. Both
+   * end up as one id on the note, so nothing downstream has to care which.
+   */
   const attachImage = useCallback(
     async (file: File) => {
-      const { meta, blob } = await prepareImage(file);
+      const { meta, blob } = isVideoFile(file)
+        ? await prepareVideo(file)
+        : await prepareImage(file);
       await store.saveImage(meta.id, blob);
       return meta;
     },

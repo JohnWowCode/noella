@@ -355,21 +355,23 @@ voice telling you your wall is empty is funny once and cold every time after.
 
 ```
 src/
-  app/            layout (fonts, theme boot, PWA), / (Today),
-                  /wall, /projects
+  app/            layout (fonts, theme boot, PWA), / (everything),
+                  /wall + /projects (redirects, for old bookmarks)
   fonts/          vendored Literata variable woff2 + OFL licence
-  components/     Focus, Wall, Compose, QuickCapture, NoteCard, NoteImages,
-                  Swatch, TagIndex, DataMenu, Projects, ProjectPanel,
-                  ListPanel, Timer, Palette, Chrome
+  components/     Home, Compose, Jester, QuickCapture, NoteCard, NoteImages,
+                  TagIndex, DataMenu, ProjectPanel, ListPanel, Timer,
+                  Palette, Chrome
   lib/
     notes.ts      hashtag + task-marker parsing, search matching
     projects.ts   status ladder, steps, progress, next action
+    pick.ts       the jester's hat: what is open, and how much it wants doing
+    surface.ts    the ink a coloured card can actually be read in
     momentum.ts   ledger, streaks, drift, estimate calibration
     recurrence.ts list cadences, period keys, what is still open
     clock.ts      today as a stable snapshot, local calendar days
-    images.ts     downscale/encode + IndexedDB blob store
+    images.ts     downscale/encode stills, keep video as-is, IndexedDB blobs
     format.ts     seq labels, absolute timestamps
-    store/        Store interface, LocalStore, React provider
+    store/        Store interface, LocalStore, React provider, the 36 colours
 public/           manifest, service worker, icons
 supabase/
   migrations/     Postgres schema, not yet applied

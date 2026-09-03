@@ -66,7 +66,7 @@ export function ThemeToggle() {
       onClick={cycle}
       aria-label={`Theme: ${choice}. Click to change.`}
       title="Auto follows your system"
-      className="label rounded-lg px-2.5 py-2 text-mute hover:text-ink"
+      className="label px-2.5 py-2 text-mute hover:text-ink"
     >
       {choice}
     </button>

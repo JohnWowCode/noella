@@ -91,7 +91,7 @@ export function Timer({ step, onColor }: { step: Note; onColor: boolean }) {
   const secs = Math.floor((elapsed % 60000) / 1000);
 
   const button = onColor
-    ? "border-current hover:bg-[#111] hover:text-white"
+    ? "border-current hover:bg-[var(--on)] hover:text-[var(--on-inv)]"
     : "border-rule hover:bg-ink hover:text-paper";
 
   return (
@@ -105,7 +105,7 @@ export function Timer({ step, onColor }: { step: Note; onColor: boolean }) {
               aria-label={`${mins} of about ${step.estimateMinutes} minutes`}
             >
               <span
-                className={`block h-full ${onColor ? "bg-[#111]" : "bg-ink"}`}
+                className={`block h-full ${onColor ? "bg-[var(--on)]" : "bg-ink"}`}
                 style={{
                   width: `${Math.min(100, (elapsed / (step.estimateMinutes * 60000)) * 100)}%`,
                 }}
@@ -150,7 +150,7 @@ export function Timer({ step, onColor }: { step: Note; onColor: boolean }) {
           onClick={start}
           className={`label border px-4 py-2.5 ${
             onColor
-              ? "border-current bg-[#111] text-white hover:bg-transparent hover:text-current"
+              ? "border-current bg-[var(--on)] text-[var(--on-inv)] hover:bg-transparent hover:text-current"
               : "border-rule bg-ink text-paper hover:bg-transparent hover:text-ink"
           }`}
         >
@@ -174,7 +174,7 @@ export function Timer({ step, onColor }: { step: Note; onColor: boolean }) {
             className={`label border border-current px-1.5 py-1 ${
               step.estimateMinutes === m
                 ? onColor
-                  ? "bg-[#111] text-white opacity-100"
+                  ? "bg-[var(--on)] text-[var(--on-inv)] opacity-100"
                   : "bg-ink text-paper opacity-100"
                 : "hover:opacity-100"
             }`}

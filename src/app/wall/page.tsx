@@ -1,5 +1,5 @@
-import { Wall } from "@/components/Wall";
+import { Moved } from "@/components/Moved";
 
 export default function Page() {
-  return <Wall />;
+  return <Moved />;
 }

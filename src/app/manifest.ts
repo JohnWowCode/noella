@@ -27,9 +27,9 @@ export default function manifest(): MetadataRoute.Manifest {
       { src: `${base}/icon-512.png`, sizes: "512x512", type: "image/png", purpose: "any" },
       { src: `${base}/icon-maskable-512.png`, sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
-    shortcuts: [
-      { name: "The wall", url: `${base}/wall` },
-      { name: "Projects", url: `${base}/projects` },
-    ],
+    // Long-pressing the icon offers the one thing worth a separate entrance:
+    // a blank box. The old shortcuts pointed at two screens that are now the
+    // same screen, so they were two ways of doing nothing.
+    shortcuts: [{ name: "Write something", url: `${base}/?capture=1` }],
   };
 }

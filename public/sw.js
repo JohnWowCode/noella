@@ -7,7 +7,7 @@
  * and everything else is cache-first with a background refresh.
  */
 
-const VERSION = "noella-v5";
+const VERSION = "noella-v6";
 
 /**
  * Where this copy of the app lives. Derived from the registration scope rather
@@ -24,11 +24,14 @@ const BASE = new URL(self.registration.scope).pathname.replace(/\/$/, "");
  * and a miss is simply skipped.
  */
 /**
- * A static export serves /wall/ and 308s the bare path; a server build serves
- * /wall. Rather than requesting both and guaranteeing a failed request for
- * every route, each page is tried as a directory first and only falls back.
+ * One screen, so one route. /wall and /projects still exist as redirects for
+ * anything that bookmarked them, but caching a page whose only job is to send
+ * you somewhere else would mean going offline lands you on a dead redirect.
+ *
+ * A static export serves the path as a directory and 308s the bare form, so
+ * each entry is tried as a directory first and only then falls back.
  */
-const ROUTES = ["", "/wall", "/projects"];
+const ROUTES = [""];
 
 async function cacheShell(cache) {
   for (const route of ROUTES) {
