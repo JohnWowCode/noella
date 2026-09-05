@@ -293,17 +293,22 @@ note; they were folded into this and the tab was deleted.**
 - Anything with something still outstanding turns up on Today under
   **Coming round again**.
 
-## Claude can read it
+## Claude and ChatGPT can read it
 
-There is an MCP server in `mcp/`. Point Claude Code or Claude Desktop at it and
-you can ask "what's still open?", or say "put *scout the underpass* on the film
-project", without opening the app.
+There is an MCP server in `mcp/`. Point Claude Code, Claude Desktop, claude.ai
+or ChatGPT at it and you can ask "what's still open?", or say "put *scout the
+underpass* on the film project", without opening the app.
 
-It uses the Claude subscription you already pay for. An MCP server is a tool
-provider for a Claude *client*; it needs no API key and costs nothing extra.
-That is the difference between this and wiring the app up to OpenRouter or the
-Anthropic API — those are metered, pay-as-you-go, and a claude.ai subscription
-does not cover them.
+It speaks two transports for one set of tools. Claude Code and Claude Desktop
+launch it as a child process over stdio — nothing on the network, nothing to
+authenticate. ChatGPT cannot do that, and neither can claude.ai in a browser or
+on a phone; they reach out to a URL, so those use the HTTP server behind a
+token and a tunnel.
+
+It uses the subscriptions you already pay for. An MCP server provides tools to
+a *client*; it needs no API key and costs nothing per call. That is the
+difference between this and wiring the app up to OpenRouter or the Anthropic
+API — those are metered, pay-as-you-go, and no chat subscription covers them.
 
 Noella lives in a browser tab and an MCP server is a separate process, so the
 two share a folder you pick once: the app writes the whole wall to

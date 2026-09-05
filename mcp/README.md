@@ -1,10 +1,11 @@
-# Noella, as tools Claude can use
+# Noella, as tools a model can use
 
-Lets Claude read your wall and add to it: "what's still open?", "put *scout the
-underpass* on the film project", "what have I got filed under Money?"
+Lets Claude or ChatGPT read your wall and add to it: "what's still open?",
+"put *scout the underpass* on the film project", "what's filed under Money?"
 
-It runs on your machine and talks to nothing but a folder. No account, no API
-key, no data leaving the computer.
+It runs on your machine and talks to nothing but a folder. No API key, nothing
+metered — an MCP server provides tools to a chat client, so it rides on the
+subscription you already have.
 
 ## The one thing to understand first
 
@@ -46,7 +47,10 @@ cd mcp
 npm install
 ```
 
-### 3. Point Claude at it
+### 3a. Point Claude Code or Claude Desktop at it (local, no secret)
+
+These launch the server as a child process and talk to it on a pipe. Nothing
+listens on the network and there is nothing to authenticate.
 
 **Claude Code**
 
@@ -76,7 +80,63 @@ Restart Claude Desktop. Both paths must be absolute.
 If you leave the folder argument off, it looks at `$NOELLA_FOLDER`, then
 `~/Noella`.
 
-## What Claude can do
+### 3b. Point ChatGPT — or claude.ai on the web or your phone — at it
+
+None of those can launch a process. They reach *out* to a URL, so they need the
+HTTP server and a way in from outside your machine.
+
+```sh
+NOELLA_TOKEN=$(openssl rand -base64 24 | tr '+/' '-_') node http.mjs /absolute/path/to/your/folder
+```
+
+It refuses to start without `NOELLA_TOKEN` and prints a usable one if you have
+not set it — this serves every note you have ever written, so it does not run
+open.
+
+Then put a tunnel in front rather than opening a port. A tunnel dials *out*, so
+nothing on your machine is listening to the internet:
+
+```sh
+cloudflared tunnel --url http://localhost:8787
+```
+
+That prints an `https://something.trycloudflare.com` URL. The connector's
+endpoint is that URL plus `/mcp`.
+
+**In ChatGPT:** Settings → Connectors → Advanced → Developer mode, then add a
+connector pointing at `https://…/mcp`. Requires a paid plan.
+
+**In claude.ai:** Settings → Connectors → Add custom connector, same URL. This
+is also the only way to reach your wall from a phone.
+
+Two ways to authenticate, because connectors differ in what they let you set:
+
+| | |
+| --- | --- |
+| `Authorization: Bearer <token>` | Preferred. Secrets do not belong in URLs. |
+| `https://…/mcp/<token>` | For connectors that only accept a URL. |
+
+The path form is a real trade-off — URLs end up in proxy logs and history — but
+a connector you cannot authenticate is one you cannot use, and it beats running
+it open. Rotate the token by restarting with a new one.
+
+`--port 8787` and `--host` change where it listens; it binds to `127.0.0.1`
+unless you say otherwise, which is what makes the tunnel the safe default.
+
+A free Cloudflare quick tunnel gets a new URL every restart, so the connector
+needs updating each time. A named tunnel keeps its hostname.
+
+### Two extra tools, for ChatGPT's sake
+
+The HTTP server exposes `search` and `fetch` alongside everything else. They
+are thin aliases over the same data in the fixed shape OpenAI's connectors look
+for — `search` gives `{id, title, url}` and `fetch` gives the text behind an id
+— because a connector that cannot find them may refuse to load at all. The urls
+are real deep links: every card carries `id="note-<id>"`, so following one
+scrolls to the note. Set `NOELLA_APP_URL` if you host the app somewhere other
+than the default.
+
+## The tools
 
 Reading — always available, current as of the last time a tab was open:
 
@@ -107,9 +167,10 @@ rather than guessing.
 - **Photos and video.** The bytes stay in the browser. A note says how many
   attachments it has and that they are not readable from here.
 - **Delete anything.** Nothing here can destroy a note. Archive from the app.
-- **Work from your phone.** A local server only serves the machine it runs on.
-  Syncing everywhere needs a real backend — `supabase/migrations/0001_init.sql`
-  is the schema for it, waiting.
+- **Run without your computer.** Even over a tunnel, the server is a process on
+  your machine and the wall is a file it writes. Close the laptop and the
+  connector goes dark. Genuine always-on sync needs a real backend —
+  `supabase/migrations/0001_init.sql` is the schema for it, waiting.
 
 ## If it says there is no wall
 
@@ -117,5 +178,5 @@ rather than guessing.
 No wall found at <path>/noella.json.
 ```
 
-Either the folder in your Claude config is not the one you picked in Noella, or
+Either the folder in the connector's config is not the one you picked in Noella, or
 you have not pressed **Connect a folder** yet. Both paths must match exactly.
