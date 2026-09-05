@@ -199,6 +199,30 @@ that, and two of them are corrections to earlier versions of this app.
 - **Deleting is undoable** and the app is installable, so it is where you left
   it rather than somewhere you have to remember to go.
 
+## There are no kinds
+
+The compose box used to open with four tabs — Note, To do, Project, List —
+asking you to classify a thought before writing it.
+
+They were not four categories. They were two unrelated questions wearing one
+row: *can this be ticked*, and *how is it tracked*. And the second one stopped
+being structural the moment anything could hold anything — a project is a note
+with a status, a list is a note with a cadence, and neither changes what the
+thing is. The tabs were describing a model the app no longer had.
+
+One tick box is left, for the only question worth asking that early, and even
+that flips afterwards. Whether something becomes a project is offered when it
+has grown contents and the question means something:
+
+> *3 things in here now. Want to keep track of it?*  **As a project · As a list**
+
+Once, quietly, and never again after an answer. It is still in the card's ⋯
+menu for anyone who knows what they are making up front.
+
+The MCP tools keep the full vocabulary — `kind: project` still works there.
+A model naming a project has already read the thing; a person at a blank box
+has not.
+
 ## Nothing is on screen until it means something
 
 The one rule the interface is held to, because every other rule was losing to
@@ -233,6 +257,17 @@ a stripe down the card's left edge, so a column of them scans down the margin
 without a word being taken in. On a coloured card the chip flips to the card's
 own ink and carries the rank as a small block instead — a red NOW on a red card
 was red on red.
+
+## The colours you actually use
+
+Thirty-six is the right number to have and the wrong number to choose from
+every time — in practice a wall lives in four or five. The last five you filed
+something in sit out in the open for one tap; the rest are one tap deeper,
+behind a `···`. Derived from the notes rather than stored, so there is nothing
+to migrate and an imported wall gets it for free.
+
+Nothing shows until you have used one, and whatever is currently chosen is
+shown exactly once — the trigger means "the rest", not "the current one".
 
 ## Stickers
 

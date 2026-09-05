@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   formatBytes,
   isVideo,
@@ -12,19 +12,53 @@ import { Popover } from "./Popover";
 import { useNoella } from "@/lib/store/provider";
 import { PRIORITIES, PRIORITY, type Priority } from "@/lib/priority";
 import { STICKERS, isSticker } from "@/lib/stickers";
-import type { NewNote, NoteImage } from "@/lib/types";
+import type { Color, NewNote, NoteImage } from "@/lib/types";
 
 const DRAFT_KEY = "noella.draft";
 
-/** What you are writing. Decided here, once, instead of hunted for later. */
-const KINDS = [
-  { id: "note", label: "Note", hint: "a thought, a scrap, a picture" },
-  { id: "task", label: "To do", hint: "one thing to tick off" },
-  { id: "project", label: "Project", hint: "a folder with steps" },
-  { id: "list", label: "List", hint: "a folder of items" },
-] as const;
+/** How many of the colours you actually use sit out in the open. */
+const RECENT = 5;
 
-export type Kind = (typeof KINDS)[number]["id"];
+/**
+ * The folders you filed something in most recently.
+ *
+ * Derived from the notes rather than stored: a "recently used" list held in
+ * settings would need writing on every save, migrating, and reconciling with
+ * a wall that arrived by import. The notes already carry the answer in the
+ * order they were written.
+ */
+function useRecentColors(): Color[] {
+  const { notes, colors } = useNoella();
+  return useMemo(() => {
+    const seen: Color[] = [];
+    const ordered = [...notes].sort((a, b) =>
+      b.createdAt.localeCompare(a.createdAt),
+    );
+    for (const n of ordered) {
+      if (!n.colorId || seen.some((c) => c.id === n.colorId)) continue;
+      const hit = colors.find((c) => c.id === n.colorId);
+      if (hit) seen.push(hit);
+      if (seen.length === RECENT) break;
+    }
+    return seen;
+  }, [notes, colors]);
+}
+
+/*
+ * There used to be four tabs here: Note, To do, Project, List.
+ *
+ * They were not four categories. They were two unrelated questions wearing one
+ * row — can this be ticked, and how is it tracked — and the second one stopped
+ * being structural the moment anything could hold anything. A "project" is a
+ * note with a status; a "list" is a note with a cadence. Nothing about either
+ * changes what the thing *is*, so asking at the keyboard meant classifying a
+ * thought before it had been written.
+ *
+ * What is left is the only question worth asking that early: is this something
+ * to do? And even that is a toggle you can flip afterwards. Whether it becomes
+ * a project is offered later, when it has contents and the question means
+ * something.
+ */
 
 function readDraft(): string {
   if (typeof window === "undefined") return "";
@@ -67,7 +101,7 @@ export function Compose({
 }: Props) {
   const { colors, addNote, attachImage } = useNoella();
   const [body, setBody] = useState("");
-  const [kind, setKind] = useState<Kind>("note");
+  const [task, setTask] = useState(false);
   const [restored, setRestored] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [pending, setPending] = useState<NoteImage[]>([]);
@@ -131,16 +165,14 @@ export function Compose({
       icon,
       priority,
     };
-    if (kind === "project") input.projectStatus = "idea";
-    if (kind === "list") input.isList = true;
-    if (kind === "task") input.isTask = true;
+    if (task) input.isTask = true;
     addNote(input);
 
     /*
      * Everything that would slow the next one down is left alone.
      *
-     * The kind, the colour, the sticker and the priority all stay set, because
-     * a run of ideas is usually a run of the same kind of idea. Only the words
+     * The tick, the colour, the sticker and the rank all stay set, because a
+     * run of ideas is usually a run of the same kind of idea. Only the words
      * clear and the caret never leaves the box, so a stream of thoughts goes
      * down as fast as it can be typed — and what landed stays visible in the
      * strip below rather than scrolling away unacknowledged.
@@ -190,7 +222,18 @@ export function Compose({
 
   const ready = body.trim().length > 0 || pending.length > 0;
   const selected = colors.find((c) => c.id === colorId) ?? null;
-  const active = KINDS.find((k) => k.id === kind) ?? KINDS[0];
+  const recent = useRecentColors();
+  /*
+   * What sits out in the open: the colours you actually use, plus whatever is
+   * chosen right now if it is not already among them. Without that second
+   * part, picking something from the full grid would leave nothing on screen
+   * showing it had been picked.
+   */
+  const strip =
+    selected && !recent.some((c) => c.id === selected.id)
+      ? [selected, ...recent].slice(0, RECENT)
+      : recent;
+
 
   return (
     <section
@@ -206,26 +249,6 @@ export function Compose({
       }}
       className={`border-2 bg-field ${dragging ? "border-ink" : "border-ink/85"}`}
     >
-      <div className="flex flex-wrap items-stretch border-b border-rule">
-        {KINDS.map((k) => (
-          <button
-            key={k.id}
-            type="button"
-            onMouseDown={hold}
-            onClick={() => setKind(k.id)}
-            aria-pressed={kind === k.id}
-            title={k.hint}
-            className={`label flex-1 border-r border-rule px-3 py-2.5 last:border-r-0 ${
-              kind === k.id
-                ? "bg-ink text-paper"
-                : "text-mute hover:bg-ink/8 hover:text-ink"
-            }`}
-          >
-            {k.label}
-          </button>
-        ))}
-      </div>
-
       <textarea
         ref={inputRef}
         value={body}
@@ -244,9 +267,7 @@ export function Compose({
           dragging
             ? "Drop it."
             : (placeholder ??
-              (parentName
-                ? `New ${active.label.toLowerCase()} in ${parentName}`
-                : `${active.label} — ${active.hint}`))
+              (parentName ? `Anything, into ${parentName}` : "Anything."))
         }
         aria-label="New note"
         /*
@@ -322,20 +343,64 @@ export function Compose({
         asked. Nothing was removed; it just stopped standing there.
       */}
       <div className="flex flex-wrap items-center gap-2 border-t border-rule px-4 py-3">
+        <button
+          type="button"
+          onMouseDown={hold}
+          onClick={() => setTask((v) => !v)}
+          aria-pressed={task}
+          aria-label="Something to do"
+          title="Something to do — you can flip this later"
+          className={`grid h-9 w-9 place-items-center border text-[15px] leading-none ${
+            task
+              ? "border-ink bg-ink text-paper"
+              : "border-rule text-mute hover:border-ink hover:text-ink"
+          }`}
+        >
+          ✓
+        </button>
+
+        {/*
+          The colours you actually use.
+          
+          Thirty-six is the right number to have and the wrong number to
+          choose from every time — in practice a wall lives in four or five.
+          The last few used sit here for one tap; the rest are one tap deeper.
+          Nothing shows until you have used one, like everything else.
+        */}
+        {strip.length > 0 && (
+          <span className="flex items-center gap-1">
+            {strip.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onMouseDown={hold}
+                onClick={() => onColorId(c.id === colorId ? null : c.id)}
+                aria-pressed={c.id === colorId}
+                title={c.name ?? "Recent folder"}
+                className={`h-7 w-7 border ${
+                  c.id === colorId
+                    ? "border-ink ring-2 ring-ink ring-inset"
+                    : "border-rule-soft hover:border-ink"
+                }`}
+                style={{ backgroundColor: c.hex }}
+              >
+                <span className="sr-only">File in {c.name ?? "recent folder"}</span>
+              </button>
+            ))}
+          </span>
+        )}
+
+        {/*
+          The trigger means "the other thirty-one", not "the current one".
+
+          It used to show the selected colour, which sat immediately beside the
+          same colour in the strip — the same swatch twice, looking like a bug.
+          Selection lives in the strip now; this is only the way to the rest.
+        */}
         <Popover
-          label="Folder colour"
-          set={colorId !== null}
-          current={
-            selected ? (
-              <span
-                aria-hidden
-                className="h-4 w-4 border border-rule-soft"
-                style={{ backgroundColor: selected.hex }}
-              />
-            ) : (
-              <span aria-hidden className="h-4 w-4 border border-current" />
-            )
-          }
+          label="All folder colours"
+          set={false}
+          current={<span className="label">···</span>}
         >
           {(close) => (
             <Palette
