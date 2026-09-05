@@ -65,6 +65,11 @@ create table public.notes (
   snoozed_until text,
   -- Hand-set priority among siblings. Lower is sooner; rank one is today.
   "order"     integer not null default 0,
+  -- One glyph, shown large. A wall of forty titles has to be read; a wall of
+  -- forty stickers can be scanned.
+  icon        text check (icon is null or char_length(icon) between 1 and 12),
+  -- Three buckets, never a number: a 1-10 field is an afternoon of deciding.
+  priority    text check (priority in ('now', 'next', 'later')),
   pinned      boolean not null default false,
   visibility  text not null default 'private'
               check (visibility in ('private', 'unlisted', 'public')),
@@ -100,6 +105,8 @@ create index notes_project_idx on public.notes (owner_id, project_status)
   where project_status is not null;
 create index notes_list_idx on public.notes (owner_id)
   where is_list;
+create index notes_priority_idx on public.notes (owner_id, priority)
+  where priority is not null;
 -- Ranking reads siblings in order, so the order column is part of the key.
 create index notes_rank_idx on public.notes (owner_id, parent_id, "order");
 

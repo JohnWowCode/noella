@@ -143,7 +143,7 @@ Reading — always available, current as of the last time a tab was open:
 | Tool | For |
 | --- | --- |
 | `whats_open` | Everything unticked, in the order Noella would work through it |
-| `search_notes` | By text, `#tag`, folder, or kind; `open_only` for just the live ones |
+| `search_notes` | By text, `#tag`, folder, kind or `priority`; `open_only` for the live ones |
 | `get_note` | One thing in full: what it holds, and the path to where it lives |
 | `list_projects` | Every project with status, progress and next step; every list |
 | `list_folders` | The colour folders, their names, and how much is in each |
@@ -152,10 +152,11 @@ Writing — queued, lands when a tab is next open:
 
 | Tool | For |
 | --- | --- |
-| `add_note` | A note, to-do, project or list; `inside` puts it in something, at any depth |
+| `add_note` | A note, to-do, project or list; `inside` nests it, plus `priority` and `sticker` |
 | `add_step` | The same thing, worded for checklists |
 | `complete` | Tick something off, or `undo: true` to un-tick it |
 | `set_project_status` | idea / active / paused / done |
+| `set_priority` | now / next / later, or none to unrank |
 | `pending_changes` | What is queued and not yet applied |
 
 Things are found by id, by their `NOTE 0041` reference, or by enough of their

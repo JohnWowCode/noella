@@ -198,6 +198,8 @@ export interface Op {
   parentId?: string;
   noteId?: string;
   status?: string;
+  icon?: string | null;
+  priority?: "now" | "next" | "later" | null;
 }
 
 export interface Envelope {

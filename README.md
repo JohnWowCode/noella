@@ -199,6 +199,47 @@ that, and two of them are corrections to earlier versions of this app.
 - **Deleting is undoable** and the app is installable, so it is where you left
   it rather than somewhere you have to remember to go.
 
+## Now, next, later
+
+Three buckets, never a number. A 1–10 priority field is a decision you can
+spend an afternoon on, which is exactly the trap — ranking feels like progress
+and produces none. Nothing is required to have one, and most things never
+will: a screen where every row shouts a priority has no priorities.
+
+It is built to be read before it is read. The rank is a colour on the chip and
+a stripe down the card's left edge, so a column of them scans down the margin
+without a word being taken in. On a coloured card the chip flips to the card's
+own ink and carries the rank as a small block instead — a red NOW on a red card
+was red on red.
+
+## Stickers
+
+Any note takes one glyph, shown large. Reading forty card titles to find the
+one about audio is work; spotting the speaker among forty shapes is not, and
+that difference is most of why they exist. The set is curated rather than the
+whole emoji keyboard, because two thousand choices is a browsing session and
+forty is a decision — anything else can still be pasted in. Colour folders take
+one too.
+
+## Rapid fire
+
+Enter saves and leaves the caret exactly where it was, so a run of ideas goes
+down as fast as it can be typed. The kind, colour, sticker and rank all stay
+set between one and the next, because a burst is usually a burst of the same
+sort of thing.
+
+Shift+Enter always makes a newline, and once a draft has one Enter stops
+saving — otherwise the first paragraph break of a rant would post half of it.
+⌘↵ always saves. The box itself starts at rant height and grows from there.
+
+Under it, the last four things you fired off stay listed, so a burst has
+something to show for itself instead of an emptying box.
+
+## Grouping
+
+The list can be cut into bands by folder, by kind, or by rank. Off is the
+default, because a heading above every single row is its own kind of noise.
+
 ## Folders, all the way down
 
 Anything can hold anything. A note is a folder the moment you put something in

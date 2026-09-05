@@ -3,7 +3,14 @@
 import { useMemo, useState } from "react";
 import type { Note } from "@/lib/types";
 
-const COLLAPSED = 12;
+/**
+ * Six, not twelve.
+ *
+ * Tags are the cross-cut, not the spine — the folders above already carry the
+ * structure. Twelve outlined boxes under them was a second navigation bar
+ * competing with the first, and the tail of it was always the tags used once.
+ */
+const COLLAPSED = 6;
 
 /**
  * Every tag on the wall, heaviest first. Colour is the spine; this is the
@@ -37,22 +44,21 @@ export function TagIndex({
   const hidden = tags.length - shown.length;
 
   return (
-    <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-2">
-      <span className="label text-mute">Tags</span>
+    <div className="mt-3 flex flex-wrap items-center gap-x-3.5 gap-y-1.5">
       {shown.map(([tag, count]) => (
         <button
           key={tag}
           type="button"
           onClick={() => onPick(active === tag ? null : tag)}
           aria-pressed={active === tag}
-          className={`label border border-rule px-2 py-1.5 ${
+          className={`label ${
             active === tag
-              ? "bg-ink text-paper"
-              : "text-mute hover:border-ink hover:text-ink"
+              ? "bg-ink px-1.5 py-0.5 text-paper"
+              : "text-mute underline decoration-1 underline-offset-2 hover:text-ink hover:no-underline"
           }`}
         >
           #{tag}
-          <span className="ml-1.5 opacity-60">{count}</span>
+          <span className="ml-1 opacity-55 tabular-nums">{count}</span>
         </button>
       ))}
       {hidden > 0 && (

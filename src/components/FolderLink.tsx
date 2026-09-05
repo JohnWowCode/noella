@@ -17,7 +17,7 @@ import {
 } from "@/lib/bridge/folder";
 import { isList, isProject } from "@/lib/projects";
 import { useNoella } from "@/lib/store/provider";
-import type { NewNote } from "@/lib/types";
+import type { NewNote, Note } from "@/lib/types";
 
 /** How often a visible tab looks for changes Claude queued. */
 const POLL_MS = 4000;
@@ -79,6 +79,8 @@ export function FolderLink() {
             parentId: op.parentId
               ? (notes.find((n) => n.id === op.parentId)?.id ?? null)
               : null,
+            icon: op.icon ?? null,
+            priority: op.priority ?? null,
           };
           if (op.kind === "project") input.projectStatus = "idea";
           if (op.kind === "list") input.isList = true;
@@ -104,6 +106,11 @@ export function FolderLink() {
           return true;
         case "reopen":
           patchNote(op.noteId ?? "", { doneAt: null });
+          return true;
+        case "set_priority":
+          patchNote(op.noteId ?? "", {
+            priority: (op.priority ?? null) as Note["priority"],
+          });
           return true;
         case "set_status": {
           const target = notes.find((n) => n.id === op.noteId);

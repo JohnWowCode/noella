@@ -9,6 +9,8 @@ import {
 } from "@/lib/images";
 import { swatchName } from "@/lib/store/defaults";
 import { useNoella } from "@/lib/store/provider";
+import { PRIORITIES, PRIORITY, type Priority } from "@/lib/priority";
+import { STICKERS, isSticker } from "@/lib/stickers";
 import type { NewNote, NoteImage } from "@/lib/types";
 
 const DRAFT_KEY = "noella.draft";
@@ -70,6 +72,11 @@ export function Compose({
   const [pending, setPending] = useState<NoteImage[]>([]);
   const [busy, setBusy] = useState(0);
   const [tooBig, setTooBig] = useState(false);
+  const [icon, setIcon] = useState<string | null>(null);
+  const [priority, setPriority] = useState<Priority | null>(null);
+  const [stickers, setStickers] = useState(false);
+  /** What you have fired off without leaving the box. */
+  const [burst, setBurst] = useState<string[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -121,11 +128,24 @@ export function Compose({
       colorId,
       images: pending,
       parentId,
+      icon,
+      priority,
     };
     if (kind === "project") input.projectStatus = "idea";
     if (kind === "list") input.isList = true;
     if (kind === "task") input.isTask = true;
     addNote(input);
+
+    /*
+     * Everything that would slow the next one down is left alone.
+     *
+     * The kind, the colour, the sticker and the priority all stay set, because
+     * a run of ideas is usually a run of the same kind of idea. Only the words
+     * clear and the caret never leaves the box, so a stream of thoughts goes
+     * down as fast as it can be typed — and what landed stays visible in the
+     * strip below rather than scrolling away unacknowledged.
+     */
+    setBurst((prev) => [input.body.split("\n")[0], ...prev].slice(0, 4));
     setBody("");
     setPending([]);
     inputRef.current?.focus();
@@ -134,6 +154,24 @@ export function Compose({
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     const mod = e.metaKey || e.ctrlKey;
     if (mod && e.key === "Enter") {
+      e.preventDefault();
+      save();
+      return;
+    }
+    /*
+     * Enter fires it off, unless you are mid-rant.
+     *
+     * Shift+Enter always makes a newline, and once the draft contains one,
+     * Enter stops saving — otherwise the first paragraph break of a long
+     * thought would post half of it. Rapid-firing one-liners is Enter, Enter,
+     * Enter; writing a paragraph is untouched.
+     */
+    if (
+      e.key === "Enter" &&
+      !e.shiftKey &&
+      !e.altKey &&
+      !body.includes("\n")
+    ) {
       e.preventDefault();
       save();
       return;
@@ -199,7 +237,7 @@ export function Compose({
             void take(files);
           }
         }}
-        rows={3}
+        rows={6}
         spellCheck
         placeholder={
           dragging
@@ -210,9 +248,49 @@ export function Compose({
                 : `${active.label} — ${active.hint}`))
         }
         aria-label="New note"
-        className="prose-note block w-full resize-none bg-transparent px-5 py-4 text-[19px]
-                   outline-none placeholder:text-mute"
+        /*
+         * min-height, not rows.
+         *
+         * The base layer sets `field-sizing: content` so the box grows with a
+         * rant instead of scrolling inside itself — but that also makes `rows`
+         * meaningless, and an empty box collapsed to a couple of lines. A
+         * floor gives it presence to start with; growing is unaffected.
+         */
+        className="prose-note block min-h-44 w-full resize-none bg-transparent px-5 py-5
+                   text-[21px] leading-[1.5] outline-none placeholder:text-mute"
       />
+
+      {/*
+        Proof it landed.
+
+        Firing off six thoughts in a row and watching the box empty six times
+        gives you nothing to hold onto — the notes are real, but they are below
+        the fold. These are the last four, newest first, and they clear the
+        moment you leave.
+      */}
+      {burst.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-t border-rule px-5 py-2.5">
+          <span className="label text-mute">Kept</span>
+          {burst.map((line, i) => (
+            <span
+              key={`${line}-${i}`}
+              className="label max-w-56 truncate border border-rule-soft px-2 py-1 text-mute"
+              style={{ opacity: 1 - i * 0.2 }}
+            >
+              {line}
+            </span>
+          ))}
+          <button
+            type="button"
+            onMouseDown={hold}
+            onClick={() => setBurst([])}
+            className="label ml-auto text-mute hover:text-ink"
+            aria-label="Clear the kept strip"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {(pending.length > 0 || busy > 0 || tooBig) && (
         <div className="flex flex-wrap items-center gap-2 border-t border-rule px-5 py-3">
@@ -235,6 +313,106 @@ export function Compose({
       )}
 
       <div className="border-t border-rule px-5 py-4">
+        <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-2">
+          <button
+            type="button"
+            onMouseDown={hold}
+            onClick={() => setStickers((v) => !v)}
+            aria-pressed={stickers}
+            aria-label="Pick a sticker"
+            className={`grid h-9 w-9 shrink-0 place-items-center border text-[18px] leading-none ${
+              icon ? "border-ink" : "border-rule text-mute hover:border-ink"
+            }`}
+          >
+            {icon ?? "☺"}
+          </button>
+          {icon && (
+            <button
+              type="button"
+              onMouseDown={hold}
+              onClick={() => setIcon(null)}
+              className="label border border-rule px-2 py-2 text-mute hover:text-ink"
+            >
+              No sticker
+            </button>
+          )}
+
+          <span className="ml-auto flex flex-wrap items-center gap-1.5">
+            {PRIORITIES.map((p) => (
+              <button
+                key={p}
+                type="button"
+                onMouseDown={hold}
+                onClick={() => setPriority(priority === p ? null : p)}
+                aria-pressed={priority === p}
+                title={PRIORITY[p].hint}
+                className="label flex items-center gap-1.5 border px-2.5 py-2"
+                style={
+                  priority === p
+                    ? {
+                        backgroundColor: PRIORITY[p].hex,
+                        borderColor: PRIORITY[p].hex,
+                        color: "#111111",
+                      }
+                    : { borderColor: "var(--rule)" }
+                }
+              >
+                <span
+                  aria-hidden
+                  className="h-2.5 w-2.5"
+                  style={{ backgroundColor: PRIORITY[p].hex }}
+                />
+                {PRIORITY[p].label}
+              </button>
+            ))}
+          </span>
+        </div>
+
+        {stickers && (
+          <div className="mb-4 border border-rule p-3">
+            {STICKERS.map((group) => (
+              <div key={group.name} className="mb-2.5 last:mb-0">
+                <p className="label mb-1.5 text-mute">{group.name}</p>
+                <div className="flex flex-wrap gap-1">
+                  {group.icons.map((glyph) => (
+                    <button
+                      key={glyph}
+                      type="button"
+                      onMouseDown={hold}
+                      onClick={() => {
+                        setIcon(glyph === icon ? null : glyph);
+                        setStickers(false);
+                      }}
+                      aria-pressed={glyph === icon}
+                      className={`grid h-8 w-8 place-items-center border text-[17px] leading-none ${
+                        glyph === icon
+                          ? "border-ink bg-ink/10"
+                          : "border-transparent hover:border-rule"
+                      }`}
+                    >
+                      {glyph}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <input
+              onMouseDown={(e) => e.stopPropagation()}
+              onChange={(e) => {
+                const value = e.target.value.trim();
+                if (isSticker(value)) {
+                  setIcon(value);
+                  setStickers(false);
+                }
+              }}
+              placeholder="…or paste any emoji"
+              aria-label="Use any emoji as the sticker"
+              className="label mt-1 w-full border border-rule bg-transparent px-2 py-1.5
+                         outline-none placeholder:opacity-50"
+            />
+          </div>
+        )}
+
         <Palette colorId={colorId} onColorId={onColorId} hold={hold} />
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -267,7 +445,7 @@ export function Compose({
                        disabled:cursor-not-allowed disabled:border-rule disabled:bg-transparent
                        disabled:text-mute"
           >
-            {parentName ? "Put it in" : "Keep it"} · ⌘↵
+            {parentName ? "Put it in" : "Keep it"} · ↵
           </button>
         </div>
       </div>

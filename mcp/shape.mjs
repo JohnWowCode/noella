@@ -96,6 +96,8 @@ export function view(wall, note) {
     tags: note.tags ?? [],
     created: note.createdAt,
   };
+  if (note.icon) out.sticker = note.icon;
+  if (note.priority) out.priority = note.priority;
   if (note.pinned) out.favourite = true;
   if (note.isTask) out.done = note.doneAt !== null;
   if (note.archivedAt) out.archived = true;

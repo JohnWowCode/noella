@@ -41,6 +41,8 @@ function migrate(snapshot: Snapshot): Snapshot {
     actualMinutes: n.actualMinutes ?? null,
     snoozedUntil: n.snoozedUntil ?? null,
     isList: n.isList ?? false,
+    icon: n.icon ?? null,
+    priority: n.priority ?? null,
   }));
 
   const colors = [...snapshot.colors];
@@ -166,6 +168,8 @@ export class LocalStore implements Store {
       images: input.images ?? [],
       projectStatus: input.projectStatus ?? null,
       parentId: input.parentId ?? null,
+      icon: input.icon ?? null,
+      priority: input.priority ?? null,
       listCadence: null,
       amount: null,
       estimateMinutes: null,

@@ -209,7 +209,7 @@ function findNote(data, needle) {
 }
 
 /** The one filter every search shares, so `search` and `search_notes` agree. */
-function matching(data, { query, colorId, kind, openOnly, archived }) {
+function matching(data, { query, colorId, kind, openOnly, archived, priority }) {
   const low = (query ?? "").toLowerCase();
   return data.notes
     .filter((n) => (archived ? true : n.archivedAt === null))
@@ -226,6 +226,7 @@ function matching(data, { query, colorId, kind, openOnly, archived }) {
               : true,
     )
     .filter((n) => (openOnly ? n.isTask && n.doneAt === null : true))
+    .filter((n) => (priority ? n.priority === priority : true))
     .filter(
       (n) =>
         !low ||
@@ -261,11 +262,23 @@ export function registerTools(server, folder) {
           .optional()
           .describe("Only unticked to-dos and steps"),
         include_archived: z.boolean().optional(),
+        priority: z
+          .enum(["now", "next", "later"])
+          .optional()
+          .describe("Only things ranked at this level"),
         limit: z.number().int().min(1).max(100).optional(),
       },
       annotations: { readOnlyHint: true },
     },
-    async ({ query, folder: name, kind, open_only, include_archived, limit }) => {
+    async ({
+      query,
+      folder: name,
+      kind,
+      open_only,
+      include_archived,
+      priority,
+      limit,
+    }) => {
       const data = await wall(folder);
       const hits = matching(data, {
         query,
@@ -273,6 +286,7 @@ export function registerTools(server, folder) {
         kind,
         openOnly: open_only,
         archived: include_archived,
+        priority,
       }).slice(0, limit ?? 25);
       if (hits.length === 0) return text("Nothing on the wall matches that.");
       return text(hits.map((n) => view(data, n)));
@@ -455,9 +469,17 @@ export function registerTools(server, folder) {
             "Put it inside this note, project or list — by name or id. " +
               "Nests to any depth, so a bug can go inside a game inside a site.",
           ),
+        priority: z
+          .enum(["now", "next", "later"])
+          .optional()
+          .describe("Rank it. Most things are better left unranked."),
+        sticker: z
+          .string()
+          .optional()
+          .describe("A single emoji, shown large on the card"),
       },
     },
-    async ({ body, kind, folder: name, inside }) => {
+    async ({ body, kind, folder: name, inside, priority, sticker }) => {
       const data = await wall(folder);
       const colorId = name ? findFolder(data, name) : null;
       const parent = inside ? findContainer(data, inside) : null;
@@ -467,6 +489,8 @@ export function registerTools(server, folder) {
         kind: kind ?? "note",
         colorId,
         parentId: parent?.id ?? null,
+        priority: priority ?? null,
+        icon: sticker && [...sticker].length <= 3 ? sticker : null,
       });
       return text(
         await landing(
@@ -542,6 +566,35 @@ export function registerTools(server, folder) {
       const target = findContainer(data, project);
       await queue(folder, { op: "set_status", noteId: target.id, status });
       return text(await landing(folder, `Queued ${title(target)} → ${status}.`));
+    },
+  );
+
+  server.registerTool(
+    "set_priority",
+    {
+      title: "Rank something",
+      description:
+        "Put a note at now, next or later — or pass none to unrank it. " +
+        "Three buckets on purpose: a 1-10 field is an afternoon of deciding.",
+      inputSchema: {
+        note: z.string(),
+        priority: z.enum(["now", "next", "later", "none"]),
+      },
+    },
+    async ({ note, priority }) => {
+      const data = await wall(folder);
+      const target = findNote(data, note);
+      await queue(folder, {
+        op: "set_priority",
+        noteId: target.id,
+        priority: priority === "none" ? null : priority,
+      });
+      return text(
+        await landing(
+          folder,
+          `Queued "${title(target)}" → ${priority === "none" ? "unranked" : priority}.`,
+        ),
+      );
     },
   );
 

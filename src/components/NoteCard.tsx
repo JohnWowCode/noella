@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { seqLabel, stamp } from "@/lib/format";
 import { imageFilesFrom } from "@/lib/images";
 import { isList, isProject, projectTitle, stepsOf } from "@/lib/projects";
+import { PRIORITIES, PRIORITY } from "@/lib/priority";
 import { swatchName } from "@/lib/store/defaults";
+import { STICKERS } from "@/lib/stickers";
 import { countChildren, pathTo, placesFor } from "@/lib/tree";
 import { useNoella } from "@/lib/store/provider";
 import { ON_COLOR_BUTTON, surfaceStyle } from "@/lib/surface";
@@ -17,7 +19,6 @@ interface Props {
   note: Note;
   /** Highlight terms from the live query. */
   query?: string;
-  onEnterWorld?: (colorId: string) => void;
   onTag?: (tag: string) => void;
   /** Step into this note and see what is inside it. */
   onOpen?: (id: string) => void;
@@ -30,7 +31,6 @@ interface Props {
 export function NoteCard({
   note,
   query = "",
-  onEnterWorld,
   onTag,
   onOpen,
   path,
@@ -50,6 +50,7 @@ export function NoteCard({
   const [moving, setMoving] = useState(false);
   const [recolouring, setRecolouring] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [stickering, setStickering] = useState(false);
   const areaRef = useRef<HTMLTextAreaElement>(null);
 
   const color = colorOf(note);
@@ -114,7 +115,22 @@ export function NoteCard({
       className={`group scroll-mt-4 border border-rule px-6 py-5 ${
         onColor ? "" : "bg-field"
       } ${archived ? "opacity-60" : ""}`}
-      style={surface}
+      style={{
+        ...surface,
+        // A ranked card carries its colour on the edge as well as in the
+        // chip, so a column of them can be read down the margin without
+        // reading any of the words.
+        ...(note.priority
+          ? {
+              borderLeft: `6px solid ${PRIORITY[note.priority].hex}`,
+              // The edge disappears when a red note is ranked Now, so the
+              // shadow draws the boundary the border cannot.
+              boxShadow: onColor
+                ? "inset 6px 0 0 -5px var(--on)"
+                : undefined,
+            }
+          : null),
+      }}
     >
       {path !== undefined && path.length > 0 && (
         <p
@@ -193,6 +209,40 @@ export function NoteCard({
         )}
         {/* Word count and image count both left. A number counting the words
             you can see, above the words you can see, is not information. */}
+        {note.priority && (
+          <>
+            {/*
+              On a plain card the chip is the priority colour. On a coloured
+              one it cannot be: a red NOW on a red card is red on red, and the
+              same went for NEXT on orange. There it takes the card's own ink
+              and carries the priority as a small block instead, which reads
+              at any pairing.
+            */}
+            <span
+              className={`flex items-center gap-1.5 px-1.5 py-0.5 ${
+                onColor ? "bg-[var(--on)] text-[var(--on-inv)]" : ""
+              }`}
+              style={
+                onColor
+                  ? undefined
+                  : {
+                      backgroundColor: PRIORITY[note.priority].hex,
+                      color: "#111111",
+                    }
+              }
+            >
+              {onColor && (
+                <span
+                  aria-hidden
+                  className="h-2 w-2 shrink-0"
+                  style={{ backgroundColor: PRIORITY[note.priority].hex }}
+                />
+              )}
+              {PRIORITY[note.priority].label}
+            </span>
+            <Dot />
+          </>
+        )}
         <span>{stamp(note.createdAt)}</span>
         {archived && (
           <>
@@ -220,6 +270,9 @@ export function NoteCard({
           >
             {note.pinned ? "★" : "☆"}
           </button>
+          {!heading && onOpen && inside === 0 && (
+            <Action onClick={() => onOpen(note.id)}>Open</Action>
+          )}
           <Action onClick={() => setEditing((v) => !v)}>
             {editing ? "Done" : "Edit"}
           </Action>
@@ -251,11 +304,35 @@ export function NoteCard({
             onClick={() => {
               setRecolouring((v) => !v);
               setMoving(false);
+              setStickering(false);
             }}
             pressed={recolouring}
           >
             Colour
           </Action>
+          <Action
+            onClick={() => {
+              setStickering((v) => !v);
+              setRecolouring(false);
+              setMoving(false);
+            }}
+            pressed={stickering}
+          >
+            Sticker
+          </Action>
+          {PRIORITIES.map((level) => (
+            <Action
+              key={level}
+              onClick={() =>
+                patchNote(note.id, {
+                  priority: note.priority === level ? null : level,
+                })
+              }
+              pressed={note.priority === level}
+            >
+              {PRIORITY[level].label}
+            </Action>
+          ))}
           {!list && (
             <Action
               onClick={() =>
@@ -321,6 +398,38 @@ export function NoteCard({
           >
             Delete
           </Action>
+        </div>
+      )}
+
+      {stickering && (
+        <div className="mt-3 border border-current/25 p-2.5">
+          {STICKERS.map((group) => (
+            <div key={group.name} className="mb-2 last:mb-0">
+              <p className="label mb-1 opacity-55">{group.name}</p>
+              <div className="flex flex-wrap gap-1">
+                {group.icons.map((glyph) => (
+                  <button
+                    key={glyph}
+                    type="button"
+                    onClick={() => {
+                      patchNote(note.id, {
+                        icon: glyph === note.icon ? null : glyph,
+                      });
+                      setStickering(false);
+                    }}
+                    aria-label={`Sticker ${glyph}`}
+                    className={`grid h-8 w-8 place-items-center border text-[17px] leading-none ${
+                      glyph === note.icon
+                        ? "border-current"
+                        : "border-transparent hover:border-current/40"
+                    }`}
+                  >
+                    {glyph}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -396,13 +505,25 @@ export function NoteCard({
         />
       ) : (
         note.body.length > 0 && (
-          <p
-            className={`prose-note mt-3 whitespace-pre-wrap ${
-              heading ? "text-[24px] leading-tight sm:text-[28px]" : ""
-            } ${done ? "line-through opacity-55" : ""}`}
-          >
-            <Highlight text={note.body} query={query} />
-          </p>
+          <div className="mt-3 flex items-start gap-3">
+            {note.icon && (
+              <span
+                aria-hidden
+                className={`shrink-0 leading-none ${
+                  heading ? "text-[30px] sm:text-[34px]" : "text-[22px]"
+                }`}
+              >
+                {note.icon}
+              </span>
+            )}
+            <p
+              className={`prose-note min-w-0 flex-1 whitespace-pre-wrap ${
+                heading ? "text-[24px] leading-tight sm:text-[28px]" : ""
+              } ${done ? "line-through opacity-55" : ""}`}
+            >
+              <Highlight text={note.body} query={query} />
+            </p>
+          </div>
         )
       )}
 
@@ -434,50 +555,54 @@ export function NoteCard({
         had no way to get into it. Every note can hold notes, so every note
         says so; an empty one says what it is for instead of a count.
       */}
-      {!heading && onOpen && (
+      {/*
+        A bar only when there is something behind it.
+
+        Every card carried a full-width outlined Open row, so a wall of plain
+        notes was a wall of identical empty bars — the loudest thing on a card
+        that had nothing inside. A folder still gets the bar, with its count;
+        everything else gets a quiet "Open" in the header row, which is always
+        visible anyway and costs the layout nothing.
+      */}
+      {!heading && onOpen && inside > 0 && (
         <button
           type="button"
           onClick={() => onOpen(note.id)}
           className={`label mt-4 flex w-full items-center gap-2 border px-3 py-2.5 ${
             onColor
               ? `border-current/40 ${ON_COLOR_BUTTON}`
-              : inside > 0
-                ? "border-rule hover:bg-ink hover:text-paper"
-                : "border-rule-soft text-mute hover:bg-ink hover:text-paper"
+              : "border-rule hover:bg-ink hover:text-paper"
           }`}
         >
           <span>Open</span>
-          {/* A count when there is one. On a wall of fifty notes, fifty
-              repetitions of "empty — put things in it" is a lecture. */}
-          {inside > 0 && (
-            <span className="tabular-nums opacity-70">{inside} inside</span>
-          )}
+          <span className="tabular-nums opacity-70">{inside} inside</span>
           <span aria-hidden className="ml-auto">
             ›
           </span>
         </button>
       )}
 
-      {(note.tags.length > 0 || color !== null) && (
-        <footer className="label mt-4 flex flex-wrap items-center gap-2">
-          {color !== null && onEnterWorld && (
-            <button
-              type="button"
-              onClick={() => onEnterWorld(color.id)}
-              className="border border-current px-2 py-1.5 hover:bg-[var(--on)] hover:text-[var(--on-inv)]"
-            >
-              {color.emoji ? `${color.emoji} ` : ""}
-              {color.name ?? swatchName(colors.indexOf(color))}
-            </button>
-          )}
+      {/*
+        Tags only, and no boxes.
+
+        The world chip was the loudest thing down here and said the least: the
+        card is already that colour, filling the whole thing, so a bordered
+        button repeating its name was a label on a label. Tags stayed as
+        outlined boxes for the same reason nothing else did — because they
+        could be — and a card with four of them read as a form. They are words
+        with a hash now, and the colour is reachable from the folder rail where
+        it belongs.
+      */}
+      {note.tags.length > 0 && (
+        <footer className="label mt-3.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
           {note.tags.map((t) =>
             onTag ? (
               <button
                 key={t}
                 type="button"
                 onClick={() => onTag(t)}
-                className={`border border-current px-2 py-1.5 hover:bg-[var(--on)] hover:text-[var(--on-inv)] ${
-                  onColor ? "opacity-70" : "text-mute"
+                className={`underline decoration-1 underline-offset-2 hover:no-underline ${
+                  onColor ? "opacity-65" : "text-mute"
                 }`}
               >
                 #{t}
@@ -485,9 +610,7 @@ export function NoteCard({
             ) : (
               <span
                 key={t}
-                className={`border border-current px-2 py-1.5 ${
-                  onColor ? "opacity-70" : "text-mute"
-                }`}
+                className={onColor ? "opacity-65" : "text-mute"}
               >
                 #{t}
               </span>
