@@ -1,0 +1,13 @@
+{
+  "name": "noella-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Lets Claude read and add to your Noella wall.",
+  "bin": { "noella-mcp": "./server.mjs" },
+  "scripts": { "start": "node server.mjs" },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^3.25.76"
+  }
+}

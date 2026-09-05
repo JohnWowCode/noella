@@ -293,6 +293,32 @@ note; they were folded into this and the tab was deleted.**
 - Anything with something still outstanding turns up on Today under
   **Coming round again**.
 
+## Claude can read it
+
+There is an MCP server in `mcp/`. Point Claude Code or Claude Desktop at it and
+you can ask "what's still open?", or say "put *scout the underpass* on the film
+project", without opening the app.
+
+It uses the Claude subscription you already pay for. An MCP server is a tool
+provider for a Claude *client*; it needs no API key and costs nothing extra.
+That is the difference between this and wiring the app up to OpenRouter or the
+Anthropic API — those are metered, pay-as-you-go, and a claude.ai subscription
+does not cover them.
+
+Noella lives in a browser tab and an MCP server is a separate process, so the
+two share a folder you pick once: the app writes the whole wall to
+`noella.json`, the server queues changes into `inbox/`, and the app applies
+them. One writer per path, so there is no merge algorithm and nothing to get
+subtly wrong — the cost is that Claude's changes land when a tab is next open,
+which every write tool says rather than pretending otherwise.
+
+Connecting the folder needs a Chromium browser: the File System Access API is
+the only way a page can hold onto a directory, and Firefox and Safari have no
+equivalent. Reading works from any machine the server runs on; your phone would
+need a real backend, which is what the parked Supabase schema is for.
+
+`mcp/README.md` has the setup.
+
 ## Capture from anywhere
 
 - The **`+ Note`** button sits in the corner of every screen, and `n` opens it
