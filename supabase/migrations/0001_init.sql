@@ -43,8 +43,8 @@ create table public.notes (
   -- A project is a note you promoted; non-null means this note is one.
   project_status text
               check (project_status in ('idea', 'active', 'paused', 'done')),
-  -- Set on a step: the project note it belongs to. Deleting a project takes
-  -- its steps with it, because a step alone means nothing.
+  -- What this note is inside, at any depth. The cascade is load-bearing:
+  -- deleting a container takes everything under it, however deep.
   parent_id   uuid references public.notes (id) on delete cascade,
 
   -- A list is a note you promoted, like a project, but inert: no status, no
@@ -75,9 +75,15 @@ create table public.notes (
     generated always as (to_tsvector('english', body)) stored,
 
   unique (owner_id, seq),
-  -- A project cannot also be somebody's step; the tree stays one level deep.
-  constraint notes_project_or_step
-    check (project_status is null or parent_id is null),
+  -- Nothing here caps the depth. This used to carry a notes_project_or_step
+  -- check forbidding a project from having a parent, which kept the tree one
+  -- level deep — enough for a project holding steps, and hopeless for a site
+  -- holding a game holding a bug holding three screenshots.
+  --
+  -- A cycle is the one shape worth refusing, and a check constraint cannot see
+  -- one; the app refuses to file a note inside its own descendant, and a
+  -- recursive trigger is the way to enforce it here when this is applied.
+  --
   -- A note is a project or a list, never both. Both are promotions of the
   -- same row, and the two panels answer different questions.
   constraint notes_project_or_list

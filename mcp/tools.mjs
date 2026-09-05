@@ -24,6 +24,7 @@ import {
   isProject,
   title,
   view,
+  whereIs,
 } from "./shape.mjs";
 
 /** Where the shared folder is: an explicit path, then the env, then a default. */
@@ -116,26 +117,61 @@ const text = (value) => ({
 
 const ref = (n) => `NOTE ${String(n.seq).padStart(4, "0")}`;
 
-/** A project or list by name, id or ref. Ambiguity is reported, not guessed. */
+/**
+ * Somewhere to put things, by name, id or ref.
+ *
+ * Any live note qualifies: anything can hold anything, so "Cave Sniper" is a
+ * valid destination whether or not it was ever promoted to a project.
+ * Ambiguity is reported, never guessed at.
+ */
 function findContainer(data, needle) {
-  const containers = data.notes.filter(
-    (n) => (isProject(n) || isList(n)) && n.archivedAt === null,
-  );
+  const containers = data.notes.filter((n) => n.archivedAt === null);
   const exact = containers.find((n) => n.id === needle || ref(n) === needle);
   if (exact) return exact;
 
   const low = needle.toLowerCase();
-  const hits = containers.filter((n) => title(n).toLowerCase().includes(low));
+  let hits = containers.filter((n) => title(n).toLowerCase().includes(low));
+
+  /*
+   * Narrow before giving up.
+   *
+   * "Cave" matches both "Cave Sniper" and "…clips through the cave wall", and
+   * refusing there is pedantic when only one of them is a thing you put things
+   * into. An exact title wins outright; otherwise prefer whatever already
+   * holds something, and only complain if that still leaves a choice.
+   */
+  if (hits.length > 1) {
+    const exactTitle = hits.filter((n) => title(n).toLowerCase() === low);
+    if (exactTitle.length === 1) return exactTitle[0];
+    const holders = hits.filter(
+      (n) =>
+        isProject(n) ||
+        isList(n) ||
+        data.notes.some((c) => c.parentId === n.id && c.archivedAt === null),
+    );
+    if (holders.length === 1) return holders[0];
+    if (holders.length > 1) hits = holders;
+  }
+
   if (hits.length === 1) return hits[0];
   if (hits.length === 0) {
+    const folders = containers.filter(
+      (n) => isProject(n) || isList(n) || data.notes.some((c) => c.parentId === n.id),
+    );
     throw new Error(
-      `No project or list matching "${needle}". There is: ` +
-        (containers.map((n) => title(n)).join(", ") || "nothing yet"),
+      `Nothing called "${needle}". Things that hold other things: ` +
+        (folders.map((n) => title(n)).join(", ") || "none yet"),
     );
   }
   throw new Error(
-    `"${needle}" matches several: ${hits.map((n) => title(n)).join(", ")}. ` +
-      `Be more specific.`,
+    `"${needle}" matches several: ` +
+      hits
+        .map((n) => {
+          const where = whereIs(data, n);
+          return where ? `${title(n)} (in ${where})` : title(n);
+        })
+        .join("; ") +
+      ". Be more specific, or pass an id.",
   );
 }
 
@@ -412,16 +448,31 @@ export function registerTools(server, folder) {
         body: z.string().min(1),
         kind: z.enum(["note", "todo", "project", "list"]).optional(),
         folder: z.string().optional().describe("A folder (colour) name"),
+        inside: z
+          .string()
+          .optional()
+          .describe(
+            "Put it inside this note, project or list — by name or id. " +
+              "Nests to any depth, so a bug can go inside a game inside a site.",
+          ),
       },
     },
-    async ({ body, kind, folder: name }) => {
+    async ({ body, kind, folder: name, inside }) => {
       const data = await wall(folder);
       const colorId = name ? findFolder(data, name) : null;
-      await queue(folder, { op: "add_note", body, kind: kind ?? "note", colorId });
+      const parent = inside ? findContainer(data, inside) : null;
+      await queue(folder, {
+        op: "add_note",
+        body,
+        kind: kind ?? "note",
+        colorId,
+        parentId: parent?.id ?? null,
+      });
       return text(
         await landing(
           folder,
-          `Queued a ${kind ?? "note"}: "${body.split("\n")[0]}".`,
+          `Queued a ${kind ?? "note"}: "${body.split("\n")[0]}"` +
+            (parent ? ` inside ${title(parent)}.` : "."),
         ),
       );
     },
@@ -432,8 +483,10 @@ export function registerTools(server, folder) {
     {
       title: "Add a step or item",
       description:
-        "Put a step on a project or an item on a list. Name it however you " +
-        "refer to it — the match is on the title.",
+        "Put something inside something else — a step on a project, an item " +
+        "on a list, a bug under a game. Same as add_note with `inside`, kept " +
+        "because it reads better for checklists. Name the parent however you " +
+        "refer to it.",
       inputSchema: {
         project: z.string().describe("The project or list to add to"),
         body: z.string().min(1),
@@ -580,8 +633,15 @@ export function registerTools(server, folder) {
       const note = findNote(data, id);
       const detail = view(data, note);
       const lines = [note.body];
-      for (const child of detail.steps ?? detail.items ?? []) {
-        lines.push(`- [${child.done ? "x" : " "}] ${child.body}`);
+      // `contains` — renamed from the old steps/items pair when a plain note
+      // became able to hold things. Reading the old names silently returned a
+      // container with nothing in it.
+      for (const child of detail.contains ?? []) {
+        const box =
+          child.done === undefined ? "-" : child.done ? "- [x]" : "- [ ]";
+        lines.push(
+          `${box} ${child.body}${child.holds ? ` (holds ${child.holds})` : ""}`,
+        );
       }
       return text({
         id: note.id,
@@ -591,6 +651,7 @@ export function registerTools(server, folder) {
         metadata: {
           kind: detail.kind,
           folder: detail.folder ?? "none",
+          inside: detail.inside ?? "top level",
           created: note.createdAt,
         },
       });

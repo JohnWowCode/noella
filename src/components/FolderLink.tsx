@@ -74,6 +74,11 @@ export function FolderLink() {
           const input: NewNote = {
             body: op.body ?? "",
             colorId: op.colorId ?? null,
+            // Nulled if the parent has since gone, so the note lands on the
+            // top of the wall rather than being filed into nothing.
+            parentId: op.parentId
+              ? (notes.find((n) => n.id === op.parentId)?.id ?? null)
+              : null,
           };
           if (op.kind === "project") input.projectStatus = "idea";
           if (op.kind === "list") input.isList = true;
@@ -83,11 +88,14 @@ export function FolderLink() {
         }
         case "add_step": {
           const parent = notes.find((n) => n.id === op.parentId);
-          if (!parent) return true; // Its project is gone; drop it quietly.
+          if (!parent) return true; // Its folder is gone; drop it quietly.
           addNote({
             body: op.body ?? "",
             colorId: parent.colorId,
             parentId: parent.id,
+            // add_step means a checklist item; add_note with `inside` is how
+            // you put a folder or a plain note into something.
+            isTask: true,
           });
           return true;
         }

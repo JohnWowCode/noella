@@ -4,6 +4,7 @@ import { useState } from "react";
 import { PROJECT_STATUSES, progressOf, type ProjectStatus } from "@/lib/projects";
 import { reorder } from "@/lib/order";
 import { useNoella } from "@/lib/store/provider";
+import { countChildren } from "@/lib/tree";
 import type { Note } from "@/lib/types";
 
 /**
@@ -14,13 +15,20 @@ export function ProjectPanel({
   project,
   steps,
   onColor,
+  showContents = true,
 }: {
   project: Note;
   steps: Note[];
   /** Cards on a colour draw in their computed ink; plain cards use tokens. */
   onColor: boolean;
+  /**
+   * False when you are standing inside this project, where its contents are
+   * already the cards below. Listing them twice — once as ticky rows, once as
+   * cards — was the single most confusing thing on the screen.
+   */
+  showContents?: boolean;
 }) {
-  const { addNote, patchNote, removeNote } = useNoella();
+  const { notes, addNote, patchNote, removeNote } = useNoella();
   const [draft, setDraft] = useState("");
 
   const status = project.projectStatus as ProjectStatus;
@@ -74,25 +82,43 @@ export function ProjectPanel({
       {/* No "next" line here: the checklist is directly below, and the first
           unticked box already says it. It earns its place on the projects
           screen and on Today, where there is no checklist. */}
-      {steps.length > 0 && (
+      {showContents && steps.length > 0 && (
         <ul className={`mt-3 border ${line}`}>
           {steps.map((step, i) => (
             <li
               key={step.id}
               className={`group/step flex items-start gap-3 border-b ${line} px-3 py-2.5 last:border-b-0`}
             >
-              <button
-                type="button"
-                onClick={() =>
-                  patchNote(step.id, {
-                    doneAt: step.doneAt ? null : new Date().toISOString(),
-                  })
-                }
-                aria-label={step.doneAt ? "Mark step not done" : "Mark step done"}
-                className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center border border-current text-[10px] leading-none"
-              >
-                {step.doneAt ? "×" : ""}
-              </button>
+              {/*
+                A tick box only on things that can be ticked.
+                
+                A project can hold notes and screenshots and sub-folders now,
+                and drawing an empty checkbox beside "Cave Sniper" said it was
+                a job you had not done. A container gets a marker instead.
+              */}
+              {step.isTask ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    patchNote(step.id, {
+                      doneAt: step.doneAt ? null : new Date().toISOString(),
+                    })
+                  }
+                  aria-label={
+                    step.doneAt ? "Mark step not done" : "Mark step done"
+                  }
+                  className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center border border-current text-[10px] leading-none"
+                >
+                  {step.doneAt ? "×" : ""}
+                </button>
+              ) : (
+                <span
+                  aria-hidden
+                  className="label mt-0.5 grid h-4 w-4 shrink-0 place-items-center opacity-50"
+                >
+                  {countChildren(notes, step.id) > 0 ? "›" : "·"}
+                </span>
+              )}
               <span
                 className={`flex-1 text-[15px] leading-snug ${
                   step.doneAt ? "line-through opacity-50" : ""
@@ -145,7 +171,8 @@ export function ProjectPanel({
         </ul>
       )}
 
-      <div className="mt-3 flex items-center gap-2">
+      {showContents && (
+        <div className="mt-3 flex items-center gap-2">
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -173,6 +200,7 @@ export function ProjectPanel({
           + Step
         </button>
       </div>
+      )}
     </div>
   );
 }

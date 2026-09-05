@@ -30,11 +30,37 @@ export function isList(note) {
   return note.isList === true;
 }
 
-/** Steps or items belonging to a project or list, in the order they are shown. */
+/** Whatever is directly inside, in the order it is shown. */
 export function childrenOf(wall, parentId) {
   return wall.notes
     .filter((n) => n.parentId === parentId && n.archivedAt === null)
     .sort((a, b) => a.order - b.order || a.createdAt.localeCompare(b.createdAt));
+}
+
+/**
+ * The folders above a note, outermost first.
+ *
+ * Anything can hold anything, so "bugs" is not an address — "WowCool.World ›
+ * Cave Sniper › bugs" is. Every result carries one.
+ */
+export function pathTo(wall, id) {
+  const byId = new Map(wall.notes.map((n) => [n.id, n]));
+  const chain = [];
+  const seen = new Set();
+  let current = byId.get(id)?.parentId ?? null;
+  while (current !== null && !seen.has(current)) {
+    seen.add(current);
+    const parent = byId.get(current);
+    if (!parent) break;
+    chain.unshift(parent);
+    current = parent.parentId;
+  }
+  return chain;
+}
+
+export function whereIs(wall, note) {
+  const chain = pathTo(wall, note.id);
+  return chain.length > 0 ? chain.map(title).join(" › ") : null;
 }
 
 export function folderName(wall, colorId) {
@@ -73,27 +99,40 @@ export function view(wall, note) {
   if (note.pinned) out.favourite = true;
   if (note.isTask) out.done = note.doneAt !== null;
   if (note.archivedAt) out.archived = true;
-  if (isProject(note)) {
-    out.kind = "project";
-    out.status = note.projectStatus;
-    const steps = childrenOf(wall, note.id);
-    out.steps = steps.map((s) => ({
-      id: s.id,
-      body: s.body,
-      done: s.doneAt !== null,
-    }));
-    out.progress = `${steps.filter((s) => s.doneAt !== null).length}/${steps.length}`;
-  } else if (isList(note)) {
-    out.kind = "list";
-    if (note.listCadence) out.repeats = note.listCadence;
-    out.items = childrenOf(wall, note.id).map((s) => ({
-      id: s.id,
-      body: s.body,
-      done: s.doneAt !== null,
-      amount: s.amount ?? undefined,
-    }));
-  } else {
-    out.kind = note.isTask ? "todo" : "note";
+  out.kind = isProject(note)
+    ? "project"
+    : isList(note)
+      ? "list"
+      : note.isTask
+        ? "todo"
+        : "note";
+  if (isProject(note)) out.status = note.projectStatus;
+  if (isList(note) && note.listCadence) out.repeats = note.listCadence;
+
+  const where = whereIs(wall, note);
+  if (where) out.inside = where;
+
+  /*
+   * Contents, for anything that has any.
+   *
+   * This used to be attached only to projects and lists, from when they were
+   * the only things allowed to contain. A plain note holding four bug reports
+   * would have reported nothing at all.
+   */
+  const children = childrenOf(wall, note.id);
+  if (children.length > 0) {
+    out.contains = children.map((c) => {
+      const row = { id: c.id, body: c.body };
+      if (c.isTask) row.done = c.doneAt !== null;
+      if (c.amount) row.amount = c.amount;
+      const deeper = childrenOf(wall, c.id).length;
+      if (deeper > 0) row.holds = deeper;
+      return row;
+    });
+    const checkable = children.filter((c) => c.isTask);
+    if (checkable.length > 0) {
+      out.progress = `${checkable.filter((c) => c.doneAt !== null).length}/${checkable.length}`;
+    }
   }
   if ((note.images ?? []).length > 0) {
     // The bytes stay in the browser; saying so beats a silent omission.

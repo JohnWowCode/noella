@@ -4,7 +4,7 @@
  * into some other system, and steps stay searchable notes like everything else.
  */
 
-import { byOrder } from "./order";
+import { childrenOf } from "./tree";
 import type { Note } from "./types";
 
 export const PROJECT_STATUSES = ["idea", "active", "paused", "done"] as const;
@@ -42,20 +42,19 @@ export function isStep(note: Note): boolean {
   return note.parentId !== null;
 }
 
-/** Steps in the order you put them in; added order until you rank them. */
-export function stepsOf(notes: Note[], projectId: string): Note[] {
-  return byOrder(
-    notes.filter((n) => n.parentId === projectId && n.archivedAt === null),
-    (a, b) => a.createdAt.localeCompare(b.createdAt),
-  );
-}
+/**
+ * What is directly inside. Kept under the old name because half the app calls
+ * it that, but it is now just the tree's children — anything can hold anything.
+ */
+export const stepsOf = childrenOf;
 
-export function progressOf(steps: Note[]): { done: number; total: number } {
-  return {
-    done: steps.filter((s) => s.doneAt !== null).length,
-    total: steps.length,
-  };
-}
+/**
+ * How far along, counting only the checkable things.
+ *
+ * A container can now hold notes and screenshots as well as jobs, and counting
+ * a screenshot as an unfinished step would make every folder look overdue.
+ */
+export { progressOf } from "./tree";
 
 /**
  * The first unfinished step. This is the answer to "how do I execute this" —
@@ -83,9 +82,9 @@ export function projectsOf(notes: Note[]): Note[] {
 }
 
 /**
- * Anything jotted and not yet filed: no world, not a project, not a step, not
- * a bill. This is what makes dumping a thought safe — it lands somewhere with
- * a name instead of dissolving into the feed.
+ * Anything jotted and not yet filed: no world, no folder above it, not itself
+ * a container. This is what makes dumping a thought safe — it lands somewhere
+ * with a name instead of dissolving into the feed.
  */
 export function unfiled(notes: Note[]): Note[] {
   return notes.filter(

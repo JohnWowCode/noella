@@ -1,6 +1,7 @@
 import { deleteBlob, getBlob, putBlob } from "../images";
 import { detectTask, parseTags } from "../notes";
 import { DEFAULT_SETTINGS, type Color, type NewNote, type Note, type Settings } from "../types";
+import { descendantsOf } from "../tree";
 import { DEFAULT_SWATCHES } from "./defaults";
 import type { Backup, Snapshot, Store } from "./types";
 
@@ -178,9 +179,15 @@ export class LocalStore implements Store {
           ? this.snapshot.notes.filter((n) => n.parentId === input.parentId)
               .length
           : 0),
-      // A step is a thing to do, so it arrives checkable. So is anything you
-      // explicitly said was a task, and anything written with [] in the body.
-      isTask: isTask || input.isTask === true || input.parentId != null,
+      /*
+       * Checkable only when you said so, or when the body says so with [].
+       *
+       * This used to force isTask on anything with a parent, from when the only
+       * thing that could have a parent was a step. Now that a note can hold
+       * notes, that turned every sub-folder into a to-do — "Cave Sniper" inside
+       * "WowCool.World" arrived as something to tick off.
+       */
+      isTask: isTask || input.isTask === true,
       doneAt: done ? now : null,
       pinned: false,
       visibility: "private",
@@ -221,11 +228,18 @@ export class LocalStore implements Store {
     return { ...next };
   }
 
-  /** Deleting a project takes its steps with it — a step alone means nothing. */
+  /**
+   * Deleting a container takes everything inside it, all the way down.
+   *
+   * This used to take one level, which was right when only one level existed.
+   * With a real tree it would have orphaned every grandchild: still in the
+   * store, pointing at a parent that no longer exists, reachable by nothing.
+   */
   async deleteNote(id: string): Promise<void> {
-    const doomed = this.snapshot.notes.filter(
-      (n) => n.id === id || n.parentId === id,
-    );
+    const doomed = [
+      ...this.snapshot.notes.filter((n) => n.id === id),
+      ...descendantsOf(this.snapshot.notes, id),
+    ];
     for (const note of doomed) {
       for (const img of note.images) this.forgetImage(img.id);
     }

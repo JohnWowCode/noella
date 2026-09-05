@@ -37,6 +37,10 @@ interface Props {
   onColorId: (id: string | null) => void;
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
   placeholder?: string;
+  /** The folder this writes into. Null is the top of the wall. */
+  parentId?: string | null;
+  /** Its name, so the box can say where what you type is going. */
+  parentName?: string | null;
 }
 
 /**
@@ -50,7 +54,14 @@ interface Props {
  * a colour blurred the textarea, unmounted the row, and the click landed on
  * nothing. Every control here holds focus on mousedown for that reason.
  */
-export function Compose({ colorId, onColorId, inputRef, placeholder }: Props) {
+export function Compose({
+  colorId,
+  onColorId,
+  inputRef,
+  placeholder,
+  parentId = null,
+  parentName = null,
+}: Props) {
   const { colors, addNote, attachImage } = useNoella();
   const [body, setBody] = useState("");
   const [kind, setKind] = useState<Kind>("note");
@@ -105,7 +116,12 @@ export function Compose({ colorId, onColorId, inputRef, placeholder }: Props) {
 
   function save() {
     if (!body.trim() && pending.length === 0) return;
-    const input: NewNote = { body: body.trim(), colorId, images: pending };
+    const input: NewNote = {
+      body: body.trim(),
+      colorId,
+      images: pending,
+      parentId,
+    };
     if (kind === "project") input.projectStatus = "idea";
     if (kind === "list") input.isList = true;
     if (kind === "task") input.isTask = true;
@@ -188,7 +204,10 @@ export function Compose({ colorId, onColorId, inputRef, placeholder }: Props) {
         placeholder={
           dragging
             ? "Drop it."
-            : (placeholder ?? `${active.label} — ${active.hint}`)
+            : (placeholder ??
+              (parentName
+                ? `New ${active.label.toLowerCase()} in ${parentName}`
+                : `${active.label} — ${active.hint}`))
         }
         aria-label="New note"
         className="prose-note block w-full resize-none bg-transparent px-5 py-4 text-[19px]
@@ -248,7 +267,7 @@ export function Compose({ colorId, onColorId, inputRef, placeholder }: Props) {
                        disabled:cursor-not-allowed disabled:border-rule disabled:bg-transparent
                        disabled:text-mute"
           >
-            Keep it · ⌘↵
+            {parentName ? "Put it in" : "Keep it"} · ⌘↵
           </button>
         </div>
       </div>

@@ -5,8 +5,9 @@ import { seqLabel, stamp } from "@/lib/format";
 import { imageFilesFrom } from "@/lib/images";
 import { isList, isProject, projectTitle, stepsOf } from "@/lib/projects";
 import { swatchName } from "@/lib/store/defaults";
+import { countChildren, pathTo, placesFor } from "@/lib/tree";
 import { useNoella } from "@/lib/store/provider";
-import { surfaceStyle } from "@/lib/surface";
+import { ON_COLOR_BUTTON, surfaceStyle } from "@/lib/surface";
 import type { Note } from "@/lib/types";
 import { Lightbox, NoteImages } from "./NoteImages";
 import { ListPanel } from "./ListPanel";
@@ -18,9 +19,23 @@ interface Props {
   query?: string;
   onEnterWorld?: (colorId: string) => void;
   onTag?: (tag: string) => void;
+  /** Step into this note and see what is inside it. */
+  onOpen?: (id: string) => void;
+  /** The folders above it. Shown on search results, which come from anywhere. */
+  path?: Note[];
+  /** This is the folder you are standing in, drawn at the top of its own view. */
+  heading?: boolean;
 }
 
-export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
+export function NoteCard({
+  note,
+  query = "",
+  onEnterWorld,
+  onTag,
+  onOpen,
+  path,
+  heading = false,
+}: Props) {
   const {
     notes,
     colors,
@@ -43,10 +58,14 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
   const project = isProject(note);
   const list = isList(note);
   const steps = project || list ? stepsOf(notes, note.id) : [];
-  // Other projects this note could be filed under.
-  const targets = notes.filter(
-    (n) => isProject(n) && n.id !== note.id && n.archivedAt === null,
-  );
+  // Anything can hold anything now, so the count is not about being a project.
+  const inside = countChildren(notes, note.id);
+  /*
+   * Where this could be filed: any live note except itself and its own
+   * descendants. It used to be projects only, which is why there was no way to
+   * put a note inside a note.
+   */
+  const targets = placesFor(notes, note.id);
 
   useEffect(() => {
     if (editing) {
@@ -97,6 +116,27 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
       } ${archived ? "opacity-60" : ""}`}
       style={surface}
     >
+      {path !== undefined && path.length > 0 && (
+        <p
+          className={`label mb-2.5 flex flex-wrap items-center gap-1.5 ${
+            onColor ? "opacity-65" : "text-mute"
+          }`}
+        >
+          {path.map((step, i) => (
+            <span key={step.id} className="flex items-center gap-1.5">
+              {i > 0 && <span aria-hidden>›</span>}
+              <button
+                type="button"
+                onClick={() => onOpen?.(step.id)}
+                className="max-w-40 truncate underline decoration-1 underline-offset-2 hover:no-underline"
+              >
+                {projectTitle(step)}
+              </button>
+            </span>
+          ))}
+        </p>
+      )}
+
       <header
         className={`label flex flex-wrap items-center gap-x-2.5 gap-y-1.5 ${
           onColor ? "opacity-70" : "text-mute"
@@ -238,7 +278,7 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
               }}
               pressed={moving}
             >
-              {note.parentId ? "Unfile" : "File"}
+              Move
             </Action>
           )}
           {!project && (
@@ -326,34 +366,18 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
       )}
 
       {moving && (
-        <div className="label mt-3 flex flex-wrap items-center gap-2">
-          <span className="opacity-60">File under</span>
-          {note.parentId && (
-            <button
-              type="button"
-              onClick={() => {
-                patchNote(note.id, { parentId: null });
-                setMoving(false);
-              }}
-              className="border border-current px-2 py-1 hover:bg-[var(--on)] hover:text-[var(--on-inv)]"
-            >
-              Nothing
-            </button>
-          )}
-          {targets.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => {
-                patchNote(note.id, { parentId: p.id, isTask: true });
-                setMoving(false);
-              }}
-              className="max-w-56 truncate border border-current px-2 py-1 normal-case tracking-normal hover:bg-[var(--on)] hover:text-[var(--on-inv)]"
-            >
-              {projectTitle(p)}
-            </button>
-          ))}
-        </div>
+        <Mover
+          note={note}
+          targets={targets}
+          notes={notes}
+          onPick={(parentId) => {
+            // Deliberately not touching isTask. Filing something used to make
+            // it a checkbox, which was fine when the only destination was a
+            // project and the only thing you could file was a step.
+            patchNote(note.id, { parentId });
+            setMoving(false);
+          }}
+        />
       )}
 
       {editing ? (
@@ -374,8 +398,8 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
         note.body.length > 0 && (
           <p
             className={`prose-note mt-3 whitespace-pre-wrap ${
-              done ? "line-through opacity-55" : ""
-            }`}
+              heading ? "text-[24px] leading-tight sm:text-[28px]" : ""
+            } ${done ? "line-through opacity-55" : ""}`}
           >
             <Highlight text={note.body} query={query} />
           </p>
@@ -385,10 +409,54 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
       <NoteImages images={note.images} onOpen={setViewing} />
 
       {project && (
-        <ProjectPanel project={note} steps={steps} onColor={onColor} />
+        <ProjectPanel
+          project={note}
+          steps={steps}
+          onColor={onColor}
+          showContents={!heading}
+        />
       )}
 
-      {list && <ListPanel list={note} items={steps} onColor={onColor} />}
+      {list && (
+        <ListPanel
+          list={note}
+          items={steps}
+          onColor={onColor}
+          showContents={!heading}
+        />
+      )}
+
+      {/*
+        The way in, on every card without exception.
+        
+        Showing it only where something was already inside meant an empty
+        folder could never be filled — you could make "Cave Sniper" and then
+        had no way to get into it. Every note can hold notes, so every note
+        says so; an empty one says what it is for instead of a count.
+      */}
+      {!heading && onOpen && (
+        <button
+          type="button"
+          onClick={() => onOpen(note.id)}
+          className={`label mt-4 flex w-full items-center gap-2 border px-3 py-2.5 ${
+            onColor
+              ? `border-current/40 ${ON_COLOR_BUTTON}`
+              : inside > 0
+                ? "border-rule hover:bg-ink hover:text-paper"
+                : "border-rule-soft text-mute hover:bg-ink hover:text-paper"
+          }`}
+        >
+          <span>Open</span>
+          {/* A count when there is one. On a wall of fifty notes, fifty
+              repetitions of "empty — put things in it" is a lecture. */}
+          {inside > 0 && (
+            <span className="tabular-nums opacity-70">{inside} inside</span>
+          )}
+          <span aria-hidden className="ml-auto">
+            ›
+          </span>
+        </button>
+      )}
 
       {(note.tags.length > 0 || color !== null) && (
         <footer className="label mt-4 flex flex-wrap items-center gap-2">
@@ -437,6 +505,94 @@ export function NoteCard({ note, query = "", onEnterWorld, onTag }: Props) {
         />
       )}
     </article>
+  );
+}
+
+
+/**
+ * Where to put this.
+ *
+ * The destination list is every live note that is not this one or underneath
+ * it — anything can hold anything, so on a real wall that is hundreds of rows.
+ * A flat wrap of hundreds of buttons is not a picker, so this is typed into,
+ * and each row carries its path because "bugs" means nothing on its own when
+ * three folders have one.
+ */
+function Mover({
+  note,
+  targets,
+  notes,
+  onPick,
+}: {
+  note: Note;
+  targets: Note[];
+  notes: Note[];
+  onPick: (parentId: string | null) => void;
+}) {
+  const [q, setQ] = useState("");
+  const needle = q.trim().toLowerCase();
+
+  const rows = targets
+    .map((t) => ({ note: t, path: pathTo(notes, t.id) }))
+    .filter(({ note: t, path }) =>
+      needle
+        ? [t, ...path].some((n) =>
+            projectTitle(n).toLowerCase().includes(needle),
+          )
+        : true,
+    )
+    .slice(0, 40);
+
+  return (
+    <div className="mt-3 border border-current/25 p-2">
+      <div className="flex items-center gap-2">
+        <input
+          autoFocus
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Put it in…"
+          aria-label="Search for somewhere to put this"
+          className="label min-w-0 flex-1 border border-current/40 bg-transparent px-2 py-1.5
+                     outline-none placeholder:opacity-50"
+        />
+        {note.parentId && (
+          <button
+            type="button"
+            onClick={() => onPick(null)}
+            className="label shrink-0 border border-current px-2 py-1.5 hover:bg-[var(--on)] hover:text-[var(--on-inv)]"
+          >
+            Take it out
+          </button>
+        )}
+      </div>
+
+      {rows.length === 0 ? (
+        <p className="label mt-2 px-1 py-2 opacity-60">
+          Nowhere by that name.
+        </p>
+      ) : (
+        <ul className="mt-2 max-h-56 overflow-y-auto">
+          {rows.map(({ note: t, path }) => (
+            <li key={t.id}>
+              <button
+                type="button"
+                onClick={() => onPick(t.id)}
+                className="flex w-full items-baseline gap-2 px-1.5 py-1.5 text-left hover:bg-current/10"
+              >
+                <span className="prose-note min-w-0 flex-1 truncate text-[15px]">
+                  {projectTitle(t)}
+                </span>
+                {path.length > 0 && (
+                  <span className="label shrink-0 max-w-40 truncate opacity-55">
+                    in {projectTitle(path[path.length - 1])}
+                  </span>
+                )}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 

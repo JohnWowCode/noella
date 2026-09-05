@@ -28,10 +28,13 @@ export function ListPanel({
   list,
   items,
   onColor,
+  showContents = true,
 }: {
   list: Note;
   items: Note[];
   onColor: boolean;
+  /** False inside the list, where the items are already the cards below. */
+  showContents?: boolean;
 }) {
   const { addNote, patchNote, removeNote, settings } = useNoella();
   const [draft, setDraft] = useState("");
@@ -138,7 +141,7 @@ export function ListPanel({
         </div>
       )}
 
-      {ordered.length > 0 && (
+      {showContents && ordered.length > 0 && (
         <ul className={`mt-4 overflow-hidden border ${edge}`}>
           {ordered.map((item, i) => {
             const done = isSettled(item, cadence, today);
@@ -188,6 +191,7 @@ export function ListPanel({
         </ul>
       )}
 
+      {showContents && (
       <div className="mt-3 flex items-center gap-2">
         <input
           value={draft}
@@ -216,6 +220,7 @@ export function ListPanel({
           Add
         </button>
       </div>
+      )}
     </div>
   );
 }

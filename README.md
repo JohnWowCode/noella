@@ -199,6 +199,28 @@ that, and two of them are corrections to earlier versions of this app.
 - **Deleting is undoable** and the app is installable, so it is where you left
   it rather than somewhere you have to remember to go.
 
+## Folders, all the way down
+
+Anything can hold anything. A note is a folder the moment you put something in
+it, so WowCool.World holds Cave Sniper holds Bugs holds a bug report with its
+screenshots — and none of those had to be declared a special kind of thing
+first.
+
+This is the one structural rule the app had wrong for most of its life. The
+model was a project holding steps, one level, enforced in the schema: *"a
+project cannot also be somebody's step; the tree stays one level deep."* That
+is fine for "buy milk" and useless for real work.
+
+Every card carries **Open**, whether or not there is anything in it yet — an
+empty folder you cannot get into is not a folder. A breadcrumb across the top
+says where you are and gets you back to any level in one click, and search
+ignores where you are standing entirely: it looks at the whole tree and every
+result shows the path it came from.
+
+Colours cut across the tree rather than mirroring it, which is the point of
+having both. A bug can live in Cave Sniper and still turn up under red with
+every other bug on the wall.
+
 ## Lists
 
 `List` on any note turns it into one. A list is deliberately **less** than a

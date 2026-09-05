@@ -144,7 +144,7 @@ Reading — always available, current as of the last time a tab was open:
 | --- | --- |
 | `whats_open` | Everything unticked, in the order Noella would work through it |
 | `search_notes` | By text, `#tag`, folder, or kind; `open_only` for just the live ones |
-| `get_note` | One thing in full, with its steps or items |
+| `get_note` | One thing in full: what it holds, and the path to where it lives |
 | `list_projects` | Every project with status, progress and next step; every list |
 | `list_folders` | The colour folders, their names, and how much is in each |
 
@@ -152,15 +152,21 @@ Writing — queued, lands when a tab is next open:
 
 | Tool | For |
 | --- | --- |
-| `add_note` | A note, to-do, project or list, optionally filed in a folder |
-| `add_step` | A step on a project or an item on a list |
+| `add_note` | A note, to-do, project or list; `inside` puts it in something, at any depth |
+| `add_step` | The same thing, worded for checklists |
 | `complete` | Tick something off, or `undo: true` to un-tick it |
 | `set_project_status` | idea / active / paused / done |
 | `pending_changes` | What is queued and not yet applied |
 
 Things are found by id, by their `NOTE 0041` reference, or by enough of their
 text to be unambiguous. When the text matches several, the server says which
-rather than guessing.
+rather than guessing — except when picking a destination, where something that
+already holds things beats something that does not.
+
+Anything can hold anything, to any depth. `WowCool.World › Cave Sniper › Bugs ›
+a screenshot` is four levels and every tool speaks it: results carry the path
+they came from, and `get_note` lists what a thing contains and what each of
+those holds in turn.
 
 ## What it cannot do
 

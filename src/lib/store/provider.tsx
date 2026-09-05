@@ -18,6 +18,7 @@ import {
   type NoteImage,
   type Settings,
 } from "../types";
+import { descendantsOf } from "../tree";
 import { LocalStore } from "./local";
 import type { Backup, Store } from "./types";
 
@@ -95,20 +96,27 @@ export function NoellaProvider({ children }: { children: React.ReactNode }) {
   /**
    * Delete is the only action in the app that cannot be walked back from the
    * UI — archive keeps the note, status changes are just fields. So it is the
-   * one that carries an undo, and it captures the project's steps too, because
-   * deleting a project takes them with it.
+   * one that carries an undo, and it captures the whole branch beneath it,
+   * because deleting a container takes everything inside it.
    */
   const removeNote = useCallback(
     (id: string) => {
       setNotes((prev) => {
-        const doomed = prev.filter((n) => n.id === id || n.parentId === id);
+        // The whole branch, so undo puts back exactly what delete took, and
+        // so the optimistic update does not leave grandchildren on screen
+        // pointing at a parent that no longer exists.
+        const branch = new Set(descendantsOf(prev, id).map((n) => n.id));
+        branch.add(id);
+        const doomed = prev.filter((n) => branch.has(n.id));
         if (doomed.length > 0) {
           const subject = doomed.find((n) => n.id === id);
           const extra = doomed.length - 1;
           setUndo({
             label:
               `Deleted ${seqLabel(subject?.seq ?? 0)}` +
-              (extra > 0 ? ` and ${extra} step${extra === 1 ? "" : "s"}` : ""),
+              (extra > 0
+                ? ` and the ${extra} thing${extra === 1 ? "" : "s"} inside it`
+                : ""),
             run: () => {
               setNotes((current) => [
                 ...doomed.filter((d) => !current.some((c) => c.id === d.id)),
@@ -119,7 +127,7 @@ export function NoellaProvider({ children }: { children: React.ReactNode }) {
             },
           });
         }
-        return prev.filter((n) => n.id !== id && n.parentId !== id);
+        return prev.filter((n) => !branch.has(n.id));
       });
       store.deleteNote(id);
     },
