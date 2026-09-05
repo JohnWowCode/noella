@@ -172,8 +172,12 @@ export function NoteCard({
             {done ? "×" : ""}
           </button>
         )}
-        <span>{seqLabel(note.seq)}</span>
-        <Dot />
+        {/*
+          NOTE 0007 is gone from the face of the card. It is a real handle —
+          the MCP tools take it, and it is still in the data and the title
+          attribute — but it opened every single card with four characters of
+          machine noise you never once needed to read.
+        */}
         {list ? (
           <>
             <span>
@@ -243,7 +247,7 @@ export function NoteCard({
             <Dot />
           </>
         )}
-        <span>{stamp(note.createdAt)}</span>
+        <span title={seqLabel(note.seq)}>{stamp(note.createdAt)}</span>
         {archived && (
           <>
             <Dot />

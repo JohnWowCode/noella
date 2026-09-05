@@ -8,6 +8,7 @@ import {
   isMediaFile,
 } from "@/lib/images";
 import { swatchName } from "@/lib/store/defaults";
+import { Popover } from "./Popover";
 import { useNoella } from "@/lib/store/provider";
 import { PRIORITIES, PRIORITY, type Priority } from "@/lib/priority";
 import { STICKERS, isSticker } from "@/lib/stickers";
@@ -74,7 +75,6 @@ export function Compose({
   const [tooBig, setTooBig] = useState(false);
   const [icon, setIcon] = useState<string | null>(null);
   const [priority, setPriority] = useState<Priority | null>(null);
-  const [stickers, setStickers] = useState(false);
   /** What you have fired off without leaving the box. */
   const [burst, setBurst] = useState<string[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -189,6 +189,7 @@ export function Compose({
   const hold = (e: React.MouseEvent) => e.preventDefault();
 
   const ready = body.trim().length > 0 || pending.length > 0;
+  const selected = colors.find((c) => c.id === colorId) ?? null;
   const active = KINDS.find((k) => k.id === kind) ?? KINDS[0];
 
   return (
@@ -214,7 +215,7 @@ export function Compose({
             onClick={() => setKind(k.id)}
             aria-pressed={kind === k.id}
             title={k.hint}
-            className={`label flex-1 border-r border-rule px-3 py-3 last:border-r-0 ${
+            className={`label flex-1 border-r border-rule px-3 py-2.5 last:border-r-0 ${
               kind === k.id
                 ? "bg-ink text-paper"
                 : "text-mute hover:bg-ink/8 hover:text-ink"
@@ -268,28 +269,27 @@ export function Compose({
         the fold. These are the last four, newest first, and they clear the
         moment you leave.
       */}
+      {/*
+        Proof it landed. One line, no boxes — a burst of six thoughts and an
+        emptying box gives you nothing to hold onto, but a row of outlined
+        fragments was its own small pile of clutter.
+      */}
       {burst.length > 0 && (
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-t border-rule px-5 py-2.5">
-          <span className="label text-mute">Kept</span>
-          {burst.map((line, i) => (
-            <span
-              key={`${line}-${i}`}
-              className="label max-w-56 truncate border border-rule-soft px-2 py-1 text-mute"
-              style={{ opacity: 1 - i * 0.2 }}
-            >
-              {line}
-            </span>
-          ))}
+        <p className="label flex items-baseline gap-2 border-t border-rule px-4 py-2 text-mute">
+          <span className="shrink-0">Kept</span>
+          <span className="min-w-0 flex-1 truncate normal-case tracking-normal">
+            {burst.join(" · ")}
+          </span>
           <button
             type="button"
             onMouseDown={hold}
             onClick={() => setBurst([])}
-            className="label ml-auto text-mute hover:text-ink"
-            aria-label="Clear the kept strip"
+            aria-label="Clear"
+            className="shrink-0 hover:text-ink"
           >
             ×
           </button>
-        </div>
+        </p>
       )}
 
       {(pending.length > 0 || busy > 0 || tooBig) && (
@@ -312,142 +312,136 @@ export function Compose({
         </div>
       )}
 
-      <div className="border-t border-rule px-5 py-4">
-        <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-2">
-          <button
-            type="button"
-            onMouseDown={hold}
-            onClick={() => setStickers((v) => !v)}
-            aria-pressed={stickers}
-            aria-label="Pick a sticker"
-            className={`grid h-9 w-9 shrink-0 place-items-center border text-[18px] leading-none ${
-              icon ? "border-ink" : "border-rule text-mute hover:border-ink"
-            }`}
-          >
-            {icon ?? "☺"}
-          </button>
-          {icon && (
-            <button
-              type="button"
-              onMouseDown={hold}
-              onClick={() => setIcon(null)}
-              className="label border border-rule px-2 py-2 text-mute hover:text-ink"
-            >
-              No sticker
-            </button>
-          )}
+      {/*
+        One row.
 
-          <span className="ml-auto flex flex-wrap items-center gap-1.5">
-            {PRIORITIES.map((p) => (
-              <button
-                key={p}
-                type="button"
-                onMouseDown={hold}
-                onClick={() => setPriority(priority === p ? null : p)}
-                aria-pressed={priority === p}
-                title={PRIORITY[p].hint}
-                className="label flex items-center gap-1.5 border px-2.5 py-2"
-                style={
-                  priority === p
-                    ? {
-                        backgroundColor: PRIORITY[p].hex,
-                        borderColor: PRIORITY[p].hex,
-                        color: "#111111",
-                      }
-                    : { borderColor: "var(--rule)" }
-                }
-              >
-                <span
-                  aria-hidden
-                  className="h-2.5 w-2.5"
-                  style={{ backgroundColor: PRIORITY[p].hex }}
-                />
-                {PRIORITY[p].label}
-              </button>
-            ))}
-          </span>
-        </div>
-
-        {stickers && (
-          <div className="mb-4 border border-rule p-3">
-            {STICKERS.map((group) => (
-              <div key={group.name} className="mb-2.5 last:mb-0">
-                <p className="label mb-1.5 text-mute">{group.name}</p>
-                <div className="flex flex-wrap gap-1">
-                  {group.icons.map((glyph) => (
-                    <button
-                      key={glyph}
-                      type="button"
-                      onMouseDown={hold}
-                      onClick={() => {
-                        setIcon(glyph === icon ? null : glyph);
-                        setStickers(false);
-                      }}
-                      aria-pressed={glyph === icon}
-                      className={`grid h-8 w-8 place-items-center border text-[17px] leading-none ${
-                        glyph === icon
-                          ? "border-ink bg-ink/10"
-                          : "border-transparent hover:border-rule"
-                      }`}
-                    >
-                      {glyph}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-            <input
-              onMouseDown={(e) => e.stopPropagation()}
-              onChange={(e) => {
-                const value = e.target.value.trim();
-                if (isSticker(value)) {
-                  setIcon(value);
-                  setStickers(false);
-                }
+        This was forty-seven controls on an empty wall — four kind tabs, a
+        sticker button, three ranks, thirty-six colours, a "no world", an
+        attach and a save — which is not a box you write in. Each of them is
+        one button now, showing what is currently chosen, opening only when
+        asked. Nothing was removed; it just stopped standing there.
+      */}
+      <div className="flex flex-wrap items-center gap-2 border-t border-rule px-4 py-3">
+        <Popover
+          label="Folder colour"
+          set={colorId !== null}
+          current={
+            selected ? (
+              <span
+                aria-hidden
+                className="h-4 w-4 border border-rule-soft"
+                style={{ backgroundColor: selected.hex }}
+              />
+            ) : (
+              <span aria-hidden className="h-4 w-4 border border-current" />
+            )
+          }
+        >
+          {(close) => (
+            <Palette
+              colorId={colorId}
+              onColorId={(id) => {
+                onColorId(id);
+                close();
               }}
-              placeholder="…or paste any emoji"
-              aria-label="Use any emoji as the sticker"
-              className="label mt-1 w-full border border-rule bg-transparent px-2 py-1.5
-                         outline-none placeholder:opacity-50"
             />
-          </div>
-        )}
+          )}
+        </Popover>
 
-        <Palette colorId={colorId} onColorId={onColorId} hold={hold} />
+        <Popover label="Sticker" set={icon !== null} current={icon ?? "☺"}>
+          {(close) => (
+            <Stickers
+              icon={icon}
+              onPick={(glyph) => {
+                setIcon(glyph);
+                close();
+              }}
+            />
+          )}
+        </Popover>
 
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*,video/*"
-            multiple
-            className="sr-only"
-            onChange={(e) => {
-              void take(Array.from(e.target.files ?? []));
-              e.target.value = "";
-            }}
-          />
-          <button
-            type="button"
-            onMouseDown={hold}
-            onClick={() => fileRef.current?.click()}
-            className="label border border-rule px-3 py-2 hover:bg-ink hover:text-paper"
-          >
-            Photo or video
-          </button>
-          <button
-            type="button"
-            onMouseDown={hold}
-            onClick={save}
-            disabled={!ready}
-            className="label ml-auto border-2 border-ink bg-ink px-4 py-2 text-paper
-                       enabled:hover:bg-transparent enabled:hover:text-ink
-                       disabled:cursor-not-allowed disabled:border-rule disabled:bg-transparent
-                       disabled:text-mute"
-          >
-            {parentName ? "Put it in" : "Keep it"} · ↵
-          </button>
-        </div>
+        <Popover
+          label="Priority"
+          set={priority !== null}
+          current={
+            priority ? (
+              <span
+                aria-hidden
+                className="h-3.5 w-3.5"
+                style={{ backgroundColor: PRIORITY[priority].hex }}
+              />
+            ) : (
+              "⚑"
+            )
+          }
+        >
+          {(close) => (
+            <span className="flex flex-col gap-1">
+              {PRIORITIES.map((level) => (
+                <button
+                  key={level}
+                  type="button"
+                  onMouseDown={hold}
+                  onClick={() => {
+                    setPriority(priority === level ? null : level);
+                    close();
+                  }}
+                  className={`label flex items-center gap-2 px-2 py-2 text-left ${
+                    priority === level ? "bg-ink text-paper" : "hover:bg-ink/10"
+                  }`}
+                >
+                  <span
+                    aria-hidden
+                    className="h-3 w-3 shrink-0"
+                    style={{ backgroundColor: PRIORITY[level].hex }}
+                  />
+                  {PRIORITY[level].label}
+                  <span className="ml-auto normal-case tracking-normal opacity-55">
+                    {PRIORITY[level].hint}
+                  </span>
+                </button>
+              ))}
+            </span>
+          )}
+        </Popover>
+
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*,video/*"
+          multiple
+          className="sr-only"
+          onChange={(e) => {
+            void take(Array.from(e.target.files ?? []));
+            e.target.value = "";
+          }}
+        />
+        <button
+          type="button"
+          onMouseDown={hold}
+          onClick={() => fileRef.current?.click()}
+          aria-label="Add a photo or video"
+          title="Add a photo or video"
+          className="grid h-9 w-9 place-items-center border border-rule text-[17px] leading-none text-mute hover:border-ink hover:text-ink"
+        >
+          {/* A plain plus, not a picture emoji: the row sits in the mono
+              chrome, and an emoji-presentation glyph renders as a tofu box
+              wherever an emoji font is not installed. */}
+          +
+        </button>
+
+        <button
+          type="button"
+          onMouseDown={hold}
+          onClick={save}
+          disabled={!ready}
+          className="label ml-auto border-2 border-ink bg-ink px-4 py-2 text-paper
+                     enabled:hover:bg-transparent enabled:hover:text-ink
+                     disabled:cursor-not-allowed disabled:border-rule disabled:bg-transparent
+                     disabled:text-mute"
+        >
+          {parentName ? "Put it in" : "Keep it"} · ↵
+        </button>
       </div>
     </section>
   );
@@ -460,24 +454,25 @@ export function Compose({
  * light, medium and deep form and the whole thing reads as a palette you could
  * pick from rather than a very long line of buttons.
  */
+/**
+ * Thirty-six worlds, twelve across and three down: one hue per column, one
+ * intensity per row. It reads as a palette rather than a very long line of
+ * buttons — and it lives behind a swatch now, because thirty-six of anything
+ * is not something a writing box should open with.
+ */
 function Palette({
   colorId,
   onColorId,
-  hold,
 }: {
   colorId: string | null;
   onColorId: (id: string | null) => void;
-  hold: (e: React.MouseEvent) => void;
 }) {
   const { colors } = useNoella();
-  // The store hands them over as twelve mediums, twelve lights, twelve darks.
-  // Laid out in rows of twelve, that puts one hue in each column and one
-  // intensity in each row without reordering anything.
   const hues = Math.max(1, Math.round(colors.length / 3));
 
   return (
-    <div className="flex flex-wrap items-start gap-x-4 gap-y-3">
-      <div
+    <span className="flex flex-col gap-2">
+      <span
         className="grid gap-[3px]"
         style={{ gridTemplateColumns: `repeat(${hues}, minmax(0, 1fr))` }}
       >
@@ -485,7 +480,7 @@ function Palette({
           <button
             key={c.id}
             type="button"
-            onMouseDown={hold}
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => onColorId(c.id === colorId ? null : c.id)}
             aria-pressed={c.id === colorId}
             title={c.name ?? swatchName(index)}
@@ -501,20 +496,72 @@ function Palette({
             </span>
           </button>
         ))}
-      </div>
-
+      </span>
       <button
         type="button"
-        onMouseDown={hold}
+        onMouseDown={(e) => e.preventDefault()}
         onClick={() => onColorId(null)}
-        aria-pressed={colorId === null}
-        className={`label border border-rule px-2.5 py-1.5 ${
+        className={`label border border-rule px-2 py-1.5 ${
           colorId === null ? "bg-ink text-paper" : "text-mute hover:text-ink"
         }`}
       >
-        No world
+        No folder
       </button>
-    </div>
+    </span>
+  );
+}
+
+/** The curated forty, grouped, plus a slot for anything else. */
+function Stickers({
+  icon,
+  onPick,
+}: {
+  icon: string | null;
+  onPick: (glyph: string | null) => void;
+}) {
+  return (
+    <span className="flex flex-col gap-2">
+      {STICKERS.map((group) => (
+        <span key={group.name} className="flex flex-wrap gap-1">
+          {group.icons.map((glyph) => (
+            <button
+              key={glyph}
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => onPick(glyph === icon ? null : glyph)}
+              aria-pressed={glyph === icon}
+              className={`grid h-8 w-8 place-items-center border text-[17px] leading-none ${
+                glyph === icon
+                  ? "border-ink bg-ink/10"
+                  : "border-transparent hover:border-rule"
+              }`}
+            >
+              {glyph}
+            </button>
+          ))}
+        </span>
+      ))}
+      <input
+        onChange={(e) => {
+          const value = e.target.value.trim();
+          if (isSticker(value)) onPick(value);
+        }}
+        placeholder="…or any emoji"
+        aria-label="Use any emoji as the sticker"
+        className="label w-full border border-rule bg-transparent px-2 py-1.5
+                   outline-none placeholder:opacity-50"
+      />
+      {icon && (
+        <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => onPick(null)}
+          className="label border border-rule px-2 py-1.5 text-mute hover:text-ink"
+        >
+          No sticker
+        </button>
+      )}
+    </span>
   );
 }
 

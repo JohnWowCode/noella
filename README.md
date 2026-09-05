@@ -199,6 +199,28 @@ that, and two of them are corrections to earlier versions of this app.
 - **Deleting is undoable** and the app is installable, so it is where you left
   it rather than somewhere you have to remember to go.
 
+## Nothing is on screen until it means something
+
+The one rule the interface is held to, because every other rule was losing to
+the pile.
+
+An empty wall was carrying forty-seven controls in the compose box alone —
+four kind tabs, a sticker button, three ranks, thirty-six colour swatches, a
+"no world", an attach and a save — before a word had been written. Below it sat
+seven view chips, three ranks and four grouping buttons, most of them filtering
+to nothing at all.
+
+It is nine now, and none of them are gone. Colour, sticker and rank each
+collapsed to one button that shows what is currently chosen and opens what it
+holds when asked. The filter row waits for its own counts: no to-dos, no To do
+chip; nothing archived, no Archive; nothing ranked, no ranks; fewer than eight
+cards, no grouping control. A new wall shows a box and a prompt. A busy one
+shows exactly the handles it has earned.
+
+The card lost its serial number too. `NOTE 0007` is a real handle — the MCP
+tools take it and it is still in the data and the tooltip — but it opened every
+card with four characters of machine noise that had never once been read.
+
 ## Now, next, later
 
 Three buckets, never a number. A 1–10 priority field is a decision you can
