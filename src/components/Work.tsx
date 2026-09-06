@@ -133,7 +133,7 @@ export function Work({
               Put it back
             </button>
           </div>
-          <p className="display px-4 pt-1.5 text-[21px] sm:text-[25px]">
+          <p className="display px-4 pt-1.5 text-[calc(21px*var(--type))] sm:text-[calc(25px*var(--type))]">
             {showing.note.body}
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2 px-4 pb-4">
@@ -174,10 +174,10 @@ export function Work({
       */}
       {queue.length === 0 && pool.length === 0 && (
         <section className="mt-4 border border-rule bg-field px-6 py-10">
-          <p className="display text-[22px] sm:text-[26px]">
+          <p className="display text-[calc(22px*var(--type))] sm:text-[calc(26px*var(--type))]">
             Nothing owed today.
           </p>
-          <p className="prose-note mt-3 max-w-md text-[16px] text-mute">
+          <p className="prose-note mt-3 max-w-md text-[calc(16px*var(--type))] text-mute">
             Anything you rank <strong className="font-semibold">Now</strong>{" "}
             lands at the top here as today&apos;s short list; Next and Later
             queue up underneath it. Everything you have written is on the Wall.
@@ -206,7 +206,7 @@ export function Work({
           </header>
 
           {queue.length === 0 ? (
-            <p className="prose-note px-4 py-5 text-[15px] text-mute">
+            <p className="prose-note px-4 py-5 text-[calc(15px*var(--type))] text-mute">
               Nothing ranked. Anything you mark Next or Later lands here, in
               order.
             </p>
@@ -286,7 +286,7 @@ function Row({
       <button
         type="button"
         onClick={() => onOpen?.(note.id)}
-        className="prose-note min-w-0 flex-1 text-left text-[17px] leading-snug"
+        className="prose-note min-w-0 flex-1 text-left text-[calc(17px*var(--type))] leading-snug"
       >
         {note.body.split("\n", 1)[0]}
       </button>

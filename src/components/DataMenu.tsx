@@ -138,7 +138,7 @@ function SendTo() {
               value={draft.name}
               onChange={(e) => set({ name: e.target.value })}
               placeholder="JSpace"
-              className="prose-note border border-rule bg-field px-2 py-1.5 text-[15px] outline-none"
+              className="prose-note border border-rule bg-field px-2 py-1.5 text-[calc(15px*var(--type))] outline-none"
             />
           </label>
           <label className="flex flex-col gap-1">
@@ -151,7 +151,7 @@ function SendTo() {
               autoCapitalize="off"
               autoCorrect="off"
               spellCheck={false}
-              className="prose-note border border-rule bg-field px-2 py-1.5 text-[15px] outline-none"
+              className="prose-note border border-rule bg-field px-2 py-1.5 text-[calc(15px*var(--type))] outline-none"
             />
           </label>
           <p className="label normal-case tracking-normal text-mute">
@@ -169,7 +169,7 @@ function SendTo() {
                 onChange={(e) => set({ token: e.target.value })}
                 type="password"
                 autoComplete="off"
-                className="prose-note border border-rule bg-field px-2 py-1.5 text-[15px] outline-none"
+                className="prose-note border border-rule bg-field px-2 py-1.5 text-[calc(15px*var(--type))] outline-none"
               />
             </label>
           )}

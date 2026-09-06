@@ -104,7 +104,7 @@ export function Dailies({
           dragging ? "border-ink bg-field" : "border-rule"
         }`}
       >
-        <p className="prose-note text-[16px] text-mute">
+        <p className="prose-note text-[calc(16px*var(--type))] text-mute">
           {busy > 0
             ? "Bringing it in…"
             : dragging
@@ -127,7 +127,7 @@ export function Dailies({
       </section>
 
       {days.length === 0 ? (
-        <p className="prose-note mt-4 border border-rule bg-field px-6 py-12 text-center text-[16px] text-mute">
+        <p className="prose-note mt-4 border border-rule bg-field px-6 py-12 text-center text-[calc(16px*var(--type))] text-mute">
           Nothing shot and nothing finished yet. Whatever you drop here, and
           whatever you tick off anywhere in the app, shows up as the day it
           happened.
@@ -187,7 +187,7 @@ export function Dailies({
                       <button
                         type="button"
                         onClick={() => onOpen?.(n.id)}
-                        className="prose-note min-w-0 flex-1 text-left text-[16px] leading-snug"
+                        className="prose-note min-w-0 flex-1 text-left text-[calc(16px*var(--type))] leading-snug"
                       >
                         {n.body.split("\n", 1)[0] || "a picture"}
                       </button>

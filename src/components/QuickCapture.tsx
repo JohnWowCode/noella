@@ -232,7 +232,7 @@ export function QuickCapture() {
             }}
             placeholder="What's on your mind?"
             aria-label="Note"
-            className="prose-note flex-1 resize-none bg-transparent px-5 py-5 text-[20px]
+            className="prose-note flex-1 resize-none bg-transparent px-5 py-5 text-[calc(20px*var(--type))]
                        outline-none placeholder:text-mute sm:px-8"
           />
 

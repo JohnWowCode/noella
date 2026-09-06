@@ -217,7 +217,7 @@ export function Palette() {
           }}
           placeholder="Search, jump, or do…"
           aria-label="Search commands and notes"
-          className="prose-note w-full border-b border-rule bg-transparent px-5 py-4 text-[18px]
+          className="prose-note w-full border-b border-rule bg-transparent px-5 py-4 text-[calc(18px*var(--type))]
                      outline-none placeholder:text-mute"
         />
 
@@ -251,7 +251,7 @@ export function Palette() {
                       {item.swatch !== undefined && (
                         <Dot colorId={item.swatch} />
                       )}
-                      <span className="prose-note flex-1 truncate text-[15px]">
+                      <span className="prose-note flex-1 truncate text-[calc(15px*var(--type))]">
                         {item.label}
                       </span>
                       {item.hint && (

@@ -170,7 +170,7 @@ export function ListPanel({
                   {done && <Icon name="check" size={11} />}
                 </button>
                 <span
-                  className={`flex-1 text-[15px] leading-snug ${
+                  className={`flex-1 text-[calc(15px*var(--type))] leading-snug ${
                     done ? "line-through opacity-40" : ""
                   }`}
                 >
@@ -205,7 +205,7 @@ export function ListPanel({
           }}
           placeholder="Add something, then Enter"
           aria-label={`Add to ${list.body.split("\n")[0]}`}
-          className={`flex-1 border ${edge} bg-transparent px-4 py-2.5 text-[15px]
+          className={`flex-1 border ${edge} bg-transparent px-4 py-2.5 text-[calc(15px*var(--type))]
                       outline-none placeholder:opacity-50`}
         />
         <button
@@ -273,7 +273,7 @@ function AmountField({ item, onColor }: { item: Note; onColor: boolean }) {
         if (e.key === "Escape") setEditing(false);
       }}
       aria-label="Amount"
-      className={`w-20 shrink-0 border bg-transparent px-2 py-1 text-right text-[14px] outline-none ${
+      className={`w-20 shrink-0 border bg-transparent px-2 py-1 text-right text-[calc(14px*var(--type))] outline-none ${
         onColor ? "border-current/40" : "border-rule-soft"
       }`}
     />

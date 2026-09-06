@@ -134,6 +134,23 @@ export function Home() {
   const searchRef = useRef<HTMLInputElement>(null);
   const moreRef = useRef<HTMLDivElement>(null);
 
+  const go = useCallback((next: Area) => {
+    setArea(next);
+    window.scrollTo({ top: 0 });
+    try {
+      localStorage.setItem(AREA_KEY, next);
+    } catch {
+      // Storage blocked; the choice still holds for this session.
+    }
+  }, []);
+
+  /*
+   * Standing inside a folder is a wall view by definition — Work and Dailies
+   * are about the whole thing, not about one container — so going in shows
+   * the contents without silently changing which area you chose.
+   */
+  const showing: Area = inside ? "wall" : area;
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const el = e.target as HTMLElement | null;
@@ -151,6 +168,19 @@ export function Home() {
         return;
       }
       if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
+      // One key per area. Nothing on screen advertises it, because a row of
+      // keyboard hints over three words you can already see is worse than
+      // never finding out.
+      const AREA_KEYS: Record<string, Area> = {
+        "1": "work",
+        "2": "wall",
+        "3": "dailies",
+      };
+      if (AREA_KEYS[e.key] && !inside) {
+        e.preventDefault();
+        go(AREA_KEYS[e.key]);
+        return;
+      }
       if (e.key === "n") {
         e.preventDefault();
         composeRef.current?.focus();
@@ -161,7 +191,9 @@ export function Home() {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+    // `go` is stable, so this only rebinds when you step in or out of a
+    // folder — which is exactly when the area keys stop and start applying.
+  }, [inside, go]);
 
   // Read after mount, on a microtask, so the server markup matches and the
   // choice does not cascade a render.
@@ -181,23 +213,6 @@ export function Home() {
       live = false;
     };
   }, []);
-
-  const go = useCallback((next: Area) => {
-    setArea(next);
-    window.scrollTo({ top: 0 });
-    try {
-      localStorage.setItem(AREA_KEY, next);
-    } catch {
-      // Storage blocked; the choice still holds for this session.
-    }
-  }, []);
-
-  /*
-   * Standing inside a folder is a wall view by definition — Work and Dailies
-   * are about the whole thing, not about one container — so going in shows
-   * the contents without silently changing which area you chose.
-   */
-  const showing: Area = inside ? "wall" : area;
 
   const here = useMemo(
     () => (inside ? (notes.find((n) => n.id === inside) ?? null) : null),
@@ -409,6 +424,27 @@ export function Home() {
     [notes, todayKey],
   );
   const week = movesThisWeek(cells);
+  /* What each tab is sitting on, for the counts above. */
+  const owed = useMemo(
+    () =>
+      notes.filter(
+        (n) =>
+          n.archivedAt === null && n.doneAt === null && n.priority === "now",
+      ).length,
+    [notes],
+  );
+  const madeToday = useMemo(
+    () =>
+      todayKey
+        ? notes.filter(
+            (n) =>
+              n.archivedAt === null &&
+              n.doneAt !== null &&
+              n.doneAt.slice(0, 10) === todayKey,
+          ).length
+        : 0,
+    [notes, todayKey],
+  );
   const filtered =
     world !== null ||
     tag !== null ||
@@ -534,7 +570,7 @@ export function Home() {
           childCount > 0 &&
           here.archivedAt === null && (
             <p className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 border border-rule-soft bg-field px-4 py-3">
-              <span className="prose-note text-[15px] text-mute">
+              <span className="prose-note text-[calc(15px*var(--type))] text-mute">
                 {childCount} things in here now. Want to keep track of it?
               </span>
               <button
@@ -581,13 +617,25 @@ export function Home() {
                 type="button"
                 onClick={() => go(id)}
                 aria-current={area === id ? "page" : undefined}
-                className={`label px-3 py-2.5 ${
+                className={`label flex items-center gap-1.5 px-3 py-2.5 ${
                   area === id
                     ? "-mb-px border-b-2 border-ink text-ink"
                     : "text-mute hover:text-ink"
                 }`}
               >
                 {AREAS[id]}
+                {/*
+                  What is waiting behind the tab you are not looking at.
+                  Only ever drawn when there is something, so a quiet app has
+                  three plain words across the top and a busy one tells you
+                  where to go without you having to go and look.
+                */}
+                {id === "work" && owed > 0 && (
+                  <span className="tabular-nums opacity-60">{owed}</span>
+                )}
+                {id === "dailies" && madeToday > 0 && (
+                  <span className="tabular-nums opacity-60">{madeToday}</span>
+                )}
               </button>
             ))}
           </nav>
@@ -1222,7 +1270,7 @@ function WorldBand({
             placeholder="Name it"
             aria-label="Folder name"
             className="prose-note border border-current bg-transparent px-2 py-1
-                       text-[17px] outline-none placeholder:opacity-60"
+                       text-[calc(17px*var(--type))] outline-none placeholder:opacity-60"
           />
         </form>
       ) : (
@@ -1232,7 +1280,7 @@ function WorldBand({
             setValue(color.name ?? "");
             setEditing(true);
           }}
-          className="prose-note text-[19px] underline decoration-1 underline-offset-4 hover:no-underline"
+          className="prose-note text-[calc(19px*var(--type))] underline decoration-1 underline-offset-4 hover:no-underline"
         >
           {name}
         </button>
@@ -1298,7 +1346,7 @@ function Drifting({ project, quiet }: { project: Note; quiet: number }) {
   const { patchNote } = useNoella();
   return (
     <article className="flex flex-col gap-3 border border-rule bg-field px-4 py-3.5 sm:flex-row sm:items-center">
-      <span className="prose-note text-[16px] leading-snug sm:flex-1">
+      <span className="prose-note text-[calc(16px*var(--type))] leading-snug sm:flex-1">
         {projectTitle(project)}
       </span>
       <span className="label tabular-nums text-mute">quiet {quiet}d</span>
@@ -1421,7 +1469,7 @@ function Figure({
 
 function Empty({ children }: { children: React.ReactNode }) {
   return (
-    <p className="prose-note border border-rule bg-field px-6 py-14 text-center text-[16px] text-mute">
+    <p className="prose-note border border-rule bg-field px-6 py-14 text-center text-[calc(16px*var(--type))] text-mute">
       {children}
     </p>
   );
@@ -1430,14 +1478,14 @@ function Empty({ children }: { children: React.ReactNode }) {
 function FirstRun() {
   return (
     <div className="border border-rule bg-field px-6 py-10 sm:px-10 sm:py-12">
-      <p className="display text-[26px] sm:text-[32px]">
+      <p className="display text-[calc(26px*var(--type))] sm:text-[calc(32px*var(--type))]">
         Write anything up there.
       </p>
-      <p className="prose-note mt-4 max-w-lg text-[17px] leading-relaxed text-mute">
+      <p className="prose-note mt-4 max-w-lg text-[calc(17px*var(--type))] leading-relaxed text-mute">
         A thought, a job, half an idea, a photo, a clip. Say what it is along
         the top of the box.
       </p>
-      <p className="prose-note mt-3 max-w-lg text-[17px] leading-relaxed text-mute">
+      <p className="prose-note mt-3 max-w-lg text-[calc(17px*var(--type))] leading-relaxed text-mute">
         Then <em>Open</em> anything and put things inside it, as deep as you
         like — a site holds a game, the game holds its bugs, a bug holds its
         screenshots. Colours cut across all of it, so one note can live in Cave

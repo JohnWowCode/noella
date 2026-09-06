@@ -120,7 +120,7 @@ export function ProjectPanel({
                 </span>
               )}
               <span
-                className={`flex-1 text-[15px] leading-snug ${
+                className={`flex-1 text-[calc(15px*var(--type))] leading-snug ${
                   step.doneAt ? "line-through opacity-50" : ""
                 }`}
               >
@@ -184,7 +184,7 @@ export function ProjectPanel({
           }}
           placeholder="Next step, then Enter"
           aria-label={`Add a step to ${project.body.split("\n")[0]}`}
-          className={`flex-1 border ${line} bg-transparent px-3 py-2 text-[15px]
+          className={`flex-1 border ${line} bg-transparent px-3 py-2 text-[calc(15px*var(--type))]
                       outline-none placeholder:opacity-55`}
         />
         <button

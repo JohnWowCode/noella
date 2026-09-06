@@ -1,9 +1,11 @@
 "use client";
 
+import { ledger, streak } from "@/lib/momentum";
 import { markLabel, marksOf } from "@/lib/stickers";
 import { ageOf, todayOf, TOO_MANY } from "@/lib/today";
 import { useNoella } from "@/lib/store/provider";
 import type { Note } from "@/lib/types";
+import { useMemo } from "react";
 import { Icon } from "./Icon";
 
 /**
@@ -29,6 +31,10 @@ export function Today({
 }) {
   const { notes, patchNote } = useNoella();
   const { open, done, carried, finished } = todayOf(notes, todayKey);
+  const run = useMemo(
+    () => (todayKey ? streak(ledger(notes, todayKey)) : 0),
+    [notes, todayKey],
+  );
 
   if (open.length === 0 && done.length === 0 && carried.length === 0) {
     return null;
@@ -43,10 +49,28 @@ export function Today({
       aria-label="Today"
       className={`mt-4 border ${clear ? "border-2 border-ink" : "border-rule"} bg-field`}
     >
+      {/*
+        A rule that fills as the day empties.
+        
+        No number, no percentage, no ring: a line under the heading that is
+        part done and part not. You take it in without reading it, which is
+        the only kind of progress display worth having on a screen you are
+        trying to work from — and ticking the last thing closes it, which is
+        the small thing this app never had.
+      */}
+      {promised > 0 && (
+        <div aria-hidden className="h-[3px] w-full bg-rule-soft">
+          <div
+            className="h-full bg-ink"
+            style={{ width: `${Math.round((done.length / promised) * 100)}%` }}
+          />
+        </div>
+      )}
+
       <header className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-rule-soft px-4 py-3">
         <h2 className="title">Today</h2>
         {clear ? (
-          <span className="prose-note text-[15px]">
+          <span className="prose-note text-[calc(15px*var(--type))]">
             Done. {done.length} finished
             {finished.length > done.length
               ? `, ${finished.length} altogether`
@@ -63,10 +87,21 @@ export function Today({
           Said, not enforced. Refusing a seventh thing would be the app
           telling you what your day is; being told is the useful part.
         */}
-        {!clear && promised > TOO_MANY && (
+        {/*
+          One of two things on the right, never both: how long the run is, or
+          that the day is overloaded. A streak is only mentioned once it is
+          worth something — two days is a coincidence, three is a run.
+        */}
+        {!clear && promised > TOO_MANY ? (
           <span className="label ml-auto text-mute">
             {promised} is a lot for one day
           </span>
+        ) : (
+          run >= 3 && (
+            <span className="label ml-auto text-mute tabular-nums">
+              {run} days running
+            </span>
+          )
         )}
       </header>
 
@@ -152,7 +187,7 @@ function Row({
       <button
         type="button"
         onClick={() => onOpen?.(note.id)}
-        className={`prose-note min-w-0 flex-1 text-left text-[17px] leading-snug ${
+        className={`prose-note min-w-0 flex-1 text-left text-[calc(17px*var(--type))] leading-snug ${
           finished ? "text-mute line-through" : ""
         }`}
       >

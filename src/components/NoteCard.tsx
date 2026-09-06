@@ -339,7 +339,7 @@ export function NoteCard({
             }}
             onDoubleClick={() => setEditing(true)}
             className={`prose-note order-3 w-full min-w-0 [overflow-wrap:anywhere] whitespace-pre-wrap sm:order-2 sm:w-auto sm:flex-1 ${
-              heading ? "text-[24px] leading-tight sm:text-[28px]" : ""
+              heading ? "text-[calc(24px*var(--type))] leading-tight sm:text-[calc(28px*var(--type))]" : ""
             } ${done ? "line-through opacity-55" : ""}`}
           >
             <Highlight text={note.body} query={query} />
@@ -823,7 +823,7 @@ function Mover({
                 onClick={() => onPick(t.id)}
                 className="flex w-full items-baseline gap-2 px-1.5 py-1.5 text-left hover:bg-current/10"
               >
-                <span className="prose-note min-w-0 flex-1 truncate text-[15px]">
+                <span className="prose-note min-w-0 flex-1 truncate text-[calc(15px*var(--type))]">
                   {projectTitle(t)}
                 </span>
                 {path.length > 0 && (

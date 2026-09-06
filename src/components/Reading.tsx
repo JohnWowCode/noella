@@ -135,7 +135,7 @@ export function Reading() {
                 }`}
               >
                 <span
-                  className="text-[16px] leading-snug"
+                  className="text-[calc(16px*var(--type))] leading-snug"
                   style={{
                     fontFamily:
                       f.id === "literata"

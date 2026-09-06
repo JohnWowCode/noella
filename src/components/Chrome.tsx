@@ -43,7 +43,7 @@ export function Footer() {
         style={{ paddingBottom: "calc(1.75rem + env(safe-area-inset-bottom))" }}
         className="mx-auto max-w-3xl px-5 pt-7 sm:px-6"
       >
-        <p className="prose-note text-[14px] text-mute">
+        <p className="prose-note text-[calc(14px*var(--type))] text-mute">
           Everything here lives on this device. No server, no account, nothing
           leaves.
         </p>

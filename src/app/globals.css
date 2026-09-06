@@ -74,18 +74,47 @@
  */
 :root {
   --font-body: var(--font-literata), Georgia, "Times New Roman", serif;
-  --read-size: 18px;
+
+  /*
+   * One multiplier, and every size in the app is a multiple of it.
+   *
+   * Size used to move a single variable that only `prose-note` read, so
+   * picking Huge changed the note bodies on the wall and nothing else —
+   * every row on the Work screen is a hard 17px, every heading a hard 19.
+   * Measured: at Huge, the default screen did not change by one pixel. A
+   * setting somebody reached for because they cannot read the screen has to
+   * move the whole screen.
+   *
+   * Chrome grows more slowly than prose on purpose. Doubling the size of a
+   * twelve-pixel uppercase counter alongside the words makes the furniture
+   * shout; it needs to stay readable, not keep pace.
+   */
+  --read-scale: 1;
+  --label-scale: 1;
+  --face-adjust: 1;
+  --type: calc(var(--read-scale) * var(--face-adjust));
+
+  --read-size: calc(18px * var(--type));
   --read-leading: 1.62;
   --read-tracking: 0em;
   --read-word: normal;
 }
 
+/*
+ * Optical correction, measured rather than guessed.
+ *
+ * Rendered at the same nominal size, the x-heights come out 51, 51, 53 and 55
+ * for Literata, Atkinson, Lexend and a system sans — so the last two read
+ * bigger at the same number. Nudging them down means switching typeface
+ * changes the shape of the text and not, jarringly, its size.
+ */
 html[data-face="atkinson"] {
   --font-body: var(--font-atkinson), system-ui, "Segoe UI", sans-serif;
 }
 
 html[data-face="lexend"] {
   --font-body: var(--font-lexend), system-ui, "Segoe UI", sans-serif;
+  --face-adjust: 0.97;
   /* Lexend's own metrics already run wide; matching Literata's leading here
      keeps switching from feeling like the page grew. */
   --read-leading: 1.55;
@@ -93,6 +122,7 @@ html[data-face="lexend"] {
 
 html[data-face="system"] {
   --font-body: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+  --face-adjust: 0.95;
 }
 
 html[data-roomy] {
@@ -101,8 +131,15 @@ html[data-roomy] {
   --read-word: 0.08em;
 }
 
-html[data-size="large"] { --read-size: 20px; }
-html[data-size="huge"] { --read-size: 23px; }
+html[data-size="large"] {
+  --read-scale: 1.12;
+  --label-scale: 1.06;
+}
+
+html[data-size="huge"] {
+  --read-scale: 1.3;
+  --label-scale: 1.13;
+}
 
 @theme {
   /* 80ms linear, or none. No easing curves, no spring physics. */
@@ -198,7 +235,7 @@ html[data-size="huge"] { --read-size: 23px; }
  */
 @utility label {
   font-family: var(--font-geist-mono), ui-monospace, monospace;
-  font-size: 12px;
+  font-size: calc(12px * var(--label-scale));
   line-height: 1.15;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -226,7 +263,7 @@ html[data-size="huge"] { --read-size: 23px; }
  */
 @utility title {
   font-family: var(--font-body);
-  font-size: 19px;
+  font-size: calc(19px * var(--type));
   font-weight: 640;
   line-height: 1.2;
   letter-spacing: -0.01em;
