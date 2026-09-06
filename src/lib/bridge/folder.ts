@@ -198,7 +198,9 @@ export interface Op {
   parentId?: string;
   noteId?: string;
   status?: string;
+  /** Legacy: one sticker. Still accepted so an older server keeps working. */
   icon?: string | null;
+  icons?: string[];
   priority?: "now" | "next" | "later" | null;
 }
 

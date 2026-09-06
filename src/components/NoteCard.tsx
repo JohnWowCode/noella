@@ -6,7 +6,7 @@ import { imageFilesFrom } from "@/lib/images";
 import { isList, isProject, projectTitle, stepsOf } from "@/lib/projects";
 import { PRIORITIES, PRIORITY } from "@/lib/priority";
 import { swatchName } from "@/lib/store/defaults";
-import { STICKERS, stickerOf } from "@/lib/stickers";
+import { MARK_GROUPS, markLabel, marksOf, toggleMark } from "@/lib/stickers";
 import { countChildren, pathTo, placesFor } from "@/lib/tree";
 import { useNoella } from "@/lib/store/provider";
 import { ON_COLOR_BUTTON, surfaceStyle } from "@/lib/surface";
@@ -37,21 +37,15 @@ export function NoteCard({
   path,
   heading = false,
 }: Props) {
-  const {
-    notes,
-    colors,
-    colorOf,
-    patchNote,
-    removeNote,
-    attachImage,
-  } = useNoella();
+  const { notes, colors, colorOf, patchNote, removeNote, attachImage } =
+    useNoella();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(note.body);
   const [viewing, setViewing] = useState<number | null>(null);
   const [moving, setMoving] = useState(false);
   const [recolouring, setRecolouring] = useState(false);
   const [menu, setMenu] = useState(false);
-  const [stickering, setStickering] = useState(false);
+  const [marking, setMarking] = useState(false);
   const areaRef = useRef<HTMLTextAreaElement>(null);
 
   const color = colorOf(note);
@@ -62,7 +56,7 @@ export function NoteCard({
   const steps = project || list ? stepsOf(notes, note.id) : [];
   // Anything can hold anything now, so the count is not about being a project.
   const inside = countChildren(notes, note.id);
-  const mark = stickerOf(note.icon);
+  const marks = marksOf(note);
   /*
    * Where this could be filed: any live note except itself and its own
    * descendants. It used to be projects only, which is why there was no way to
@@ -127,9 +121,7 @@ export function NoteCard({
               borderLeft: `6px solid ${PRIORITY[note.priority].hex}`,
               // The edge disappears when a red note is ranked Now, so the
               // shadow draws the boundary the border cannot.
-              boxShadow: onColor
-                ? "inset 6px 0 0 -5px var(--on)"
-                : undefined,
+              boxShadow: onColor ? "inset 6px 0 0 -5px var(--on)" : undefined,
             }
           : null),
       }}
@@ -249,6 +241,27 @@ export function NoteCard({
             <Dot />
           </>
         )}
+        {/*
+          The marks, in the meta row.
+
+          They spent one commit beside the body as a column, which on a
+          one-line note put the second mark on a line of its own underneath —
+          it read as a glyph that had fallen off the card. They belong up here
+          anyway: this row is already everything the note *is* rather than
+          anything it says, and four marks cost it no height at all.
+        */}
+        {marks.length > 0 && (
+          <>
+            <span className="flex items-center gap-1.5">
+              {marks.map((m) => (
+                <span key={m} title={markLabel(m)} className="flex">
+                  <Icon name={m} size={heading ? 17 : 15} />
+                </span>
+              ))}
+            </span>
+            <Dot />
+          </>
+        )}
         {color && (
           <>
             <span
@@ -280,7 +293,9 @@ export function NoteCard({
             type="button"
             onClick={() => patchNote(note.id, { pinned: !note.pinned })}
             aria-pressed={note.pinned}
-            aria-label={note.pinned ? "Remove from favourites" : "Add to favourites"}
+            aria-label={
+              note.pinned ? "Remove from favourites" : "Add to favourites"
+            }
             className={`tap grid place-items-center px-1.5 py-1.5 ${
               note.pinned ? "opacity-100" : "opacity-35 hover:opacity-100"
             }`}
@@ -344,7 +359,7 @@ export function NoteCard({
             onClick={() => {
               setRecolouring((v) => !v);
               setMoving(false);
-              setStickering(false);
+              setMarking(false);
             }}
             pressed={recolouring}
           >
@@ -352,13 +367,13 @@ export function NoteCard({
           </Action>
           <Action
             onClick={() => {
-              setStickering((v) => !v);
+              setMarking((v) => !v);
               setRecolouring(false);
               setMoving(false);
             }}
-            pressed={stickering}
+            pressed={marking}
           >
-            Sticker
+            Marks
           </Action>
           {PRIORITIES.map((level) => (
             <Action
@@ -441,33 +456,39 @@ export function NoteCard({
         </div>
       )}
 
-      {stickering && (
+      {marking && (
         <div className="mt-3 border border-current/25 p-2.5">
-          {STICKERS.map((group) => (
-            <div key={group.name} className="mb-2 last:mb-0">
+          {MARK_GROUPS.map((group) => (
+            <div key={group.name} className="mb-2.5 last:mb-0">
               <p className="label mb-1 opacity-55">{group.name}</p>
               <div className="flex flex-wrap gap-1">
-                {group.icons.map((glyph) => (
-                  <button
-                    key={glyph}
-                    type="button"
-                    onClick={() => {
-                      patchNote(note.id, {
-                        icon: glyph === mark ? null : glyph,
-                      });
-                      setStickering(false);
-                    }}
-                    aria-label={`Sticker ${glyph}`}
-                    title={glyph}
-                    className={`grid h-9 w-9 place-items-center border ${
-                      glyph === mark
-                        ? "border-current"
-                        : "border-transparent hover:border-current/40"
-                    }`}
-                  >
-                    <Icon name={glyph} size={19} />
-                  </button>
-                ))}
+                {group.icons.map((mark) => {
+                  const on = marks.includes(mark);
+                  return (
+                    <button
+                      key={mark}
+                      type="button"
+                      // Stays open: marks are picked in twos and threes, and
+                      // the drawer snapping shut after each one made adding a
+                      // second mark feel like a mistake being undone.
+                      onClick={() =>
+                        patchNote(note.id, {
+                          icons: toggleMark(note.icons, mark),
+                        })
+                      }
+                      aria-pressed={on}
+                      aria-label={markLabel(mark)}
+                      className={`flex items-center gap-1.5 border px-1.5 py-1.5 ${
+                        on
+                          ? "border-current bg-current/15"
+                          : "border-transparent hover:border-current/40"
+                      }`}
+                    >
+                      <Icon name={mark} size={16} />
+                      <span className="label">{markLabel(mark)}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           ))}
@@ -548,15 +569,7 @@ export function NoteCard({
         />
       ) : (
         note.body.length > 0 && (
-          <div
-            onDoubleClick={() => setEditing(true)}
-            className="mt-3 flex items-start gap-3"
-          >
-            {mark && (
-              <span className="shrink-0 pt-0.5">
-                <Icon name={mark} size={heading ? 30 : 22} />
-              </span>
-            )}
+          <div onDoubleClick={() => setEditing(true)} className="mt-3">
             <p
               className={`prose-note min-w-0 flex-1 whitespace-pre-wrap ${
                 heading ? "text-[24px] leading-tight sm:text-[28px]" : ""
@@ -647,10 +660,7 @@ export function NoteCard({
                 #{t}
               </button>
             ) : (
-              <span
-                key={t}
-                className={onColor ? "opacity-65" : "text-mute"}
-              >
+              <span key={t} className={onColor ? "opacity-65" : "text-mute"}>
                 #{t}
               </span>
             ),
@@ -669,7 +679,6 @@ export function NoteCard({
     </article>
   );
 }
-
 
 /**
  * Where to put this.
@@ -729,9 +738,7 @@ function Mover({
       </div>
 
       {rows.length === 0 ? (
-        <p className="label mt-2 px-1 py-2 opacity-60">
-          Nowhere by that name.
-        </p>
+        <p className="label mt-2 px-1 py-2 opacity-60">Nowhere by that name.</p>
       ) : (
         <ul className="mt-2 max-h-56 overflow-y-auto">
           {rows.map(({ note: t, path }) => (

@@ -12,7 +12,7 @@ import { Icon, type IconName } from "./Icon";
 import { Popover } from "./Popover";
 import { useNoella } from "@/lib/store/provider";
 import { PRIORITIES, PRIORITY, type Priority } from "@/lib/priority";
-import { STICKERS } from "@/lib/stickers";
+import { MARK_GROUPS, markLabel, toggleMark } from "@/lib/stickers";
 import type { Color, NewNote, NoteImage } from "@/lib/types";
 
 const DRAFT_KEY = "noella.draft";
@@ -108,7 +108,7 @@ export function Compose({
   const [pending, setPending] = useState<NoteImage[]>([]);
   const [busy, setBusy] = useState(0);
   const [tooBig, setTooBig] = useState(false);
-  const [icon, setIcon] = useState<IconName | null>(null);
+  const [icons, setIcons] = useState<IconName[]>([]);
   const [priority, setPriority] = useState<Priority | null>(null);
   /** What you have fired off without leaving the box. */
   const [burst, setBurst] = useState<string[]>([]);
@@ -163,7 +163,7 @@ export function Compose({
       colorId,
       images: pending,
       parentId,
-      icon,
+      icons,
       priority,
     };
     if (task) input.isTask = true;
@@ -172,7 +172,7 @@ export function Compose({
     /*
      * Everything that would slow the next one down is left alone.
      *
-     * The tick, the colour, the sticker and the rank all stay set, because a
+     * The tick, the colour, the marks and the rank all stay set, because a
      * run of ideas is usually a run of the same kind of idea. Only the words
      * clear and the caret never leaves the box, so a stream of thoughts goes
      * down as fast as it can be typed — and what landed stays visible in the
@@ -199,12 +199,7 @@ export function Compose({
      * thought would post half of it. Rapid-firing one-liners is Enter, Enter,
      * Enter; writing a paragraph is untouched.
      */
-    if (
-      e.key === "Enter" &&
-      !e.shiftKey &&
-      !e.altKey &&
-      !body.includes("\n")
-    ) {
+    if (e.key === "Enter" && !e.shiftKey && !e.altKey && !body.includes("\n")) {
       e.preventDefault();
       save();
       return;
@@ -234,7 +229,6 @@ export function Compose({
     selected && !recent.some((c) => c.id === selected.id)
       ? [selected, ...recent].slice(0, RECENT)
       : recent;
-
 
   return (
     <section
@@ -338,7 +332,7 @@ export function Compose({
         One row.
 
         This was forty-seven controls on an empty wall — four kind tabs, a
-        sticker button, three ranks, thirty-six colours, a "no world", an
+        marks button, three ranks, thirty-six colours, a "no world", an
         attach and a save — which is not a box you write in. Each of them is
         one button now, showing what is currently chosen, opening only when
         asked. Nothing was removed; it just stopped standing there.
@@ -385,7 +379,9 @@ export function Compose({
                 }`}
                 style={{ backgroundColor: c.hex }}
               >
-                <span className="sr-only">File in {c.name ?? "recent folder"}</span>
+                <span className="sr-only">
+                  File in {c.name ?? "recent folder"}
+                </span>
               </button>
             ))}
           </span>
@@ -414,18 +410,36 @@ export function Compose({
           )}
         </Popover>
 
+        {/*
+          Marks, plural.
+
+          One sticker per note was decoration. These are the reasons — bug,
+          money, ship — and a note wears every one that applies, because a bug
+          in a game you have to ship is genuinely three things and picking the
+          "main" one is a decision with no right answer and a real cost. They
+          are the filters on the wall too, so this is also how a note gets
+          filed without typing a single #.
+        */}
         <Popover
-          label="Sticker"
-          set={icon !== null}
-          current={<Icon name={icon ?? "spark"} size={17} />}
+          label="Marks"
+          set={icons.length > 0}
+          current={
+            icons.length > 0 ? (
+              <span className="flex items-center gap-1">
+                {icons.slice(0, 3).map((m) => (
+                  <Icon key={m} name={m} size={16} />
+                ))}
+              </span>
+            ) : (
+              <Icon name="tag" size={16} />
+            )
+          }
         >
-          {(close) => (
-            <Stickers
-              icon={icon}
-              onPick={(glyph) => {
-                setIcon(glyph);
-                close();
-              }}
+          {() => (
+            <Marks
+              icons={icons}
+              onToggle={(mark) => setIcons((prev) => toggleMark(prev, mark))}
+              onClear={() => setIcons([])}
             />
           )}
         </Popover>
@@ -583,46 +597,61 @@ function Palette({
   );
 }
 
-/** The twenty-four, grouped. No free-text slot: there is nothing to type. */
-function Stickers({
-  icon,
-  onPick,
+/**
+ * The twenty-four, named and grouped.
+ *
+ * It stays open as you pick, because picking one is rare — you are usually
+ * saying "bug, in a game, urgent" — and a panel that closes after each choice
+ * turns three marks into three trips. Names are on the rows, not in tooltips:
+ * a mark you have to hover to identify is a mark you will never trust.
+ */
+function Marks({
+  icons,
+  onToggle,
+  onClear,
 }: {
-  icon: IconName | null;
-  onPick: (glyph: IconName | null) => void;
+  icons: IconName[];
+  onToggle: (mark: IconName) => void;
+  onClear: () => void;
 }) {
   return (
-    <span className="flex flex-col gap-2">
-      {STICKERS.map((group) => (
-        <span key={group.name} className="flex flex-wrap gap-1">
-          {group.icons.map((glyph) => (
-            <button
-              key={glyph}
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => onPick(glyph === icon ? null : glyph)}
-              aria-pressed={glyph === icon}
-              aria-label={glyph}
-              title={glyph}
-              className={`grid h-9 w-9 place-items-center border ${
-                glyph === icon
-                  ? "border-ink bg-ink/10"
-                  : "border-transparent hover:border-rule"
-              }`}
-            >
-              <Icon name={glyph} size={19} />
-            </button>
-          ))}
+    <span className="flex w-80 flex-col gap-2.5">
+      {MARK_GROUPS.map((group) => (
+        <span key={group.name} className="flex flex-col gap-1">
+          <span className="label text-mute">{group.name}</span>
+          <span className="grid grid-cols-3 gap-1">
+            {group.icons.map((mark) => {
+              const on = icons.includes(mark);
+              return (
+                <button
+                  key={mark}
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => onToggle(mark)}
+                  aria-pressed={on}
+                  aria-label={markLabel(mark)}
+                  className={`flex items-center gap-1.5 border px-1.5 py-1.5 ${
+                    on
+                      ? "border-ink bg-ink text-paper"
+                      : "border-transparent hover:border-rule"
+                  }`}
+                >
+                  <Icon name={mark} size={16} />
+                  <span className="label">{markLabel(mark)}</span>
+                </button>
+              );
+            })}
+          </span>
         </span>
       ))}
-      {icon && (
+      {icons.length > 0 && (
         <button
           type="button"
           onMouseDown={(e) => e.preventDefault()}
-          onClick={() => onPick(null)}
+          onClick={onClear}
           className="label border border-rule px-2 py-1.5 text-mute hover:text-ink"
         >
-          No sticker
+          No marks
         </button>
       )}
     </span>

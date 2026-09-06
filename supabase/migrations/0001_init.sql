@@ -65,9 +65,12 @@ create table public.notes (
   snoozed_until text,
   -- Hand-set priority among siblings. Lower is sooner; rank one is today.
   "order"     integer not null default 0,
-  -- One glyph, shown large. A wall of forty titles has to be read; a wall of
-  -- forty stickers can be scanned.
-  icon        text check (icon is null or char_length(icon) between 1 and 12),
+  -- Why this exists: bug, money, art, admin. As many as apply, capped at four.
+  -- A wall of forty titles has to be read; a wall of forty marks is
+  -- recognised — and because a mark means something, it is also the tag the
+  -- wall filters and groups by, without anyone having to type a #.
+  icons       text[] not null default '{}'
+              check (array_length(icons, 1) is null or array_length(icons, 1) <= 4),
   -- Three buckets, never a number: a 1-10 field is an afternoon of deciding.
   priority    text check (priority in ('now', 'next', 'later')),
   pinned      boolean not null default false,
@@ -118,6 +121,7 @@ create table public.settings (
 );
 create index notes_search_idx        on public.notes using gin (search_vector);
 create index notes_tags_idx          on public.notes using gin (tags);
+create index notes_icons_idx         on public.notes using gin (icons);
 create index notes_color_idx         on public.notes (color_id);
 
 -- ----------------------------------------------------------------- images ---

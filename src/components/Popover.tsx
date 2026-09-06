@@ -10,6 +10,34 @@ import { useEffect, useRef, useState } from "react";
  * you operate. Everything still reachable, none of it standing there. The
  * trigger keeps showing the current value, so nothing is hidden, only folded.
  */
+/**
+ * Drag a panel back inside the window if it opened past the edge.
+ *
+ * These triggers sit in a row, so the third one along on a 390px phone opens a
+ * panel that starts 122px in and is 276px wide — eight pixels over, which does
+ * not clip, it makes the whole page scroll sideways. There is no CSS for "stay
+ * in the viewport" that also knows where its trigger is, so it is measured.
+ *
+ * Done on the node itself rather than through state: the panel is measured the
+ * moment React hands it over, before a frame is painted, so it never appears
+ * in the wrong place first and then jumps.
+ */
+function keepInView(el: HTMLElement | null) {
+  if (!el) return;
+  el.style.transform = "";
+  const margin = 8;
+  const rect = el.getBoundingClientRect();
+  /*
+   * clientWidth, not innerWidth. On a phone the two are different numbers —
+   * an emulated 390px screen reports an innerWidth of 462 — and measuring
+   * against the larger one is how a panel gets declared "on screen" while
+   * sixty pixels of it sit past the right edge with nothing to scroll to.
+   */
+  const over = rect.right - (document.documentElement.clientWidth - margin);
+  if (over <= 0) return;
+  el.style.transform = `translateX(${-Math.min(over, Math.max(0, rect.left - margin))}px)`;
+}
+
 export function Popover({
   label,
   current,
@@ -65,12 +93,13 @@ export function Popover({
       </button>
       {open && (
         <span
+          ref={keepInView}
           /*
            * Downward. These triggers sit in a row near the top of the page, so
            * a panel opening upward — a thirty-six swatch grid especially —
            * would run off the top of the viewport with no way to scroll to it.
            */
-          className={`absolute top-full z-30 mt-1 w-max max-w-[min(20rem,80vw)] border-2 border-ink bg-paper p-2 text-ink shadow-lg ${
+          className={`absolute top-full z-30 mt-1 w-max max-w-[min(22rem,calc(100vw-1rem))] border-2 border-ink bg-paper p-2 text-ink shadow-lg ${
             align === "right" ? "right-0" : "left-0"
           }`}
         >

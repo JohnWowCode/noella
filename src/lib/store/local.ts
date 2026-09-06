@@ -1,6 +1,13 @@
 import { deleteBlob, getBlob, putBlob } from "../images";
 import { detectTask, parseTags } from "../notes";
-import { DEFAULT_SETTINGS, type Color, type NewNote, type Note, type Settings } from "../types";
+import { marksOf } from "../stickers";
+import {
+  DEFAULT_SETTINGS,
+  type Color,
+  type NewNote,
+  type Note,
+  type Settings,
+} from "../types";
 import { descendantsOf } from "../tree";
 import { DEFAULT_SWATCHES } from "./defaults";
 import type { Backup, Snapshot, Store } from "./types";
@@ -29,21 +36,28 @@ function seedColors(): Color[] {
  * names and positions, and existing notes simply are not projects yet.
  */
 function migrate(snapshot: Snapshot): Snapshot {
-  const notes = snapshot.notes.map((n) => ({
-    ...n,
-    images: Array.isArray(n.images) ? n.images : [],
-    projectStatus: n.projectStatus ?? null,
-    parentId: n.parentId ?? null,
-    listCadence: n.listCadence ?? null,
-    amount: typeof n.amount === "number" ? n.amount : null,
-    order: typeof n.order === "number" ? n.order : 0,
-    estimateMinutes: n.estimateMinutes ?? null,
-    actualMinutes: n.actualMinutes ?? null,
-    snoozedUntil: n.snoozedUntil ?? null,
-    isList: n.isList ?? false,
-    icon: n.icon ?? null,
-    priority: n.priority ?? null,
-  }));
+  const notes = snapshot.notes.map((stored) => {
+    // Read as the loose shape it is on disk: a wall written by an older build
+    // has fields this one dropped, and none of them are on `Note` any more.
+    const n = stored as Note & { icon?: string | null };
+    return {
+      ...n,
+      images: Array.isArray(n.images) ? n.images : [],
+      projectStatus: n.projectStatus ?? null,
+      parentId: n.parentId ?? null,
+      listCadence: n.listCadence ?? null,
+      amount: typeof n.amount === "number" ? n.amount : null,
+      order: typeof n.order === "number" ? n.order : 0,
+      estimateMinutes: n.estimateMinutes ?? null,
+      actualMinutes: n.actualMinutes ?? null,
+      snoozedUntil: n.snoozedUntil ?? null,
+      isList: n.isList ?? false,
+      // A sticker was one glyph; a mark set is a list of reasons. An old note
+      // arrives with its single icon read across (see marksOf) rather than lost.
+      icons: marksOf(n),
+      priority: n.priority ?? null,
+    };
+  });
 
   const colors = [...snapshot.colors];
   const present = new Set(colors.map((c) => c.hex.toUpperCase()));
@@ -168,7 +182,7 @@ export class LocalStore implements Store {
       images: input.images ?? [],
       projectStatus: input.projectStatus ?? null,
       parentId: input.parentId ?? null,
-      icon: input.icon ?? null,
+      icons: marksOf({ icons: input.icons ?? [] }),
       priority: input.priority ?? null,
       listCadence: null,
       amount: null,

@@ -77,8 +77,90 @@ export function folderName(wall, colorId) {
  * Mirrors swatchName() in the app: twelve hues, then the same twelve light,
  * then the same twelve deep.
  */
+/**
+ * Every mark a note may wear, in the order the app shows them. Kept in step
+ * with src/lib/stickers.ts by hand — two runtimes, one vocabulary.
+ */
+export const MARKS = [
+  "idea", "write", "art", "sound", "build", "game",
+  "bug", "fix", "test", "ship", "blocked", "danger",
+  "money", "buy", "admin", "home", "health", "travel",
+  "read", "watch", "people", "place", "love", "ask",
+];
+
+/**
+ * Everything that is not already a mark, mapped to the one it means.
+ *
+ * Two jobs in one table. The emoji and the abstract shapes are the two older
+ * sticker vocabularies, so a wall written months ago still answers "everything
+ * about bugs" correctly; the words are what a model actually says when asked
+ * to mark something, because "bills" and "issue" are the natural phrasings and
+ * failing them would be a tool that only works if you already know its enum.
+ */
+const MARK_ALIAS = {
+  // The emoji era. Kept in step with LEGACY in src/lib/stickers.ts.
+  "🎮": "game", "🕹️": "game", "🕹": "game", "🧩": "game",
+  "🎬": "watch", "📷": "art", "🎨": "art", "🎵": "sound",
+  "✏️": "write", "✏": "write", "🛠️": "fix", "🛠": "fix", "⚙️": "fix", "⚙": "fix",
+  "🐛": "bug", "🔥": "danger", "💥": "danger", "🧨": "danger",
+  "⚠️": "danger", "⚠": "danger", "🚧": "blocked", "🩹": "fix", "❓": "ask",
+  "💸": "money", "🏠": "home", "📦": "buy", "🎁": "buy",
+  "🍜": "health", "🩺": "health", "🚗": "travel", "✈️": "travel", "✈": "travel",
+  "⭐": "love", "💡": "idea", "🚀": "ship", "🌱": "idea",
+  "🧠": "idea", "❤️": "love", "❤": "love", "☕": "health",
+  "🌙": "home", "🎯": "test", "🏁": "ship", "📖": "read", "📚": "read",
+
+  // The one-abstract-shape era, which lasted two commits.
+  cube: "build", frame: "art", film: "watch", wave: "sound",
+  pen: "write", sliders: "fix", bolt: "bug", burst: "danger",
+  warn: "danger", cross: "blocked", eye: "watch", shield: "health",
+  coin: "money", house: "home", box: "buy", heart: "love",
+  clock: "travel", key: "admin", target: "test", spark: "idea",
+  seed: "idea", moon: "home", ring: "idea", star: "love", flag: "ship",
+
+  // What a model says when it means one of these.
+  bugs: "bug", issue: "bug", defect: "bug",
+  idea: "idea", ideas: "idea", thought: "idea",
+  writing: "write", note: "write", draft: "write",
+  audio: "sound", music: "sound", design: "art", image: "art",
+  games: "game", gamedev: "game",
+  fixing: "fix", repair: "fix", testing: "test", qa: "test",
+  release: "ship", shipping: "ship", launch: "ship",
+  stuck: "blocked", waiting: "blocked", risk: "danger", urgent: "danger",
+  bill: "money", bills: "money", finance: "money", cost: "money",
+  shopping: "buy", purchase: "buy", errand: "admin", paperwork: "admin",
+  house: "home", health: "health", trip: "travel", holiday: "travel",
+  reading: "read", book: "read", watching: "watch", film: "watch", video: "watch",
+  person: "people", someone: "people", friends: "people",
+  location: "place", where: "place",
+  favourite: "love", favorite: "love", question: "ask",
+};
+
 const HUES = ["yellow", "lime", "teal", "blue", "violet", "pink",
   "red", "orange", "amber", "orchid", "cyan", "green"];
+
+/**
+ * The marks a note wears.
+ *
+ * A mark means something now — bug, money, admin — so it is a tag with no
+ * spelling to get wrong, and the tools filter on it like they filter on a
+ * folder. Old walls stored one decorative sticker in `icon`; that is read
+ * across here so a wall written by an older tab still answers correctly.
+ */
+export function marksOf(note) {
+  const raw =
+    Array.isArray(note.icons) && note.icons.length > 0
+      ? note.icons
+      : note.icon
+        ? [note.icon]
+        : [];
+  const out = [];
+  for (const value of raw) {
+    const mark = MARK_ALIAS[value] ?? (MARKS.includes(value) ? value : null);
+    if (mark && !out.includes(mark)) out.push(mark);
+  }
+  return out;
+}
 
 export function defaultFolderName(index) {
   const hue = HUES[index % HUES.length];
@@ -96,7 +178,8 @@ export function view(wall, note) {
     tags: note.tags ?? [],
     created: note.createdAt,
   };
-  if (note.icon) out.sticker = note.icon;
+  const marks = marksOf(note);
+  if (marks.length > 0) out.marks = marks;
   if (note.priority) out.priority = note.priority;
   if (note.pinned) out.favourite = true;
   if (note.isTask) out.done = note.doneAt !== null;

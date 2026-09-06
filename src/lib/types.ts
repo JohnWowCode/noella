@@ -31,11 +31,14 @@ export interface Note {
   /** Parsed out of the body on write. Cross-cuts worlds. */
   tags: string[];
   /**
-   * One glyph, shown big. A wall of forty titles has to be read; a wall of
-   * forty stickers can be scanned, which is the difference between finding the
-   * audio note and giving up.
+   * Why this exists: bug, money, art, admin. As many as apply.
+   *
+   * A wall of forty titles has to be read; a wall of forty marks is
+   * recognised. These used to be one decorative sticker each, sorting nothing,
+   * which wasted the fastest surface on the card — they are the tags now, and
+   * the wall filters and groups by them.
    */
-  icon: string | null;
+  icons: string[];
   /** Now, next, later, or — most of the time — nothing at all. */
   priority: Priority | null;
   /** Metadata only — the bytes live in IndexedDB, keyed by image id. */
@@ -104,7 +107,7 @@ export interface NewNote {
   projectStatus?: ProjectStatus | null;
   isList?: boolean;
   isTask?: boolean;
-  icon?: string | null;
+  icons?: string[];
   priority?: Priority | null;
 }
 

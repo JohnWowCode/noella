@@ -79,7 +79,7 @@ export function FolderLink() {
             parentId: op.parentId
               ? (notes.find((n) => n.id === op.parentId)?.id ?? null)
               : null,
-            icon: op.icon ?? null,
+            icons: op.icons ?? (op.icon ? [op.icon] : []),
             priority: op.priority ?? null,
           };
           if (op.kind === "project") input.projectStatus = "idea";
@@ -106,6 +106,9 @@ export function FolderLink() {
           return true;
         case "reopen":
           patchNote(op.noteId ?? "", { doneAt: null });
+          return true;
+        case "set_marks":
+          patchNote(op.noteId ?? "", { icons: op.icons ?? [] });
           return true;
         case "set_priority":
           patchNote(op.noteId ?? "", {

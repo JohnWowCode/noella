@@ -16,12 +16,14 @@ import { join, resolve } from "node:path";
 import { z } from "zod";
 import {
   INBOX_DIR,
+  MARKS,
   WALL_FILE,
   childrenOf,
   defaultFolderName,
   folderName,
   isList,
   isProject,
+  marksOf,
   title,
   view,
   whereIs,
@@ -209,7 +211,10 @@ function findNote(data, needle) {
 }
 
 /** The one filter every search shares, so `search` and `search_notes` agree. */
-function matching(data, { query, colorId, kind, openOnly, archived, priority }) {
+function matching(
+  data,
+  { query, colorId, kind, openOnly, archived, priority, mark },
+) {
   const low = (query ?? "").toLowerCase();
   return data.notes
     .filter((n) => (archived ? true : n.archivedAt === null))
@@ -227,6 +232,7 @@ function matching(data, { query, colorId, kind, openOnly, archived, priority }) 
     )
     .filter((n) => (openOnly ? n.isTask && n.doneAt === null : true))
     .filter((n) => (priority ? n.priority === priority : true))
+    .filter((n) => (mark ? marksOf(n).includes(mark) : true))
     .filter(
       (n) =>
         !low ||
@@ -266,6 +272,14 @@ export function registerTools(server, folder) {
           .enum(["now", "next", "later"])
           .optional()
           .describe("Only things ranked at this level"),
+        mark: z
+          .enum(MARKS)
+          .optional()
+          .describe(
+            "Only things wearing this mark. Marks are what a note is about — " +
+              "bug, money, admin — and a note can wear several, so this is " +
+              "the reliable way to answer 'everything about X'.",
+          ),
         limit: z.number().int().min(1).max(100).optional(),
       },
       annotations: { readOnlyHint: true },
@@ -277,6 +291,7 @@ export function registerTools(server, folder) {
       open_only,
       include_archived,
       priority,
+      mark,
       limit,
     }) => {
       const data = await wall(folder);
@@ -287,6 +302,7 @@ export function registerTools(server, folder) {
         openOnly: open_only,
         archived: include_archived,
         priority,
+        mark,
       }).slice(0, limit ?? 25);
       if (hits.length === 0) return text("Nothing on the wall matches that.");
       return text(hits.map((n) => view(data, n)));
@@ -473,13 +489,18 @@ export function registerTools(server, folder) {
           .enum(["now", "next", "later"])
           .optional()
           .describe("Rank it. Most things are better left unranked."),
-        sticker: z
-          .string()
+        marks: z
+          .array(z.enum(MARKS))
+          .max(4)
           .optional()
-          .describe("A single emoji, shown large on the card"),
+          .describe(
+            "What it is about, up to four: bug, money, ship, admin. These " +
+              "are the app's tags — they show on the card and filter the " +
+              "wall — so mark anything you can rather than leaving it bare.",
+          ),
       },
     },
-    async ({ body, kind, folder: name, inside, priority, sticker }) => {
+    async ({ body, kind, folder: name, inside, priority, marks }) => {
       const data = await wall(folder);
       const colorId = name ? findFolder(data, name) : null;
       const parent = inside ? findContainer(data, inside) : null;
@@ -490,7 +511,7 @@ export function registerTools(server, folder) {
         colorId,
         parentId: parent?.id ?? null,
         priority: priority ?? null,
-        icon: sticker && [...sticker].length <= 3 ? sticker : null,
+        icons: marksOf({ icons: marks ?? [] }),
       });
       return text(
         await landing(
@@ -566,6 +587,34 @@ export function registerTools(server, folder) {
       const target = findContainer(data, project);
       await queue(folder, { op: "set_status", noteId: target.id, status });
       return text(await landing(folder, `Queued ${title(target)} → ${status}.`));
+    },
+  );
+
+  server.registerTool(
+    "set_marks",
+    {
+      title: "Say what something is about",
+      description:
+        "Set the marks on a note — bug, money, ship, admin, up to four. " +
+        "Marks are what the wall filters and groups by, so this is how a pile " +
+        "of unsorted notes becomes sortable. Replaces whatever it wore; pass " +
+        "an empty list to strip it back to nothing.",
+      inputSchema: {
+        note: z.string(),
+        marks: z.array(z.enum(MARKS)).max(4),
+      },
+    },
+    async ({ note, marks }) => {
+      const data = await wall(folder);
+      const target = findNote(data, note);
+      const icons = marksOf({ icons: marks });
+      await queue(folder, { op: "set_marks", noteId: target.id, icons });
+      return text(
+        await landing(
+          folder,
+          `Queued "${title(target)}" → ${icons.length > 0 ? icons.join(", ") : "no marks"}.`,
+        ),
+      );
     },
   );
 

@@ -143,7 +143,7 @@ Reading — always available, current as of the last time a tab was open:
 | Tool | For |
 | --- | --- |
 | `whats_open` | Everything unticked, in the order Noella would work through it |
-| `search_notes` | By text, `#tag`, folder, kind or `priority`; `open_only` for the live ones |
+| `search_notes` | By text, `#tag`, folder, kind, `mark` or `priority`; `open_only` for the live ones |
 | `get_note` | One thing in full: what it holds, and the path to where it lives |
 | `list_projects` | Every project with status, progress and next step; every list |
 | `list_folders` | The colour folders, their names, and how much is in each |
@@ -152,12 +152,27 @@ Writing — queued, lands when a tab is next open:
 
 | Tool | For |
 | --- | --- |
-| `add_note` | A note, to-do, project or list; `inside` nests it, plus `priority` and `sticker` |
+| `add_note` | A note, to-do, project or list; `inside` nests it, plus `priority` and `marks` |
 | `add_step` | The same thing, worded for checklists |
 | `complete` | Tick something off, or `undo: true` to un-tick it |
 | `set_project_status` | idea / active / paused / done |
 | `set_priority` | now / next / later, or none to unrank |
+| `set_marks` | What something is about; replaces the set, empty strips it |
 | `pending_changes` | What is queued and not yet applied |
+
+### Marks
+
+A note wears up to four of these, and they are what the wall filters and
+groups by — so marking something is filing it, and `search_notes` with a
+`mark` is the reliable way to answer "everything about X" no matter how it
+was worded:
+
+```
+idea   write  art     sound   build   game
+bug    fix    test    ship    blocked danger
+money  buy    admin   home    health  travel
+read   watch  people  place   love    ask
+```
 
 Things are found by id, by their `NOTE 0041` reference, or by enough of their
 text to be unambiguous. When the text matches several, the server says which
