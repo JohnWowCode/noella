@@ -28,6 +28,7 @@ import { DataMenu } from "./DataMenu";
 import { FolderLink } from "./FolderLink";
 import { Work } from "./Work";
 import { NoteCard } from "./NoteCard";
+import { SelectionBar } from "./Selection";
 import { TagIndex } from "./TagIndex";
 import { Reading } from "./Reading";
 import { ThemeToggle } from "./ThemeToggle";
@@ -47,6 +48,7 @@ const MARK_ROW = 6;
  * for the drawer things go into.
  */
 const CHIP = {
+  room: "#A98BE0",
   todo: "#6FA8F0",
   done: "#7ED97E",
   starred: "#F0B92E",
@@ -122,10 +124,25 @@ export function Home() {
   const [level, setLevel] = useState<Priority | null>(null);
   /** One mark, used as a filter. Marks are the tags now. */
   const [mark, setMark] = useState<IconName | null>(null);
+  /**
+   * What is picked, and therefore whether the wall is in picking mode at all.
+   * Empty set means not picking; the bar and the boxes both appear with the
+   * first pick and both leave with the last.
+   */
+  const [picked, setPicked] = useState<Set<string>>(() => new Set());
 
   const composeRef = useRef<HTMLTextAreaElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const moreRef = useRef<HTMLDivElement>(null);
+
+  const pick = useCallback((id: string, on: boolean) => {
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
 
   const go = useCallback((next: Area) => {
     setArea(next);
@@ -158,6 +175,7 @@ export function Home() {
         setView("all");
         setLevel(null);
         setMark(null);
+        setPicked(new Set());
         return;
       }
       if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -522,7 +540,16 @@ export function Home() {
         }
       />
 
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 pt-6 pb-28 sm:px-6 sm:pt-8">
+      <main
+        /*
+         * Room to scroll past the picking bar, which is fixed over the bottom
+         * of the screen. Without it the last card is permanently underneath
+         * the thing you are using to act on it.
+         */
+        className={`mx-auto w-full max-w-3xl flex-1 px-4 pt-6 sm:px-6 sm:pt-8 ${
+          picked.size > 0 ? "pb-72" : "pb-28"
+        }`}
+      >
         {here && (
           <Trail
             trail={trail}
@@ -646,12 +673,12 @@ export function Home() {
               buttons — fourteen controls standing over an empty wall, most of
               them filtering to nothing. Each one now waits for its own count,
               so a new wall shows none of them and a busy one shows the ones
-              you have earned. Projects and Lists went entirely: grouping by
-              Kind already says that, and said it better.
+              you have earned.
             */}
             {(counts.todo > 0 ||
               counts.done > 0 ||
               counts.starred > 0 ||
+              counts.rooms > 0 ||
               counts.archive > 0 ||
               counts.byLevel.size > 0 ||
               counts.byMark.size > 0 ||
@@ -700,6 +727,16 @@ export function Home() {
                     hex={CHIP.starred}
                   >
                     <Icon name="starFilled" size={12} />
+                  </Chip>
+                )}
+                {counts.rooms > 0 && (
+                  <Chip
+                    on={view === "rooms"}
+                    onClick={() => setView(view === "rooms" ? "all" : "rooms")}
+                    count={counts.rooms}
+                    hex={CHIP.room}
+                  >
+                    Rooms
                   </Chip>
                 )}
                 {counts.archive > 0 && (
@@ -877,6 +914,8 @@ export function Home() {
                       query={query}
                       onTag={setTag}
                       onOpen={open}
+                      picked={picked.size > 0 ? picked.has(n.id) : null}
+                      onPick={pick}
                       // While searching you are looking at the whole tree, so a
                       // result has to say where it came from or it is just a
                       // sentence with no address.
@@ -910,6 +949,14 @@ export function Home() {
           </div>
         )}
       </main>
+
+      {/* Sits over everything, at the bottom, where a thumb already is. */}
+      <SelectionBar
+        selected={picked}
+        notes={notes}
+        onClear={() => setPicked(new Set())}
+        onOpen={open}
+      />
 
       <Footer />
     </div>

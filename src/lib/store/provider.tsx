@@ -29,7 +29,7 @@ interface Noella {
   colors: Color[];
   settings: Settings;
   colorOf: (note: Note) => Color | null;
-  addNote: (input: NewNote) => void;
+  addNote: (input: NewNote) => Promise<Note>;
   patchNote: (id: string, patch: Partial<Note>) => void;
   removeNote: (id: string) => void;
   patchColor: (id: string, patch: Partial<Color>) => void;
@@ -72,11 +72,17 @@ export function NoellaProvider({ children }: { children: React.ReactNode }) {
 
   // Every mutation writes to state first and reconciles after. The card shows
   // up the instant you hit save, before the store has answered.
+  /*
+   * Returns the note it made. Nearly every caller ignores it, but making a
+   * room out of a handful of selected notes has to know where to put them,
+   * and inventing a second code path for that would be worse than a promise
+   * nobody awaits.
+   */
   const addNote = useCallback(
-    (input: NewNote) => {
-      store.createNote(input).then((note) => {
-        setNotes((prev) => [note, ...prev.filter((n) => n.id !== note.id)]);
-      });
+    async (input: NewNote) => {
+      const note = await store.createNote(input);
+      setNotes((prev) => [note, ...prev.filter((n) => n.id !== note.id)]);
+      return note;
     },
     [store],
   );

@@ -41,6 +41,9 @@ interface Props {
   path?: Note[];
   /** This is the folder you are standing in, drawn at the top of its own view. */
   heading?: boolean;
+  /** Non-null once the wall is in picking mode. */
+  picked?: boolean | null;
+  onPick?: (id: string, on: boolean) => void;
 }
 
 export function NoteCard({
@@ -50,6 +53,8 @@ export function NoteCard({
   onOpen,
   path,
   heading = false,
+  picked = null,
+  onPick,
 }: Props) {
   const { notes, colors, colorOf, patchNote, removeNote, attachImage } =
     useNoella();
@@ -260,6 +265,30 @@ export function NoteCard({
             onColor ? "opacity-70" : "text-mute"
           }`}
         >
+          {/*
+            The picking box, only while picking. It takes the front of the
+            gutter so a column of them lines up down the wall and you can run
+            your thumb straight down it.
+          */}
+          {picked !== null && (
+            <button
+              type="button"
+              onClick={() => onPick?.(note.id, !picked)}
+              aria-pressed={picked}
+              aria-label={picked ? "Unpick" : "Pick"}
+              className={`tap grid h-4 w-4 shrink-0 place-items-center border-2 border-current ${
+                picked ? "bg-current" : ""
+              }`}
+            >
+              {picked && (
+                <span
+                  className={onColor ? "text-[var(--on-inv)]" : "text-paper"}
+                >
+                  <Icon name="check" size={10} />
+                </span>
+              )}
+            </button>
+          )}
           {note.isTask && (
             <button
               type="button"
@@ -483,6 +512,9 @@ export function NoteCard({
       */}
       {menu && (
         <div className="mt-3 flex flex-wrap items-center gap-1.5 border border-current/25 px-2 py-2">
+          {onPick && picked === null && (
+            <Action onClick={() => onPick(note.id, true)}>Pick</Action>
+          )}
           {!heading && onOpen && (
             <Action onClick={() => onOpen(note.id)}>
               {inside > 0 ? `Open · ${inside}` : "Open"}
