@@ -181,6 +181,14 @@ export function view(wall, note) {
   const marks = marksOf(note);
   if (marks.length > 0) out.marks = marks;
   if (note.priority) out.priority = note.priority;
+  /*
+   * When it was put on today. "now" means today — it has always said so on
+   * the picker — so a now with an old date is something that has been carried
+   * rather than something chosen this morning, and saying which is the
+   * difference between a useful answer and a list that quietly stopped being
+   * true months ago.
+   */
+  if (note.priority === "now" && note.rankedOn) out.promised = note.rankedOn;
   if (note.pinned) out.favourite = true;
   if (note.isTask) out.done = note.doneAt !== null;
   if (note.archivedAt) out.archived = true;

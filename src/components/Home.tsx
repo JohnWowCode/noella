@@ -28,6 +28,7 @@ import { FolderLink } from "./FolderLink";
 import { Jester } from "./Jester";
 import { NoteCard } from "./NoteCard";
 import { TagIndex } from "./TagIndex";
+import { Today } from "./Today";
 import { ThemeToggle } from "./ThemeToggle";
 
 /** Cards rendered per page. Enough to fill any screen, cheap enough to be instant. */
@@ -492,6 +493,17 @@ export function Home() {
           parentId={inside}
           parentName={here ? projectTitle(here) : null}
         />
+
+        {/*
+          What you promised, above what you have.
+
+          The jester answers "I cannot choose" and the wall answers "what have
+          I got"; neither answers "what did I say I would do today", which is
+          the only question with an end to it. It sits directly under the box
+          you write in and above everything else, and it is not there at all
+          until you have put something on it.
+        */}
+        {!inside && todayKey && <Today todayKey={todayKey} onOpen={open} />}
 
         {!inside && (
           <div className="mt-4">

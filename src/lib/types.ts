@@ -41,6 +41,17 @@ export interface Note {
   icons: string[];
   /** Now, next, later, or — most of the time — nothing at all. */
   priority: Priority | null;
+  /**
+   * The day you said "now", as a local date key.
+   *
+   * Now means today — that is what it has always said on the picker — but a
+   * label with no date does not mean today for long. Something marked now in
+   * March is still marked now in June, and a list that has quietly stopped
+   * being true is how every system like this dies. The date is what lets the
+   * app tell "today's" from "carried over", and so what lets today be a thing
+   * you can finish rather than a filter over everything you ever meant to do.
+   */
+  rankedOn: string | null;
   /** Metadata only — the bytes live in IndexedDB, keyed by image id. */
   images: NoteImage[];
   /**

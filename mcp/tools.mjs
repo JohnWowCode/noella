@@ -44,6 +44,10 @@ const APP_URL = (
 
 const link = (id) => `${APP_URL}#note-${id}`;
 
+/** Local calendar day, matching the browser's. A day is where you are. */
+const dayKey = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
 // --------------------------------------------------------------- the folder
 
 /** Everything the tools answer from. Re-read per call: the tab rewrites it. */
@@ -322,6 +326,46 @@ export function registerTools(server, folder) {
     async ({ note }) => {
       const data = await wall(folder);
       return text(view(data, findNote(data, note)));
+    },
+  );
+
+  server.registerTool(
+    "whats_on_today",
+    {
+      title: "What was promised today",
+      description:
+        "The short list: everything ranked now, split into what was chosen " +
+        "today, what has been carried over from an earlier day, and what has " +
+        "already been ticked off. This is the one list in Noella with an end " +
+        "to it — prefer it over whats_open when the question is what to do " +
+        "next rather than what exists.",
+      annotations: { readOnlyHint: true },
+      inputSchema: {},
+    },
+    async () => {
+      const data = await wall(folder);
+      const key = dayKey(new Date());
+      const live = data.notes.filter((n) => !n.archivedAt);
+      const now = live.filter((n) => n.priority === "now");
+      const open = now.filter((n) => !n.doneAt && (n.rankedOn ?? key) === key);
+      const carried = now
+        .filter((n) => !n.doneAt && (n.rankedOn ?? key) !== key)
+        .sort((a, b) => (a.rankedOn ?? "").localeCompare(b.rankedOn ?? ""));
+      const finished = live.filter(
+        (n) => n.doneAt && n.doneAt.slice(0, 10) === key,
+      );
+      if (open.length + carried.length + finished.length === 0) {
+        return text(
+          "Nothing is on today yet. set_priority something to now to put it there.",
+        );
+      }
+      return text({
+        today: key,
+        left: open.length + carried.length,
+        chosen_today: open.map((n) => view(data, n)),
+        carried_over: carried.map((n) => view(data, n)),
+        finished_today: finished.map((n) => view(data, n)),
+      });
     },
   );
 
@@ -624,7 +668,10 @@ export function registerTools(server, folder) {
       title: "Rank something",
       description:
         "Put a note at now, next or later — or pass none to unrank it. " +
-        "Three buckets on purpose: a 1-10 field is an afternoon of deciding.",
+        "Three buckets on purpose: a 1-10 field is an afternoon of deciding. " +
+        "Now means today: it puts the note on the short list the app opens " +
+        "with, so use it for what is actually being done today rather than " +
+        "for what matters most in general.",
       inputSchema: {
         note: z.string(),
         priority: z.enum(["now", "next", "later", "none"]),

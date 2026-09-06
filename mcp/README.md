@@ -142,6 +142,7 @@ Reading — always available, current as of the last time a tab was open:
 
 | Tool | For |
 | --- | --- |
+| `whats_on_today` | The short list: chosen today, carried over, already done. Ask this first |
 | `whats_open` | Everything unticked, in the order Noella would work through it |
 | `search_notes` | By text, `#tag`, folder, kind, `mark` or `priority`; `open_only` for the live ones |
 | `get_note` | One thing in full: what it holds, and the path to where it lives |

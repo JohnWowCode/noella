@@ -73,6 +73,11 @@ create table public.notes (
               check (array_length(icons, 1) is null or array_length(icons, 1) <= 4),
   -- Three buckets, never a number: a 1-10 field is an afternoon of deciding.
   priority    text check (priority in ('now', 'next', 'later')),
+  -- The day "now" was said, 'YYYY-MM-DD' local. Now means today, and a label
+  -- with no date stops meaning today about a week after you write it — this
+  -- is what separates what you chose this morning from what you have been
+  -- carrying since March.
+  ranked_on   text check (ranked_on is null or ranked_on ~ '^\d{4}-\d{2}-\d{2}$'),
   pinned      boolean not null default false,
   visibility  text not null default 'private'
               check (visibility in ('private', 'unlisted', 'public')),
@@ -122,6 +127,8 @@ create table public.settings (
 create index notes_search_idx        on public.notes using gin (search_vector);
 create index notes_tags_idx          on public.notes using gin (tags);
 create index notes_icons_idx         on public.notes using gin (icons);
+create index notes_today_idx         on public.notes (owner_id, ranked_on)
+  where priority = 'now' and archived_at is null;
 create index notes_color_idx         on public.notes (color_id);
 
 -- ----------------------------------------------------------------- images ---

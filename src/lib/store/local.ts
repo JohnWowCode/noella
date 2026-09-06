@@ -8,6 +8,7 @@ import {
   type Note,
   type Settings,
 } from "../types";
+import { todayKey } from "../clock";
 import { descendantsOf } from "../tree";
 import { DEFAULT_SWATCHES } from "./defaults";
 import type { Backup, Snapshot, Store } from "./types";
@@ -56,6 +57,7 @@ function migrate(snapshot: Snapshot): Snapshot {
       // arrives with its single icon read across (see marksOf) rather than lost.
       icons: marksOf(n),
       priority: n.priority ?? null,
+      rankedOn: n.rankedOn ?? null,
     };
   });
 
@@ -184,6 +186,7 @@ export class LocalStore implements Store {
       parentId: input.parentId ?? null,
       icons: marksOf({ icons: input.icons ?? [] }),
       priority: input.priority ?? null,
+      rankedOn: input.priority === "now" ? todayKey() : null,
       listCadence: null,
       amount: null,
       estimateMinutes: null,
@@ -232,6 +235,21 @@ export class LocalStore implements Store {
     };
     // Tags are derived, never passed in.
     if (patch.body !== undefined) next.tags = parseTags(next.body);
+
+    /*
+     * Stamped here rather than at each call site, so every route in gets it:
+     * the card menu, the compose box, an MCP change queued by Claude, and an
+     * imported wall. Re-saying "now" on something already on today is not a
+     * new commitment, so the original day survives — otherwise a note could
+     * never carry over, because touching it would reset its age.
+     */
+    if (patch.priority !== undefined) {
+      next.rankedOn =
+        patch.priority === "now"
+          ? ((previous.priority === "now" ? previous.rankedOn : null) ??
+            todayKey())
+          : null;
+    }
 
     // Images dropped from a note lose their bytes too, or IndexedDB only grows.
     if (patch.images !== undefined) {
