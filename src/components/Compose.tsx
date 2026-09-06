@@ -8,10 +8,11 @@ import {
   isMediaFile,
 } from "@/lib/images";
 import { swatchName } from "@/lib/store/defaults";
+import { Icon, type IconName } from "./Icon";
 import { Popover } from "./Popover";
 import { useNoella } from "@/lib/store/provider";
 import { PRIORITIES, PRIORITY, type Priority } from "@/lib/priority";
-import { STICKERS, isSticker } from "@/lib/stickers";
+import { STICKERS } from "@/lib/stickers";
 import type { Color, NewNote, NoteImage } from "@/lib/types";
 
 const DRAFT_KEY = "noella.draft";
@@ -107,7 +108,7 @@ export function Compose({
   const [pending, setPending] = useState<NoteImage[]>([]);
   const [busy, setBusy] = useState(0);
   const [tooBig, setTooBig] = useState(false);
-  const [icon, setIcon] = useState<string | null>(null);
+  const [icon, setIcon] = useState<IconName | null>(null);
   const [priority, setPriority] = useState<Priority | null>(null);
   /** What you have fired off without leaving the box. */
   const [burst, setBurst] = useState<string[]>([]);
@@ -356,7 +357,7 @@ export function Compose({
               : "border-rule text-mute hover:border-ink hover:text-ink"
           }`}
         >
-          ✓
+          <Icon name="check" size={16} />
         </button>
 
         {/*
@@ -400,7 +401,7 @@ export function Compose({
         <Popover
           label="All folder colours"
           set={false}
-          current={<span className="label">···</span>}
+          current={<Icon name="grid" size={15} />}
         >
           {(close) => (
             <Palette
@@ -413,7 +414,11 @@ export function Compose({
           )}
         </Popover>
 
-        <Popover label="Sticker" set={icon !== null} current={icon ?? "☺"}>
+        <Popover
+          label="Sticker"
+          set={icon !== null}
+          current={<Icon name={icon ?? "spark"} size={17} />}
+        >
           {(close) => (
             <Stickers
               icon={icon}
@@ -436,7 +441,7 @@ export function Compose({
                 style={{ backgroundColor: PRIORITY[priority].hex }}
               />
             ) : (
-              "⚑"
+              <Icon name="flag" size={16} />
             )
           }
         >
@@ -489,10 +494,7 @@ export function Compose({
           title="Add a photo or video"
           className="grid h-9 w-9 place-items-center border border-rule text-[17px] leading-none text-mute hover:border-ink hover:text-ink"
         >
-          {/* A plain plus, not a picture emoji: the row sits in the mono
-              chrome, and an emoji-presentation glyph renders as a tofu box
-              wherever an emoji font is not installed. */}
-          +
+          <Icon name="plus" size={16} />
         </button>
 
         <button
@@ -576,13 +578,13 @@ function Palette({
   );
 }
 
-/** The curated forty, grouped, plus a slot for anything else. */
+/** The twenty-four, grouped. No free-text slot: there is nothing to type. */
 function Stickers({
   icon,
   onPick,
 }: {
-  icon: string | null;
-  onPick: (glyph: string | null) => void;
+  icon: IconName | null;
+  onPick: (glyph: IconName | null) => void;
 }) {
   return (
     <span className="flex flex-col gap-2">
@@ -595,27 +597,19 @@ function Stickers({
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => onPick(glyph === icon ? null : glyph)}
               aria-pressed={glyph === icon}
-              className={`grid h-8 w-8 place-items-center border text-[17px] leading-none ${
+              aria-label={glyph}
+              title={glyph}
+              className={`grid h-9 w-9 place-items-center border ${
                 glyph === icon
                   ? "border-ink bg-ink/10"
                   : "border-transparent hover:border-rule"
               }`}
             >
-              {glyph}
+              <Icon name={glyph} size={19} />
             </button>
           ))}
         </span>
       ))}
-      <input
-        onChange={(e) => {
-          const value = e.target.value.trim();
-          if (isSticker(value)) onPick(value);
-        }}
-        placeholder="…or any emoji"
-        aria-label="Use any emoji as the sticker"
-        className="label w-full border border-rule bg-transparent px-2 py-1.5
-                   outline-none placeholder:opacity-50"
-      />
       {icon && (
         <button
           type="button"

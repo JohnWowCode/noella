@@ -2,48 +2,61 @@
  * A sticker on a note.
  *
  * Reading forty card titles to find the one about audio is work; spotting the
- * speaker among forty glyphs is not. That difference is most of why this
+ * one mark among forty shapes is not, and that difference is most of why this
  * exists — a wall you can scan by shape stays usable at a size where a wall of
  * text has already become a wall.
  *
- * The set is curated rather than a full emoji keyboard on purpose. Two
- * thousand choices is a browsing session; forty is a decision. Anything else
- * can still be pasted in by hand.
+ * They were emoji until now. Emoji are somebody else's drawings in somebody
+ * else's palette, render differently on every platform, and vanish entirely
+ * where no emoji font is installed. These are drawn — see Icon.tsx — so a
+ * sticker is one geometry with the rest of the app and takes the ink of
+ * whatever card it lands on.
  */
+
+import { STICKER_NAMES, isIconName, type IconName } from "@/components/Icon";
 
 export interface StickerGroup {
   name: string;
-  icons: string[];
+  icons: IconName[];
 }
 
+/** Four rows of six. Grouped so the picker is scanned rather than read. */
 export const STICKERS: StickerGroup[] = [
-  {
-    name: "Making",
-    icons: ["🎮", "🕹️", "🎬", "🎨", "🎵", "📷", "✏️", "🧩", "🛠️", "⚙️"],
-  },
-  {
-    name: "Going wrong",
-    icons: ["🐛", "🔥", "💥", "⚠️", "🧨", "🩹", "🚧", "❓"],
-  },
-  {
-    name: "Life",
-    icons: ["💸", "🏠", "🍜", "🩺", "📦", "🚗", "✈️", "🎁"],
-  },
-  {
-    name: "Weather",
-    icons: ["⭐", "💡", "🚀", "🌱", "🧠", "❤️", "☕", "🌙", "🎯", "🏁"],
-  },
+  { name: "Making", icons: STICKER_NAMES.slice(0, 6) },
+  { name: "Going wrong", icons: STICKER_NAMES.slice(6, 12) },
+  { name: "Life", icons: STICKER_NAMES.slice(12, 18) },
+  { name: "Weather", icons: STICKER_NAMES.slice(18, 24) },
 ];
 
-export const ALL_STICKERS = STICKERS.flatMap((g) => g.icons);
+export const ALL_STICKERS = STICKER_NAMES;
 
 /**
- * Whether a string is small enough to sit in a sticker slot.
+ * What the emoji stickers become.
  *
- * Not a real emoji test — that is a losing fight against skin tones, joiners
- * and flags. The only thing that actually matters is that it is short, because
- * anything long breaks the layout it is pasted into.
+ * Anything filed before this is a codepoint, not a name. Rather than leaving
+ * those notes with a glyph the app can no longer draw, each is read across to
+ * the nearest mark; anything unlisted falls back to a plain ring, which says
+ * "this had a sticker" without inventing a meaning for it.
  */
-export function isSticker(value: string): boolean {
-  return value.length > 0 && [...value].length <= 3;
+const LEGACY: Record<string, IconName> = {
+  "🎮": "cube", "🕹️": "cube", "🕹": "cube", "🧩": "cube",
+  "🎬": "film", "📷": "frame", "🎨": "frame", "🎵": "wave",
+  "✏️": "pen", "✏": "pen", "🛠️": "sliders", "🛠": "sliders", "⚙️": "sliders", "⚙": "sliders",
+  "🐛": "bolt", "🔥": "bolt", "💥": "burst", "🧨": "burst",
+  "⚠️": "warn", "⚠": "warn", "🚧": "warn", "🩹": "shield", "❓": "eye",
+  "💸": "coin", "🏠": "house", "📦": "box", "🎁": "box",
+  "🍜": "heart", "🩺": "shield", "🚗": "clock", "✈️": "clock", "✈": "clock",
+  "⭐": "spark", "💡": "spark", "🚀": "bolt", "🌱": "seed",
+  "🧠": "eye", "❤️": "heart", "❤": "heart", "☕": "clock",
+  "🌙": "moon", "🎯": "target", "🏁": "flag",
+};
+
+/**
+ * Reads whatever is stored on a note into a mark this build can draw.
+ * Returns null when the field is empty, so a note without one stays without.
+ */
+export function stickerOf(stored: string | null): IconName | null {
+  if (!stored) return null;
+  if (isIconName(stored)) return stored;
+  return LEGACY[stored] ?? "ring";
 }

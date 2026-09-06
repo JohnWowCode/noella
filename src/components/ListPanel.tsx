@@ -12,6 +12,7 @@ import {
 } from "@/lib/recurrence";
 import { useNoella } from "@/lib/store/provider";
 import type { Note } from "@/lib/types";
+import { Icon } from "./Icon";
 
 /**
  * A list, and — if you give it a cadence — a recurring one.
@@ -166,7 +167,7 @@ export function ListPanel({
                       : "border-current/50 hover:border-current"
                   }`}
                 >
-                  {done ? "✓" : ""}
+                  {done && <Icon name="check" size={11} />}
                 </button>
                 <span
                   className={`flex-1 text-[15px] leading-snug ${

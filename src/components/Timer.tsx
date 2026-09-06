@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useNoella } from "@/lib/store/provider";
 import type { Note } from "@/lib/types";
+import { Icon } from "./Icon";
 
 const KEY = "noella.timer";
 
@@ -154,7 +155,10 @@ export function Timer({ step, onColor }: { step: Note; onColor: boolean }) {
               : "border-rule bg-ink text-paper hover:bg-transparent hover:text-ink"
           }`}
         >
-          ▶ Just start · 5 minutes
+          <span className="flex items-center gap-2">
+            <Icon name="play" size={12} />
+            Just start · 5 minutes
+          </span>
         </button>
       )}
 

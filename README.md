@@ -245,6 +245,11 @@ The card lost its serial number too. `NOTE 0007` is a real handle — the MCP
 tools take it and it is still in the data and the tooltip — but it opened every
 card with four characters of machine noise that had never once been read.
 
+And it lost its Edit button, which sat on every card doing what the words could
+do. Double-click them. On a wall of forty that was forty buttons for a gesture
+nobody needs telling twice; it stays in the ⋯ menu, and a Done appears only
+while you are actually editing.
+
 ## Now, next, later
 
 Three buckets, never a number. A 1–10 priority field is a decision you can
@@ -269,14 +274,26 @@ to migrate and an imported wall gets it for free.
 Nothing shows until you have used one, and whatever is currently chosen is
 shown exactly once — the trigger means "the rest", not "the current one".
 
-## Stickers
+## Stickers, drawn
 
-Any note takes one glyph, shown large. Reading forty card titles to find the
-one about audio is work; spotting the speaker among forty shapes is not, and
-that difference is most of why they exist. The set is curated rather than the
-whole emoji keyboard, because two thousand choices is a browsing session and
-forty is a decision — anything else can still be pasted in. Colour folders take
-one too.
+Any note takes one mark, shown large. Reading forty card titles to find the one
+about audio is work; spotting the one shape among forty is not, and that
+difference is most of why they exist. Colour folders take one too.
+
+They were emoji, and emoji were the only part of the app not under its own
+control: somebody else's drawings, in somebody else's palette, rendered
+differently on every platform and absent entirely where no emoji font is
+installed — which is what turned the attach button into a tofu box.
+
+There are twenty-four now and they are drawn: one 24-unit grid, two-unit
+strokes, square caps, mitred joins, in `currentColor`. A sticker takes the ink
+of whatever card it lands on, scales to any size, and looks like it was made by
+the same hand as everything else. The whole of the chrome went the same way —
+the star, the flag, the tick, the chevron, the menu. Nothing in the interface
+is a character any more.
+
+Anything stickered before the change is read across to the nearest mark, so no
+note loses the thing you gave it.
 
 ## Rapid fire
 

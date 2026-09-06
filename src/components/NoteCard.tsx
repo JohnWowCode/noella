@@ -6,11 +6,12 @@ import { imageFilesFrom } from "@/lib/images";
 import { isList, isProject, projectTitle, stepsOf } from "@/lib/projects";
 import { PRIORITIES, PRIORITY } from "@/lib/priority";
 import { swatchName } from "@/lib/store/defaults";
-import { STICKERS } from "@/lib/stickers";
+import { STICKERS, stickerOf } from "@/lib/stickers";
 import { countChildren, pathTo, placesFor } from "@/lib/tree";
 import { useNoella } from "@/lib/store/provider";
 import { ON_COLOR_BUTTON, surfaceStyle } from "@/lib/surface";
 import type { Note } from "@/lib/types";
+import { Icon } from "./Icon";
 import { Lightbox, NoteImages } from "./NoteImages";
 import { ListPanel } from "./ListPanel";
 import { ProjectPanel } from "./ProjectPanel";
@@ -61,6 +62,7 @@ export function NoteCard({
   const steps = project || list ? stepsOf(notes, note.id) : [];
   // Anything can hold anything now, so the count is not about being a project.
   const inside = countChildren(notes, note.id);
+  const mark = stickerOf(note.icon);
   /*
    * Where this could be filed: any live note except itself and its own
    * descendants. It used to be projects only, which is why there was no way to
@@ -268,18 +270,25 @@ export function NoteCard({
             onClick={() => patchNote(note.id, { pinned: !note.pinned })}
             aria-pressed={note.pinned}
             aria-label={note.pinned ? "Remove from favourites" : "Add to favourites"}
-            className={`px-1.5 py-1 text-[15px] leading-none ${
+            className={`grid place-items-center px-1.5 py-1 ${
               note.pinned ? "opacity-100" : "opacity-35 hover:opacity-100"
             }`}
           >
-            {note.pinned ? "★" : "☆"}
+            <Icon name={note.pinned ? "starFilled" : "star"} size={15} />
           </button>
           {!heading && onOpen && inside === 0 && (
             <Action onClick={() => onOpen(note.id)}>Open</Action>
           )}
-          <Action onClick={() => setEditing((v) => !v)}>
-            {editing ? "Done" : "Edit"}
-          </Action>
+          {/*
+            Edit is a double-click on the words themselves, which is where the
+            hand already is. It sat here on every card doing what the text
+            could do, and on a wall of forty that was forty buttons for a
+            gesture nobody needs told about twice. It stays in the ⋯ menu, and
+            appears here only while you are in it, as the way out.
+          */}
+          {editing && (
+            <Action onClick={() => setEditing(false)}>Done</Action>
+          )}
           <Action
             onClick={() => {
               setMenu((v) => !v);
@@ -289,7 +298,7 @@ export function NoteCard({
             pressed={menu}
             label="More actions"
           >
-            ⋯
+            <Icon name="more" size={15} />
           </Action>
         </span>
       </header>
@@ -304,6 +313,14 @@ export function NoteCard({
       */}
       {menu && (
         <div className="mt-3 flex flex-wrap items-center gap-1.5 border border-current/25 px-2 py-2">
+          <Action
+            onClick={() => {
+              setEditing(true);
+              setMenu(false);
+            }}
+          >
+            Edit
+          </Action>
           <Action
             onClick={() => {
               setRecolouring((v) => !v);
@@ -417,18 +434,19 @@ export function NoteCard({
                     type="button"
                     onClick={() => {
                       patchNote(note.id, {
-                        icon: glyph === note.icon ? null : glyph,
+                        icon: glyph === mark ? null : glyph,
                       });
                       setStickering(false);
                     }}
                     aria-label={`Sticker ${glyph}`}
-                    className={`grid h-8 w-8 place-items-center border text-[17px] leading-none ${
-                      glyph === note.icon
+                    title={glyph}
+                    className={`grid h-9 w-9 place-items-center border ${
+                      glyph === mark
                         ? "border-current"
                         : "border-transparent hover:border-current/40"
                     }`}
                   >
-                    {glyph}
+                    <Icon name={glyph} size={19} />
                   </button>
                 ))}
               </div>
@@ -500,6 +518,8 @@ export function NoteCard({
           onChange={(e) => setDraft(e.target.value)}
           onBlur={commit}
           onKeyDown={(e) => {
+            // Escape and ⌘↵ both put it away; blurring does too. Editing
+            // should never be a mode you have to hunt your way out of.
             if (e.key === "Escape") commit();
             if ((e.metaKey || e.ctrlKey) && e.key === "Enter") commit();
           }}
@@ -509,15 +529,13 @@ export function NoteCard({
         />
       ) : (
         note.body.length > 0 && (
-          <div className="mt-3 flex items-start gap-3">
-            {note.icon && (
-              <span
-                aria-hidden
-                className={`shrink-0 leading-none ${
-                  heading ? "text-[30px] sm:text-[34px]" : "text-[22px]"
-                }`}
-              >
-                {note.icon}
+          <div
+            onDoubleClick={() => setEditing(true)}
+            className="mt-3 flex items-start gap-3"
+          >
+            {mark && (
+              <span className="shrink-0 pt-0.5">
+                <Icon name={mark} size={heading ? 30 : 22} />
               </span>
             )}
             <p
@@ -580,9 +598,7 @@ export function NoteCard({
         >
           <span>Open</span>
           <span className="tabular-nums opacity-70">{inside} inside</span>
-          <span aria-hidden className="ml-auto">
-            ›
-          </span>
+          <Icon name="chevron" size={13} className="ml-auto" />
         </button>
       )}
 
