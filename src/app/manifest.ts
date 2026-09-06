@@ -23,9 +23,24 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#f4f2ed",
     orientation: "any",
     icons: [
-      { src: `${base}/icon-192.png`, sizes: "192x192", type: "image/png", purpose: "any" },
-      { src: `${base}/icon-512.png`, sizes: "512x512", type: "image/png", purpose: "any" },
-      { src: `${base}/icon-maskable-512.png`, sizes: "512x512", type: "image/png", purpose: "maskable" },
+      {
+        src: `${base}/icon-192.png`,
+        sizes: "192x192",
+        type: "image/png",
+        purpose: "any",
+      },
+      {
+        src: `${base}/icon-512.png`,
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "any",
+      },
+      {
+        src: `${base}/icon-maskable-512.png`,
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "maskable",
+      },
     ],
     // Long-pressing the icon offers the one thing worth a separate entrance:
     // a blank box. The old shortcuts pointed at two screens that are now the

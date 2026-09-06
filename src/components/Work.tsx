@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { fromKey } from "@/lib/clock";
 import { candidates, pick, type Candidate } from "@/lib/pick";
 import { PRIORITY, rankOf } from "@/lib/priority";
-import { isList, isProject } from "@/lib/projects";
+import { contentsOf } from "@/lib/rooms";
 import { markLabel, marksOf } from "@/lib/stickers";
 import { useNoella } from "@/lib/store/provider";
 import type { Note } from "@/lib/types";
@@ -51,9 +51,9 @@ export function Work({
       (n) =>
         n.archivedAt === null &&
         n.doneAt === null &&
-        n.priority !== "now" &&
-        !isProject(n) &&
-        !isList(n) &&
+        n.todayOn === null &&
+        // A room is a place, not a job: what you queue is what is inside it.
+        contentsOf(notes, n.id).length === 0 &&
         (n.priority !== null || n.isTask),
     );
     return rows.sort((a, b) => {
@@ -90,7 +90,14 @@ export function Work({
       .map((n) => ({
         note: n,
         from: "",
-        weight: n.priority === "next" ? 6 : n.priority === "later" ? 2 : 3,
+        weight:
+          n.priority === "high"
+            ? 12
+            : n.priority === "mid"
+              ? 6
+              : n.priority === "low"
+                ? 2
+                : 4,
       }));
     return [...weighted, ...extra];
   }, [notes, todayKey, queue]);
@@ -139,7 +146,7 @@ export function Work({
           <div className="mt-3 flex flex-wrap items-center gap-2 px-4 pb-4">
             <button
               type="button"
-              onClick={() => patchNote(showing.note.id, { priority: "now" })}
+              onClick={() => patchNote(showing.note.id, { todayOn: todayKey })}
               className="label border border-ink bg-ink px-3 py-2 text-paper hover:bg-transparent hover:text-ink"
             >
               Do it today
@@ -178,9 +185,10 @@ export function Work({
             Nothing owed today.
           </p>
           <p className="prose-note mt-3 max-w-md text-[calc(16px*var(--type))] text-mute">
-            Anything you rank <strong className="font-semibold">Now</strong>{" "}
-            lands at the top here as today&apos;s short list; Next and Later
-            queue up underneath it. Everything you have written is on the Wall.
+            Put anything on <strong className="font-semibold">Today</strong> and
+            it lands at the top here as the short list; everything ranked HPrio,
+            MPrio or LPrio queues up underneath it in that order. Everything you
+            have written is on the Wall.
           </p>
         </section>
       )}
@@ -216,7 +224,7 @@ export function Work({
                 <Row
                   key={n.id}
                   note={n}
-                  onToday={() => patchNote(n.id, { priority: "now" })}
+                  onToday={() => patchNote(n.id, { todayOn: todayKey })}
                   onTick={() =>
                     patchNote(n.id, { doneAt: new Date().toISOString() })
                   }

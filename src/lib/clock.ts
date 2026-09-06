@@ -26,6 +26,13 @@ export function fromKey(key: string): Date {
   return new Date(y, (m ?? 1) - 1, d ?? 1);
 }
 
+/** A date key `days` after the given one. Local, like everything here. */
+export function inDays(key: string, days: number): string {
+  const d = fromKey(key);
+  d.setDate(d.getDate() + days);
+  return dateKey(d);
+}
+
 export function daysBetween(fromKeyStr: string, toKeyStr: string): number {
   const a = fromKey(fromKeyStr).getTime();
   const b = fromKey(toKeyStr).getTime();

@@ -17,12 +17,13 @@ import { z } from "zod";
 import {
   INBOX_DIR,
   MARKS,
+  PRIORITIES,
+  RANK,
   WALL_FILE,
   childrenOf,
   defaultFolderName,
   folderName,
-  isList,
-  isProject,
+  isRoom,
   marksOf,
   title,
   view,
@@ -151,8 +152,7 @@ function findContainer(data, needle) {
     if (exactTitle.length === 1) return exactTitle[0];
     const holders = hits.filter(
       (n) =>
-        isProject(n) ||
-        isList(n) ||
+        isRoom(data, n) ||
         data.notes.some((c) => c.parentId === n.id && c.archivedAt === null),
     );
     if (holders.length === 1) return holders[0];
@@ -162,7 +162,7 @@ function findContainer(data, needle) {
   if (hits.length === 1) return hits[0];
   if (hits.length === 0) {
     const folders = containers.filter(
-      (n) => isProject(n) || isList(n) || data.notes.some((c) => c.parentId === n.id),
+      (n) => isRoom(data, n),
     );
     throw new Error(
       `Nothing called "${needle}". Things that hold other things: ` +
@@ -224,15 +224,13 @@ function matching(
     .filter((n) => (archived ? true : n.archivedAt === null))
     .filter((n) => (colorId ? n.colorId === colorId : true))
     .filter((n) =>
-      kind === "project"
-        ? isProject(n)
-        : kind === "list"
-          ? isList(n)
-          : kind === "todo"
-            ? n.isTask && !isProject(n) && !isList(n)
-            : kind === "note"
-              ? !n.isTask && !isProject(n) && !isList(n)
-              : true,
+      kind === "room"
+        ? isRoom(data, n)
+        : kind === "todo"
+          ? n.isTask && !isRoom(data, n)
+          : kind === "note"
+            ? !n.isTask && !isRoom(data, n)
+            : true,
     )
     .filter((n) => (openOnly ? n.isTask && n.doneAt === null : true))
     .filter((n) => (priority ? n.priority === priority : true))
@@ -266,16 +264,16 @@ export function registerTools(server, folder) {
           .optional()
           .describe("Text to match in the body, or a #tag"),
         folder: z.string().optional().describe("A folder (colour) name"),
-        kind: z.enum(["note", "todo", "project", "list"]).optional(),
+        kind: z.enum(["note", "todo", "room"]).optional(),
         open_only: z
           .boolean()
           .optional()
           .describe("Only unticked to-dos and steps"),
         include_archived: z.boolean().optional(),
         priority: z
-          .enum(["now", "next", "later"])
+          .enum(PRIORITIES)
           .optional()
-          .describe("Only things ranked at this level"),
+          .describe("Only things ranked at this level: high, mid or low"),
         mark: z
           .enum(MARKS)
           .optional()
@@ -346,17 +344,17 @@ export function registerTools(server, folder) {
       const data = await wall(folder);
       const key = dayKey(new Date());
       const live = data.notes.filter((n) => !n.archivedAt);
-      const now = live.filter((n) => n.priority === "now");
-      const open = now.filter((n) => !n.doneAt && (n.rankedOn ?? key) === key);
-      const carried = now
-        .filter((n) => !n.doneAt && (n.rankedOn ?? key) !== key)
-        .sort((a, b) => (a.rankedOn ?? "").localeCompare(b.rankedOn ?? ""));
+      const promised = live.filter((n) => n.todayOn);
+      const open = promised.filter((n) => !n.doneAt && n.todayOn === key);
+      const carried = promised
+        .filter((n) => !n.doneAt && n.todayOn !== key)
+        .sort((a, b) => (a.todayOn ?? "").localeCompare(b.todayOn ?? ""));
       const finished = live.filter(
         (n) => n.doneAt && n.doneAt.slice(0, 10) === key,
       );
       if (open.length + carried.length + finished.length === 0) {
         return text(
-          "Nothing is on today yet. set_priority something to now to put it there.",
+          "Nothing is on today yet. Use set_today to put something there.",
         );
       }
       return text({
@@ -370,58 +368,51 @@ export function registerTools(server, folder) {
   );
 
   server.registerTool(
-    "list_projects",
+    "list_rooms",
     {
-      title: "Projects and lists",
+      title: "Everything holding something",
       description:
-        "Every project with its status, progress and next unticked step, and " +
-        "every list with what is still open on it.",
+        "Every note with things inside it: what is in it, how far through it " +
+        "is, and the first unfinished thing. There are no projects or lists " +
+        "any more — a room is simply a note that contains notes.",
       inputSchema: {
-        status: z.enum(["idea", "active", "paused", "done"]).optional(),
+        open_only: z
+          .boolean()
+          .optional()
+          .describe("Only rooms with something still unticked in them"),
       },
       annotations: { readOnlyHint: true },
     },
-    async ({ status }) => {
+    async ({ open_only }) => {
       const data = await wall(folder);
-      const rank = { active: 0, idea: 1, paused: 2, done: 3 };
-      const projects = data.notes
-        .filter((n) => isProject(n) && n.archivedAt === null)
-        .filter((n) => (status ? n.projectStatus === status : true))
-        .sort(
-          (a, b) =>
-            rank[a.projectStatus] - rank[b.projectStatus] || a.order - b.order,
-        )
-        .map((p) => {
-          const steps = childrenOf(data, p.id);
-          const next = steps.find((s) => s.doneAt === null);
+      const rooms = data.notes
+        .filter((n) => isRoom(data, n) && n.archivedAt === null)
+        .sort((a, b) => a.order - b.order || b.createdAt.localeCompare(a.createdAt))
+        .map((room) => {
+          const inside = childrenOf(data, room.id);
+          const open = inside.filter((i) => i.doneAt === null);
+          const tickable = inside.filter((i) => i.isTask);
           return {
-            id: p.id,
-            name: title(p),
-            status: p.projectStatus,
-            folder: folderName(data, p.colorId),
-            progress: `${steps.filter((s) => s.doneAt !== null).length}/${steps.length}`,
-            next_step: next ? { id: next.id, body: next.body } : null,
+            id: room.id,
+            name: title(room),
+            folder: folderName(data, room.colorId),
+            holds: inside.length,
+            progress: tickable.length
+              ? `${tickable.filter((i) => i.doneAt !== null).length}/${tickable.length}`
+              : null,
+            repeats: room.repeats ?? room.listCadence ?? null,
+            next: open[0] ? { id: open[0].id, body: open[0].body } : null,
           };
-        });
+        })
+        .filter((r) => (open_only ? r.next !== null : true));
 
-      const lists = data.notes
-        .filter((n) => isList(n) && n.archivedAt === null)
-        .map((l) => {
-          const items = childrenOf(data, l.id);
-          return {
-            id: l.id,
-            name: title(l),
-            repeats: l.listCadence ?? null,
-            folder: folderName(data, l.colorId),
-            open: items.filter((i) => i.doneAt === null).map((i) => i.body),
-            done: items.filter((i) => i.doneAt !== null).length,
-          };
-        });
-
-      if (projects.length === 0 && lists.length === 0) {
-        return text("No projects or lists yet.");
+      if (rooms.length === 0) {
+        return text(
+          "Nothing is holding anything yet. Put a note inside another note " +
+            "with add_note's `inside`, and that note becomes a room.",
+        );
       }
-      return text({ projects, lists });
+      return text(rooms);
     },
   );
 
@@ -471,37 +462,56 @@ export function registerTools(server, folder) {
     async () => {
       const data = await wall(folder);
       const live = data.notes.filter((n) => n.archivedAt === null);
-      const active = live
-        .filter((n) => n.projectStatus === "active")
-        .sort((a, b) => a.order - b.order);
+      const key = dayKey(new Date());
 
-      const out = { today: [], also_active: [], loose: [], repeating: [] };
-
-      active.forEach((p, rank) => {
-        const next = childrenOf(data, p.id).find((s) => s.doneAt === null);
-        if (!next) return;
-        const row = { id: next.id, body: next.body, project: title(p) };
-        if (rank === 0) out.today.push(row);
-        else out.also_active.push(row);
-      });
+      /*
+       * Three lists, and none of them are about projects any more.
+       *
+       * This used to lead with "the next step of the top-ranked active
+       * project", which meant it only ever knew about the handful of things
+       * you had gone to the trouble of promoting. What is open is: what you
+       * put on today, the first unfinished thing in each room, and anything
+       * loose with a checkbox on it.
+       */
+      const out = { today: [], in_rooms: [], loose: [], repeating: [] };
 
       for (const n of live) {
-        if (!n.isTask || n.doneAt !== null) continue;
-        if (n.parentId || isProject(n) || isList(n)) continue;
-        out.loose.push({ id: n.id, body: n.body });
+        if (n.doneAt !== null || !n.todayOn) continue;
+        out.today.push({ id: n.id, body: n.body, since: n.todayOn, stale: n.todayOn !== key });
       }
 
-      for (const l of live.filter((n) => isList(n) && n.listCadence)) {
-        for (const item of childrenOf(data, l.id)) {
-          if (item.doneAt === null) {
-            out.repeating.push({ id: item.id, body: item.body, list: title(l) });
+      const rooms = live
+        .filter((n) => isRoom(data, n))
+        .sort((a, b) => a.order - b.order);
+      for (const room of rooms) {
+        const repeats = room.repeats ?? room.listCadence ?? null;
+        const inside = childrenOf(data, room.id).filter((c) => c.doneAt === null);
+        if (inside.length === 0) continue;
+        if (repeats) {
+          for (const item of inside) {
+            out.repeating.push({ id: item.id, body: item.body, room: title(room), repeats });
           }
+          continue;
         }
+        const next = inside[0];
+        if (next.todayOn) continue; // already listed above
+        out.in_rooms.push({
+          id: next.id,
+          body: next.body,
+          room: title(room),
+          left: inside.length,
+        });
+      }
+
+      for (const n of live) {
+        if (!n.isTask || n.doneAt !== null || n.todayOn) continue;
+        if (n.parentId || isRoom(data, n)) continue;
+        out.loose.push({ id: n.id, body: n.body, priority: RANK[n.priority] ?? null });
       }
 
       const total =
         out.today.length +
-        out.also_active.length +
+        out.in_rooms.length +
         out.loose.length +
         out.repeating.length;
       if (total === 0) return text("Nothing open. The wall is clear.");
@@ -520,7 +530,7 @@ export function registerTools(server, folder) {
         "file it in a colour folder.",
       inputSchema: {
         body: z.string().min(1),
-        kind: z.enum(["note", "todo", "project", "list"]).optional(),
+        kind: z.enum(["note", "todo", "room"]).optional(),
         folder: z.string().optional().describe("A folder (colour) name"),
         inside: z
           .string()
@@ -530,9 +540,12 @@ export function registerTools(server, folder) {
               "Nests to any depth, so a bug can go inside a game inside a site.",
           ),
         priority: z
-          .enum(["now", "next", "later"])
+          .enum(PRIORITIES)
           .optional()
-          .describe("Rank it. Most things are better left unranked."),
+          .describe(
+            "How much it matters: high, mid or low. Not when — use " +
+              "set_today for that. Most things are better left unranked.",
+          ),
         marks: z
           .array(z.enum(MARKS))
           .max(4)
@@ -614,23 +627,31 @@ export function registerTools(server, folder) {
     },
   );
 
-  server.registerTool(
-    "set_project_status",
+    server.registerTool(
+    "set_today",
     {
-      title: "Move a project along",
+      title: "Put something on today, or take it off",
       description:
-        "Set a project to idea, active, paused or done. Active projects are " +
-        "what Noella works from; three at a time is the usual limit.",
+        "Today is the one list in Noella with an end to it: a short set of " +
+        "things promised for one day, which is not the same question as how " +
+        "much they matter. Dated, so what was chosen this morning reads " +
+        "differently from what has been carried for a week.",
       inputSchema: {
-        project: z.string(),
-        status: z.enum(["idea", "active", "paused", "done"]),
+        note: z.string(),
+        on: z.boolean().optional().describe("Defaults to true. False takes it off."),
       },
     },
-    async ({ project, status }) => {
+    async ({ note, on }) => {
       const data = await wall(folder);
-      const target = findContainer(data, project);
-      await queue(folder, { op: "set_status", noteId: target.id, status });
-      return text(await landing(folder, `Queued ${title(target)} → ${status}.`));
+      const target = findNote(data, note);
+      const today = on === false ? false : true;
+      await queue(folder, { op: "set_today", noteId: target.id, today });
+      return text(
+        await landing(
+          folder,
+          `Queued "${title(target)}" ${today ? "onto today" : "off today"}.`,
+        ),
+      );
     },
   );
 
@@ -667,14 +688,14 @@ export function registerTools(server, folder) {
     {
       title: "Rank something",
       description:
-        "Put a note at now, next or later — or pass none to unrank it. " +
-        "Three buckets on purpose: a 1-10 field is an afternoon of deciding. " +
-        "Now means today: it puts the note on the short list the app opens " +
-        "with, so use it for what is actually being done today rather than " +
-        "for what matters most in general.",
+        "How much something matters: high, mid or low, or none to unrank it. " +
+        "Three buckets on purpose — a 1-10 field is an afternoon of deciding. " +
+        "This is weight, not timing: what is being done today is set_today, " +
+        "and the two are deliberately separate so the most important thing you " +
+        "have does not have to be today's thing.",
       inputSchema: {
         note: z.string(),
-        priority: z.enum(["now", "next", "later", "none"]),
+        priority: z.enum([...PRIORITIES, "none"]),
       },
     },
     async ({ note, priority }) => {
@@ -760,7 +781,7 @@ export function registerTools(server, folder) {
         .slice(0, 20)
         .map((n) => ({
           id: n.id,
-          title: `${title(n)}${isProject(n) ? " (project)" : isList(n) ? " (list)" : ""}`,
+          title: `${title(n)}${isRoom(data, n) ? " (room)" : ""}`,
           url: link(n.id),
         }));
       return text({ results });

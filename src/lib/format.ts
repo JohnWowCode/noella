@@ -6,8 +6,20 @@ export function seqLabel(seq: number): string {
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-const MONTH = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTH = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
 
 /**
  * Still absolute — never "2 hours ago" — but only as much of it as you need.

@@ -191,7 +191,8 @@ export function NoellaProvider({ children }: { children: React.ReactNode }) {
       notes,
       colors,
       settings,
-      colorOf: (note) => (note.colorId ? byId.get(note.colorId) ?? null : null),
+      colorOf: (note) =>
+        note.colorId ? (byId.get(note.colorId) ?? null) : null,
       addNote,
       patchNote,
       removeNote,

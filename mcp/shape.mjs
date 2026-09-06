@@ -22,13 +22,12 @@ export function title(note) {
   return line || `Note ${note.seq}`;
 }
 
-export function isProject(note) {
-  return note.projectStatus !== null && note.projectStatus !== undefined;
+/** A room is anything holding something. There is no other kind of container. */
+export function isRoom(wall, note) {
+  return childrenOf(wall, note.id).length > 0;
 }
 
-export function isList(note) {
-  return note.isList === true;
-}
+
 
 /** Whatever is directly inside, in the order it is shown. */
 export function childrenOf(wall, parentId) {
@@ -81,6 +80,18 @@ export function folderName(wall, colorId) {
  * Every mark a note may wear, in the order the app shows them. Kept in step
  * with src/lib/stickers.ts by hand — two runtimes, one vocabulary.
  */
+/** Older walls said now / next / later. Same three buckets, better names. */
+export const RANK = {
+  high: "high",
+  mid: "mid",
+  low: "low",
+  now: "high",
+  next: "mid",
+  later: "low",
+};
+
+export const PRIORITIES = ["high", "mid", "low"];
+
 export const MARKS = [
   "idea", "write", "art", "sound", "build", "game",
   "bug", "fix", "test", "ship", "blocked", "danger",
@@ -180,27 +191,29 @@ export function view(wall, note) {
   };
   const marks = marksOf(note);
   if (marks.length > 0) out.marks = marks;
-  if (note.priority) out.priority = note.priority;
+  const rank = RANK[note.priority] ?? null;
+  if (rank) out.priority = rank;
   /*
-   * When it was put on today. "now" means today — it has always said so on
-   * the picker — so a now with an old date is something that has been carried
-   * rather than something chosen this morning, and saying which is the
+   * The day it was put on today. An old date is something that has been
+   * carried rather than chosen this morning, and saying which is the
    * difference between a useful answer and a list that quietly stopped being
-   * true months ago.
+   * true months ago. Separate from priority on purpose: how much something
+   * matters and whether you are doing it today are two questions.
    */
-  if (note.priority === "now" && note.rankedOn) out.promised = note.rankedOn;
+  if (note.todayOn) out.on_today = note.todayOn;
   if (note.pinned) out.favourite = true;
   if (note.isTask) out.done = note.doneAt !== null;
   if (note.archivedAt) out.archived = true;
-  out.kind = isProject(note)
-    ? "project"
-    : isList(note)
-      ? "list"
-      : note.isTask
-        ? "todo"
-        : "note";
-  if (isProject(note)) out.status = note.projectStatus;
-  if (isList(note) && note.listCadence) out.repeats = note.listCadence;
+  /*
+   * There are no kinds any more. A project was a note with a status and a list
+   * was a note with a cadence, and both were "a note with things inside it" —
+   * so what a thing is, is what it holds.
+   */
+  const children = childrenOf(wall, note.id);
+  out.kind = children.length > 0 ? "room" : note.isTask ? "todo" : "note";
+  if (note.repeats ?? note.listCadence) {
+    out.repeats = note.repeats ?? note.listCadence;
+  }
 
   const where = whereIs(wall, note);
   if (where) out.inside = where;
@@ -212,7 +225,6 @@ export function view(wall, note) {
    * the only things allowed to contain. A plain note holding four bug reports
    * would have reported nothing at all.
    */
-  const children = childrenOf(wall, note.id);
   if (children.length > 0) {
     out.contains = children.map((c) => {
       const row = { id: c.id, body: c.body };

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useTodayKey } from "@/lib/clock";
+import { inDays, useTodayKey } from "@/lib/clock";
 import {
   bestRun,
   drifting,
@@ -11,10 +11,10 @@ import {
   streak,
 } from "@/lib/momentum";
 import { matches } from "@/lib/notes";
-import { isList, isProject, projectTitle } from "@/lib/projects";
+import { contentsOf, titleOf } from "@/lib/rooms";
 import { PRIORITIES, PRIORITY, rankOf, type Priority } from "@/lib/priority";
 import { ALL_MARKS, markLabel, markOf, marksOf } from "@/lib/stickers";
-import { countChildren, pathTo } from "@/lib/tree";
+import { pathTo } from "@/lib/tree";
 import { Icon, type IconName } from "./Icon";
 import { Popover } from "./Popover";
 import { swatchName } from "@/lib/store/defaults";
@@ -23,7 +23,7 @@ import { ON_COLOR_BUTTON, surfaceStyle } from "@/lib/surface";
 import type { Color, Note } from "@/lib/types";
 import { Footer, Header } from "./Chrome";
 import { Compose } from "./Compose";
-import { Dailies } from "./Dailies";
+import { Journal } from "./Journal";
 import { DataMenu } from "./DataMenu";
 import { FolderLink } from "./FolderLink";
 import { Work } from "./Work";
@@ -79,21 +79,14 @@ type Grouping = "none" | "folder" | "mark" | "kind" | "priority";
 const AREAS = {
   work: "Work",
   wall: "Wall",
-  dailies: "Dailies",
+  journal: "Journal",
 } as const;
 
 type Area = keyof typeof AREAS;
 
 const AREA_KEY = "noella.area";
 
-type View =
-  | "all"
-  | "todo"
-  | "done"
-  | "starred"
-  | "projects"
-  | "lists"
-  | "archive";
+type View = "all" | "todo" | "done" | "starred" | "rooms" | "archive";
 
 /**
  * The whole app, on one screen.
@@ -105,7 +98,7 @@ type View =
  * filter one list of everything by folder, by kind, or by what is still open.
  */
 export function Home() {
-  const { ready, notes, colors, patchColor, patchNote } = useNoella();
+  const { ready, notes, colors, patchColor } = useNoella();
   const todayKey = useTodayKey();
 
   const [query, setQuery] = useState("");
@@ -174,7 +167,7 @@ export function Home() {
       const AREA_KEYS: Record<string, Area> = {
         "1": "work",
         "2": "wall",
-        "3": "dailies",
+        "3": "journal",
       };
       if (AREA_KEYS[e.key] && !inside) {
         e.preventDefault();
@@ -222,7 +215,6 @@ export function Home() {
     () => (inside ? pathTo(notes, inside) : []),
     [notes, inside],
   );
-  const childCount = inside ? countChildren(notes, inside) : 0;
 
   /*
    * What this screen is a view of.
@@ -247,8 +239,7 @@ export function Home() {
     let todo = 0;
     let done = 0;
     let starred = 0;
-    let projects = 0;
-    let lists = 0;
+    let rooms = 0;
     for (const n of live) {
       if (n.colorId) byWorld.set(n.colorId, (byWorld.get(n.colorId) ?? 0) + 1);
       if (n.priority)
@@ -257,8 +248,7 @@ export function Home() {
       if (n.isTask && n.doneAt === null) todo += 1;
       if (n.doneAt !== null) done += 1;
       if (n.pinned) starred += 1;
-      if (isProject(n)) projects += 1;
-      if (isList(n)) lists += 1;
+      if (contentsOf(notes, n.id).length > 0) rooms += 1;
     }
     return {
       byWorld,
@@ -268,11 +258,10 @@ export function Home() {
       todo,
       done,
       starred,
-      projects,
-      lists,
+      rooms,
       archive: top.length - live.length,
     };
-  }, [live, top]);
+  }, [live, top, notes]);
 
   const visible = useMemo(() => {
     const pool =
@@ -284,8 +273,7 @@ export function Home() {
         (view !== "todo" || (n.isTask && n.doneAt === null)) &&
         (view !== "done" || n.doneAt !== null) &&
         (view !== "starred" || n.pinned) &&
-        (view !== "projects" || isProject(n)) &&
-        (view !== "lists" || isList(n)) &&
+        (view !== "rooms" || contentsOf(notes, n.id).length > 0) &&
         (level === null || n.priority === level) &&
         (mark === null || marksOf(n).includes(mark)) &&
         matches(n, query),
@@ -295,7 +283,7 @@ export function Home() {
       if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
       return b.createdAt.localeCompare(a.createdAt);
     });
-  }, [top, live, world, tag, view, query, level, mark]);
+  }, [top, live, world, tag, view, query, level, mark, notes]);
 
   // Any change to what is on screen restarts the list from the top. Adjusted
   // during render, so the first paint is already the short list.
@@ -389,18 +377,22 @@ export function Home() {
           put("none", "Unranked", null, PRIORITIES.length, n);
         }
       } else {
-        const kind = isProject(n)
-          ? { k: "project", n: "Projects", at: 0 }
-          : isList(n)
-            ? { k: "list", n: "Lists", at: 1 }
+        /*
+         * Two kinds, because there are only two: things that hold other
+         * things, and things that do not. Projects and Lists used to be two
+         * more bands here, describing a distinction the app no longer makes.
+         */
+        const kind =
+          contentsOf(notes, n.id).length > 0
+            ? { k: "room", n: "Rooms", at: 0 }
             : n.isTask
-              ? { k: "todo", n: "To do", at: 2 }
-              : { k: "note", n: "Notes", at: 3 };
+              ? { k: "todo", n: "To do", at: 1 }
+              : { k: "note", n: "Notes", at: 2 };
         put(kind.k, kind.n, null, kind.at, n);
       }
     }
     return [...bands.values()].sort((a, b) => a.at - b.at);
-  }, [shown, group, colors]);
+  }, [shown, group, colors, notes]);
   const more = visible.length - shown.length;
   const loadMore = useCallback(() => setLimit((n) => n + PAGE), []);
 
@@ -428,8 +420,7 @@ export function Home() {
   const owed = useMemo(
     () =>
       notes.filter(
-        (n) =>
-          n.archivedAt === null && n.doneAt === null && n.priority === "now",
+        (n) => n.archivedAt === null && n.doneAt === null && n.todayOn !== null,
       ).length,
     [notes],
   );
@@ -556,47 +547,13 @@ export function Home() {
           </div>
         )}
 
-        {/*
-          The offer, at the only moment it means anything.
-
-          Deciding "project or list?" at the keyboard meant classifying a
-          thought before writing it, which is why the tabs are gone. But a note
-          that has grown contents is asking a real question, and this is where
-          it gets asked — once, quietly, and never again after an answer.
-        */}
-        {here &&
-          !isProject(here) &&
-          !isList(here) &&
-          childCount > 0 &&
-          here.archivedAt === null && (
-            <p className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 border border-rule-soft bg-field px-4 py-3">
-              <span className="prose-note text-[calc(15px*var(--type))] text-mute">
-                {childCount} things in here now. Want to keep track of it?
-              </span>
-              <button
-                type="button"
-                onClick={() => patchNote(here.id, { projectStatus: "idea" })}
-                className="label ml-auto border border-rule px-2.5 py-1.5 hover:bg-ink hover:text-paper"
-              >
-                As a project
-              </button>
-              <button
-                type="button"
-                onClick={() => patchNote(here.id, { isList: true })}
-                className="label border border-rule px-2.5 py-1.5 hover:bg-ink hover:text-paper"
-              >
-                As a list
-              </button>
-            </p>
-          )}
-
         <Compose
           key={inside ?? "root"}
           colorId={composeColor}
           onColorId={setComposeColor}
           inputRef={composeRef}
           parentId={inside}
-          parentName={here ? projectTitle(here) : null}
+          parentName={here ? titleOf(here) : null}
         />
 
         {/*
@@ -633,7 +590,7 @@ export function Home() {
                 {id === "work" && owed > 0 && (
                   <span className="tabular-nums opacity-60">{owed}</span>
                 )}
-                {id === "dailies" && madeToday > 0 && (
+                {id === "journal" && madeToday > 0 && (
                   <span className="tabular-nums opacity-60">{madeToday}</span>
                 )}
               </button>
@@ -669,9 +626,9 @@ export function Home() {
           </>
         )}
 
-        {showing === "dailies" && (
+        {showing === "journal" && (
           <>
-            <Dailies todayKey={todayKey} onOpen={open} />
+            <Journal todayKey={todayKey} onOpen={open} />
 
             {/* The same record as the days above, zoomed out to eight weeks. */}
             {quiet && cells.some((c) => c.moves > 0) && (
@@ -887,7 +844,7 @@ export function Home() {
                 {view === "archive"
                   ? "Nothing archived."
                   : inside
-                    ? `Nothing in ${projectTitle(here!)} yet. Put something in it up there.`
+                    ? `Nothing in ${titleOf(here!)} yet. Put something in it up there.`
                     : "Nothing here. Try another folder, or clear the filters."}
               </Empty>
             ) : (
@@ -999,7 +956,7 @@ function Trail({
             className="label flex max-w-48 items-center gap-1.5 border border-rule px-2 py-1.5 text-mute hover:bg-ink hover:text-paper"
           >
             <TrailMark note={step} />
-            {projectTitle(step)}
+            {titleOf(step)}
           </button>
         </span>
       ))}
@@ -1008,7 +965,7 @@ function Trail({
       </span>
       <span className="label flex max-w-64 items-center gap-1.5 border-2 border-ink px-2 py-1.5">
         <TrailMark note={here} />
-        {projectTitle(here)}
+        {titleOf(here)}
       </span>
     </nav>
   );
@@ -1342,30 +1299,32 @@ function FolderSticker({ color }: { color: Color }) {
   );
 }
 
-function Drifting({ project, quiet }: { project: Note; quiet: number }) {
+function Drifting({ project: room, quiet }: { project: Note; quiet: number }) {
   const { patchNote } = useNoella();
+  const todayKey = useTodayKey();
   return (
     <article className="flex flex-col gap-3 border border-rule bg-field px-4 py-3.5 sm:flex-row sm:items-center">
       <span className="prose-note text-[calc(16px*var(--type))] leading-snug sm:flex-1">
-        {projectTitle(project)}
+        {titleOf(room)}
       </span>
       <span className="label tabular-nums text-mute">quiet {quiet}d</span>
       <span className="flex flex-wrap items-center gap-1.5">
-        <Small
-          onClick={() =>
-            patchNote(project.id, { projectStatus: "active", order: -1 })
-          }
-        >
+        <Small onClick={() => patchNote(room.id, { todayOn: todayKey })}>
           Back on
         </Small>
         <Small
-          onClick={() => patchNote(project.id, { projectStatus: "paused" })}
+          onClick={() =>
+            // Out of the way for a fortnight, rather than answered. "Not now"
+            // is a legitimate answer and this list is only useful if it is
+            // answerable rather than permanent.
+            patchNote(room.id, { snoozedUntil: inDays(todayKey, 14) })
+          }
         >
           Park
         </Small>
         <Small
           onClick={() =>
-            patchNote(project.id, { archivedAt: new Date().toISOString() })
+            patchNote(room.id, { archivedAt: new Date().toISOString() })
           }
         >
           Drop

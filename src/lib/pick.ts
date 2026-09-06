@@ -3,12 +3,12 @@
  *
  * A priority list you wrote yourself is a list you can argue with, and the
  * argument is usually how an afternoon disappears. Weighted chance takes the
- * decision away without taking the ranking away — the top of your list comes
- * up most, but not always, so the thing sitting at rank nine for a fortnight
- * still gets its turn.
+ * decision away without taking the ranking away — HPrio comes up six times as
+ * often as LPrio, but not always, so the thing sitting at the bottom for a
+ * fortnight still gets its turn.
  */
 
-import { isList, isProject, projectTitle, stepsOf } from "./projects";
+import { contentsOf, titleOf } from "./rooms";
 import { isSettled } from "./recurrence";
 import type { Note } from "./types";
 
@@ -19,64 +19,56 @@ export interface Candidate {
   weight: number;
 }
 
-/** How much each kind of open thing wants to be chosen. */
+/**
+ * How much each open thing wants to be chosen.
+ *
+ * Weight used to be read off a project's status — first step of the top active
+ * project, then other active ones, then parked ones — which meant the hat only
+ * ever contained things you had gone to the trouble of promoting. There are no
+ * projects any more, so it is read off the two things every note has: how much
+ * it matters, and whether anything is waiting behind it.
+ */
 const WEIGHTS = {
-  /** The next step of the project you ranked first. */
-  todaysStep: 12,
-  /** The next step of any other active project. */
-  activeStep: 7,
-  /** A later step of an active project. */
-  laterStep: 2,
-  /** A loose to-do with no project behind it. */
-  looseTask: 5,
-  /** An item on a recurring list that has not come round yet this period. */
-  recurring: 4,
-  /** A step of a project you have parked or only had an idea about. */
-  quietStep: 1,
+  high: 12,
+  mid: 6,
+  low: 2,
+  /** Unranked. Middling on purpose: never triaged is not the same as unimportant. */
+  unranked: 4,
 } as const;
+
+/** The first unfinished thing in a room wants doing more than the fifth. */
+const FIRST_IN_ROOM = 1.6;
 
 export function candidates(notes: Note[], today: Date): Candidate[] {
   const out: Candidate[] = [];
   const live = notes.filter((n) => n.archivedAt === null);
-
-  const active = live
-    .filter((n) => n.projectStatus === "active")
-    .sort((a, b) => a.order - b.order);
-
-  for (const project of live.filter(isProject)) {
-    const steps = stepsOf(notes, project.id).filter((s) => s.doneAt === null);
-    const rank = active.indexOf(project);
-    steps.forEach((step, i) => {
-      const weight =
-        rank === -1
-          ? WEIGHTS.quietStep
-          : i > 0
-            ? WEIGHTS.laterStep
-            : rank === 0
-              ? WEIGHTS.todaysStep
-              : WEIGHTS.activeStep;
-      out.push({ note: step, from: projectTitle(project), weight });
-    });
-  }
-
-  for (const list of live.filter(isList)) {
-    const items = live.filter((n) => n.parentId === list.id);
-    for (const item of items) {
-      if (isSettled(item, list.listCadence, today)) continue;
-      // A plain list is storage, not a demand; only a recurring one is asking.
-      if (list.listCadence === null) continue;
-      out.push({
-        note: item,
-        from: projectTitle(list),
-        weight: WEIGHTS.recurring,
-      });
-    }
-  }
+  const byId = new Map(live.map((n) => [n.id, n]));
+  const seenRoom = new Set<string>();
 
   for (const note of live) {
-    if (!note.isTask || note.doneAt !== null) continue;
-    if (note.parentId !== null || isProject(note) || isList(note)) continue;
-    out.push({ note, from: "on its own", weight: WEIGHTS.looseTask });
+    if (note.doneAt !== null) continue;
+    // A room is a place, not a job: what you do is the thing inside it.
+    if (contentsOf(notes, note.id).length > 0) continue;
+
+    const room = note.parentId ? byId.get(note.parentId) : null;
+    if (room && isSettled(note, room.repeats, today)) continue;
+
+    let weight = note.priority
+      ? WEIGHTS[note.priority]
+      : note.isTask
+        ? WEIGHTS.unranked
+        : WEIGHTS.low;
+
+    if (room && !seenRoom.has(room.id)) {
+      seenRoom.add(room.id);
+      weight *= FIRST_IN_ROOM;
+    }
+
+    out.push({
+      note,
+      from: room ? titleOf(room) : "",
+      weight,
+    });
   }
 
   return out;

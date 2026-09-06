@@ -6,7 +6,10 @@ import { useEffect } from "react";
 export function ServiceWorker() {
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
-    if (window.location.protocol !== "https:" && window.location.hostname !== "localhost") {
+    if (
+      window.location.protocol !== "https:" &&
+      window.location.hostname !== "localhost"
+    ) {
       return;
     }
     const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";

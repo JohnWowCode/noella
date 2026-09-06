@@ -90,7 +90,9 @@ function tx<T>(
 export async function remembered(): Promise<Folder | null> {
   if (!supported()) return null;
   try {
-    return (await tx<Folder | undefined>("readonly", (s) => s.get(KEY))) ?? null;
+    return (
+      (await tx<Folder | undefined>("readonly", (s) => s.get(KEY))) ?? null
+    );
   } catch {
     return null;
   }
@@ -201,7 +203,9 @@ export interface Op {
   /** Legacy: one sticker. Still accepted so an older server keeps working. */
   icon?: string | null;
   icons?: string[];
-  priority?: "now" | "next" | "later" | null;
+  /** Older servers send now/next/later; they are read across on the way in. */
+  priority?: string | null;
+  today?: boolean;
 }
 
 export interface Envelope {

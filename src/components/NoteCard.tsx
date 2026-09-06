@@ -9,7 +9,9 @@ import {
   type Destination,
 } from "@/lib/send";
 import { imageFilesFrom } from "@/lib/images";
-import { isList, isProject, projectTitle, stepsOf } from "@/lib/projects";
+import { wordCount } from "@/lib/notes";
+import { todayKey } from "@/lib/clock";
+import { contentsOf, titleOf } from "@/lib/rooms";
 import { PRIORITIES, PRIORITY } from "@/lib/priority";
 import { swatchName } from "@/lib/store/defaults";
 import { MARK_GROUPS, markLabel, marksOf, toggleMark } from "@/lib/stickers";
@@ -19,8 +21,14 @@ import { ON_COLOR_BUTTON, surfaceStyle } from "@/lib/surface";
 import type { Note } from "@/lib/types";
 import { Icon } from "./Icon";
 import { Lightbox, NoteImages } from "./NoteImages";
-import { ListPanel } from "./ListPanel";
-import { ProjectPanel } from "./ProjectPanel";
+import { Inside } from "./Inside";
+
+/**
+ * Characters past which a body folds on the wall. Roughly four lines at the
+ * default size — enough to recognise a note by, short enough that a wall of
+ * them is still a wall.
+ */
+const LONG = 320;
 
 interface Props {
   note: Note;
@@ -52,6 +60,8 @@ export function NoteCard({
   const [recolouring, setRecolouring] = useState(false);
   const [menu, setMenu] = useState(false);
   const [marking, setMarking] = useState(false);
+  /** Long bodies open on demand. See LONG below. */
+  const [unfolded, setUnfolded] = useState(false);
   /*
    * Read on mount rather than in render: it is a device setting in
    * localStorage, and reading storage during render is both impure and a
@@ -64,9 +74,18 @@ export function NoteCard({
   const color = colorOf(note);
   const done = note.doneAt !== null;
   const archived = note.archivedAt !== null;
-  const project = isProject(note);
-  const list = isList(note);
-  const steps = project || list ? stepsOf(notes, note.id) : [];
+  const contents = contentsOf(notes, note.id);
+  const room = contents.length > 0;
+  /*
+   * Long enough that showing all of it turns the wall into a document.
+   *
+   * A bug write-up, a pasted stack trace, a scene — these are exactly what
+   * this is for, and they were rendering in full on every card, so one long
+   * note buried forty short ones. Folded, a long note shows its first lines
+   * and says how much more there is; the card you are standing inside never
+   * folds, because that is the reading view.
+   */
+  const long = !heading && note.body.length > LONG;
   // Anything can hold anything now, so the count is not about being a project.
   const inside = countChildren(notes, note.id);
   const marks = marksOf(note);
@@ -180,7 +199,7 @@ export function NoteCard({
                 onClick={() => onOpen?.(step.id)}
                 className="max-w-40 truncate underline decoration-1 underline-offset-2 hover:no-underline"
               >
-                {projectTitle(step)}
+                {titleOf(step)}
               </button>
             </span>
           ))}
@@ -213,7 +232,20 @@ export function NoteCard({
         changes. Flex order does the whole thing, so it is one DOM either way
         and the tab order stays the reading order.
       */}
-      <div className="flex flex-wrap items-start gap-x-3 gap-y-1 sm:flex-nowrap">
+      <div
+        className={`flex flex-wrap items-start gap-x-3 gap-y-1 ${
+          /*
+           * A long note takes the whole column at every width.
+           *
+           * Three columns are right for a sentence and wrong for a page: the
+           * prose starts after the gutter, so every wrapped line sits in a
+           * narrow channel with a dead rectangle beside it. Anything long
+           * enough to fold gets the layout a phone already uses — chrome on
+           * one short line, words underneath, full width.
+           */
+          long ? "" : "sm:flex-nowrap"
+        }`}
+      >
         {/*
           A fixed gutter, so the sentences line up.
 
@@ -243,30 +275,15 @@ export function NoteCard({
             </button>
           )}
 
-          {/* What it is, when it is not simply a note. */}
-          {list ? (
-            <span className="shrink-0">
-              {note.listCadence ? `${note.listCadence} list` : "list"}{" "}
-              {steps.length}
-            </span>
-          ) : project ? (
-            <span
-              className={`shrink-0 px-1.5 py-0.5 ${
-                note.projectStatus === "active"
-                  ? onColor
-                    ? "bg-[var(--on)] text-[var(--on-inv)]"
-                    : "bg-ink text-paper"
-                  : "border border-current/35"
-              }`}
-            >
-              project {note.projectStatus}
-            </span>
-          ) : (
-            // Visibility is identical on every note until sharing ships, so
-            // it earns its place on a card only when it is not the default.
-            note.visibility !== "private" && (
-              <span className="shrink-0">{note.visibility}</span>
-            )
+          {/*
+            No kind pill any more, because there are no kinds. What a note is
+            is what it holds, and that is drawn where it lives — the count on
+            the way in, the contents underneath. Visibility is the one thing
+            here that cannot be seen elsewhere, and only when it is not the
+            default.
+          */}
+          {note.visibility !== "private" && (
+            <span className="shrink-0">{note.visibility}</span>
           )}
 
           {/*
@@ -275,6 +292,17 @@ export function NoteCard({
             went for NEXT on orange. There it takes the card's own ink and
             carries the priority as a small block instead.
           */}
+          {note.todayOn !== null && (
+            <span
+              className={`shrink-0 px-1.5 py-0.5 ${
+                onColor
+                  ? "bg-[var(--on)] text-[var(--on-inv)]"
+                  : "bg-ink text-paper"
+              }`}
+            >
+              Today
+            </span>
+          )}
           {note.priority && (
             <span
               className={`flex shrink-0 items-center gap-1.5 px-1.5 py-0.5 ${
@@ -320,6 +348,13 @@ export function NoteCard({
               if ((e.metaKey || e.ctrlKey) && e.key === "Enter") commit();
             }}
             rows={3}
+            /*
+             * The base layer already gives every textarea `field-sizing:
+             * content`, so this grows with a pasted bug report rather than
+             * scrolling inside three rows. The cap stops a very long one
+             * pushing the card's own actions off the screen.
+             */
+            style={{ maxHeight: "70vh" }}
           />
         ) : note.body.length > 0 ? (
           <p
@@ -338,11 +373,20 @@ export function NoteCard({
               if (window.matchMedia("(hover: none)").matches) setEditing(true);
             }}
             onDoubleClick={() => setEditing(true)}
-            className={`prose-note order-3 w-full min-w-0 [overflow-wrap:anywhere] whitespace-pre-wrap sm:order-2 sm:w-auto sm:flex-1 ${
-              heading ? "text-[calc(24px*var(--type))] leading-tight sm:text-[calc(28px*var(--type))]" : ""
-            } ${done ? "line-through opacity-55" : ""}`}
+            className={`prose-note order-3 w-full min-w-0 [overflow-wrap:anywhere] whitespace-pre-wrap ${
+              long ? "" : "sm:order-2 sm:w-auto sm:flex-1"
+            } ${
+              heading
+                ? "text-[calc(24px*var(--type))] leading-tight sm:text-[calc(28px*var(--type))]"
+                : ""
+            } ${done ? "line-through opacity-55" : ""} ${
+              long && !unfolded ? "line-clamp-4" : ""
+            } ${heading || unfolded ? "max-w-[68ch]" : ""}`}
           >
-            <Highlight text={note.body} query={query} />
+            <Highlight
+              text={long && !unfolded ? note.body.slice(0, LONG) : note.body}
+              query={query}
+            />
           </p>
         ) : (
           <span className="order-3 flex-1 sm:order-2" />
@@ -406,6 +450,30 @@ export function NoteCard({
       </div>
 
       {/*
+        The rest of a long one, one tap away.
+
+        Outside the card's row, not in it: as a full-width item inside a
+        no-wrap flex line it took the whole width and crushed the paragraph
+        beside it to zero, so the "four line" fold was rendering four
+        characters. Measured, not noticed.
+
+        It opens in place rather than in a modal, so the note you were reading
+        stays where it was on the wall and folding it back puts you exactly
+        where you were.
+      */}
+      {long && !editing && (
+        <button
+          type="button"
+          onClick={() => setUnfolded((v) => !v)}
+          className="label mt-2 text-mute underline decoration-1 underline-offset-2 hover:text-ink hover:no-underline"
+        >
+          {unfolded
+            ? "Fold it back"
+            : `Read all of it · ${wordCount(note.body)} words`}
+        </button>
+      )}
+
+      {/*
         Everything else, once asked for.
 
         Nine actions used to sit in the header as nine underlined words, on
@@ -448,6 +516,22 @@ export function NoteCard({
           >
             Marks
           </Action>
+          {/*
+            Today first, because it is the one you reach for daily and it is
+            no longer the same question as importance. Now/Next/Later meant
+            both at once, so "the most important thing I have, not today" had
+            nowhere to go.
+          */}
+          <Action
+            onClick={() =>
+              patchNote(note.id, {
+                todayOn: note.todayOn ? null : todayKey(),
+              })
+            }
+            pressed={note.todayOn !== null}
+          >
+            {note.todayOn ? "Off today" : "Today"}
+          </Action>
           {PRIORITIES.map((level) => (
             <Action
               key={level}
@@ -461,21 +545,7 @@ export function NoteCard({
               {PRIORITY[level].label}
             </Action>
           ))}
-          {!list && (
-            <Action
-              onClick={() =>
-                patchNote(note.id, { projectStatus: project ? null : "idea" })
-              }
-            >
-              {project ? "Unproject" : "Make a project"}
-            </Action>
-          )}
-          {!project && (
-            <Action onClick={() => patchNote(note.id, { isList: !list })}>
-              {list ? "Unlist" : "Make a list"}
-            </Action>
-          )}
-          {!project && targets.length > 0 && (
+          {targets.length > 0 && (
             <Action
               onClick={() => {
                 setMoving((v) => !v);
@@ -486,15 +556,13 @@ export function NoteCard({
               Move
             </Action>
           )}
-          {!project && (
-            <Action
-              onClick={() =>
-                patchNote(note.id, { isTask: !note.isTask, doneAt: null })
-              }
-            >
-              {note.isTask ? "Untask" : "Task"}
-            </Action>
-          )}
+          <Action
+            onClick={() =>
+              patchNote(note.id, { isTask: !note.isTask, doneAt: null })
+            }
+          >
+            {note.isTask ? "No checkbox" : "Checkbox"}
+          </Action>
           {destination && (
             <Action
               onClick={() => {
@@ -540,15 +608,11 @@ export function NoteCard({
             onClick={() => {
               // Steps go with the project, so say so before it happens.
               if (
-                steps.length > 0 &&
+                contents.length > 0 &&
                 !window.confirm(
-                  list
-                    ? `Delete this list and its ${steps.length} ${
-                        steps.length === 1 ? "item" : "items"
-                      }?`
-                    : `Delete this project and its ${steps.length} ${
-                        steps.length === 1 ? "step" : "steps"
-                      }?`,
+                  `Delete this and the ${contents.length} ${
+                    contents.length === 1 ? "thing" : "things"
+                  } inside it?`,
                 )
               ) {
                 return;
@@ -658,21 +722,13 @@ export function NoteCard({
 
       <NoteImages images={note.images} onOpen={setViewing} />
 
-      {project && (
-        <ProjectPanel
-          project={note}
-          steps={steps}
+      {room && (
+        <Inside
+          note={note}
+          contents={contents}
           onColor={onColor}
           showContents={!heading}
-        />
-      )}
-
-      {list && (
-        <ListPanel
-          list={note}
-          items={steps}
-          onColor={onColor}
-          showContents={!heading}
+          today={new Date()}
         />
       )}
 
@@ -782,9 +838,7 @@ function Mover({
     .map((t) => ({ note: t, path: pathTo(notes, t.id) }))
     .filter(({ note: t, path }) =>
       needle
-        ? [t, ...path].some((n) =>
-            projectTitle(n).toLowerCase().includes(needle),
-          )
+        ? [t, ...path].some((n) => titleOf(n).toLowerCase().includes(needle))
         : true,
     )
     .slice(0, 40);
@@ -824,11 +878,11 @@ function Mover({
                 className="flex w-full items-baseline gap-2 px-1.5 py-1.5 text-left hover:bg-current/10"
               >
                 <span className="prose-note min-w-0 flex-1 truncate text-[calc(15px*var(--type))]">
-                  {projectTitle(t)}
+                  {titleOf(t)}
                 </span>
                 {path.length > 0 && (
                   <span className="label shrink-0 max-w-40 truncate opacity-55">
-                    in {projectTitle(path[path.length - 1])}
+                    in {titleOf(path[path.length - 1])}
                   </span>
                 )}
               </button>

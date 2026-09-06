@@ -127,8 +127,16 @@ export function Icon({
       aria-hidden
       focusable="false"
       className={className}
-      // Scaled so a 16px mark and a 34px one carry the same visual weight.
-      strokeWidth={mark.d ? (size < 18 ? 2.4 : 2) : 0}
+      /*
+       * Heavier than it was.
+       *
+       * These sit at 15 and 16 pixels in a card's meta row, next to 12px
+       * uppercase mono and 18px serif — both of which put down more ink than a
+       * two-unit hairline. At that size the marks read as faint suggestions
+       * rather than as the labels they now are, so the stroke goes up and
+       * scales harder as the mark gets smaller.
+       */
+      strokeWidth={mark.d ? (size < 14 ? 3 : size < 18 ? 2.7 : 2.3) : 0}
       stroke={mark.d ? "currentColor" : "none"}
       fill={mark.fill ? "currentColor" : "none"}
       strokeLinecap="square"

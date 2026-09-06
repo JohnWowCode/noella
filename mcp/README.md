@@ -143,10 +143,10 @@ Reading — always available, current as of the last time a tab was open:
 | Tool | For |
 | --- | --- |
 | `whats_on_today` | The short list: chosen today, carried over, already done. Ask this first |
-| `whats_open` | Everything unticked, in the order Noella would work through it |
-| `search_notes` | By text, `#tag`, folder, kind, `mark` or `priority`; `open_only` for the live ones |
+| `whats_open` | What is on today, the next thing in each room, and anything loose |
+| `search_notes` | By text, `#tag`, folder, kind (`note`/`todo`/`room`), `mark` or `priority` |
 | `get_note` | One thing in full: what it holds, and the path to where it lives |
-| `list_projects` | Every project with status, progress and next step; every list |
+| `list_rooms` | Every note holding something, with what is in it and how far through |
 | `list_folders` | The colour folders, their names, and how much is in each |
 
 Writing — queued, lands when a tab is next open:
@@ -156,10 +156,22 @@ Writing — queued, lands when a tab is next open:
 | `add_note` | A note, to-do, project or list; `inside` nests it, plus `priority` and `marks` |
 | `add_step` | The same thing, worded for checklists |
 | `complete` | Tick something off, or `undo: true` to un-tick it |
-| `set_project_status` | idea / active / paused / done |
-| `set_priority` | now / next / later, or none to unrank |
+| `set_priority` | high / mid / low, or none to unrank. Weight, not timing |
+| `set_today` | Put something on today, or take it off |
 | `set_marks` | What something is about; replaces the set, empty strips it |
 | `pending_changes` | What is queued and not yet applied |
+
+### One kind of thing
+
+There are no projects and no lists. A note with something inside it is a room;
+take everything out and it is a note again. Nothing is promoted and there is no
+wrong drawer to have put something in. What the kinds used to carry survives as
+properties any note can have: a checkbox, a cadence, and a count of what is
+inside.
+
+Priority is weight — high, mid, low — and is deliberately not timing. What is
+being done today is `set_today`, which is dated, so a thing chosen this morning
+reads differently from a thing carried for a week.
 
 ### Marks
 

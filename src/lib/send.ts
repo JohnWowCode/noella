@@ -33,7 +33,11 @@ export interface Destination {
   token: string;
 }
 
-export const NO_DESTINATION: Destination = { name: "JSpace", url: "", token: "" };
+export const NO_DESTINATION: Destination = {
+  name: "JSpace",
+  url: "",
+  token: "",
+};
 
 const KEY = "noella.send";
 
@@ -115,7 +119,10 @@ export async function send(
       body: JSON.stringify(parcel),
     });
     if (!response.ok) {
-      return await copied(parcel, `${destination.name} said ${response.status}`);
+      return await copied(
+        parcel,
+        `${destination.name} said ${response.status}`,
+      );
     }
     return { ok: true, how: "posted" };
   } catch (error) {

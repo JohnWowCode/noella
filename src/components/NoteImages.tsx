@@ -43,7 +43,12 @@ export function NoteImages({
       }`}
     >
       {images.map((img, i) => (
-        <Thumb key={img.id} image={img} single={single} onOpen={() => onOpen(i)} />
+        <Thumb
+          key={img.id}
+          image={img}
+          single={single}
+          onOpen={() => onOpen(i)}
+        />
       ))}
     </div>
   );
@@ -73,7 +78,11 @@ function Thumb({
     return (
       <div
         className={`border border-current/25 ${single ? "" : "aspect-square overflow-hidden"}`}
-        style={single ? { aspectRatio: `${image.width} / ${image.height}` } : undefined}
+        style={
+          single
+            ? { aspectRatio: `${image.width} / ${image.height}` }
+            : undefined
+        }
       >
         {url ? (
           <video
@@ -192,7 +201,9 @@ export function Lightbox({
           <span className="ml-auto flex gap-2">
             <button
               type="button"
-              onClick={() => onIndex((index - 1 + images.length) % images.length)}
+              onClick={() =>
+                onIndex((index - 1 + images.length) % images.length)
+              }
               className="label border border-rule px-2 py-1 hover:bg-ink hover:text-paper"
             >
               ← Prev

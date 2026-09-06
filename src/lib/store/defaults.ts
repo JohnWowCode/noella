@@ -31,10 +31,26 @@ const MEDIUMS = [
   "#7ED97E", // green
 ] as const;
 
-const NAMES = ["yellow", "lime", "teal", "blue", "violet", "pink",
-  "red", "orange", "amber", "orchid", "cyan", "green"] as const;
+const NAMES = [
+  "yellow",
+  "lime",
+  "teal",
+  "blue",
+  "violet",
+  "pink",
+  "red",
+  "orange",
+  "amber",
+  "orchid",
+  "cyan",
+  "green",
+] as const;
 
-interface Hsl { h: number; s: number; l: number }
+interface Hsl {
+  h: number;
+  s: number;
+  l: number;
+}
 
 function toHsl(hex: string): Hsl {
   const v = hex.replace("#", "");
@@ -49,7 +65,7 @@ function toHsl(hex: string): Hsl {
   const s = d / (1 - Math.abs(2 * l - 1));
   const h =
     max === r
-      ? ((g - b) / d + (g < b ? 6 : 0))
+      ? (g - b) / d + (g < b ? 6 : 0)
       : max === g
         ? (b - r) / d + 2
         : (r - g) / d + 4;
@@ -127,8 +143,7 @@ export function readableInk(hex: string): string {
     const c = parseInt(v.slice(i, i + 2), 16) / 255;
     return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
   };
-  const lum =
-    0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4);
+  const lum = 0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4);
   // Contrast against white is 1.05 / (lum + 0.05); against #111 it is
   // (lum + 0.05) / 0.0556. Setting those equal gives (lum + 0.05)^2 = 0.0584,
   // so they cross at lum ≈ 0.1917 — below that white wins, above it #111 does.

@@ -11,10 +11,10 @@
  * emptied, which is the whole point: a screen you can finish is the only thing
  * that makes tomorrow's screen worth opening.
  *
- * It reuses `now` rather than inventing a seventh way to label a note. The
- * picker has always said "today, or it slips" — that *is* today, and there are
- * already enough dimensions (colour, marks, rank, favourite, task, container)
- * without a "Today" flag sitting beside a "Now" rank meaning the same thing.
+ * It is its own mark rather than a value of the priority field. Those were
+ * welded together — "now" meant both "today" and "most important" — which
+ * made it impossible to say "this is the most important thing I have and I am
+ * not doing it today", which is true of nearly everything important.
  */
 
 import { daysBetween } from "./clock";
@@ -49,10 +49,8 @@ export function todayOf(notes: Note[], key: string): Today {
   for (const n of notes) {
     if (n.archivedAt !== null) continue;
     if (n.doneAt !== null && n.doneAt.slice(0, 10) === key) finished.push(n);
-    if (n.priority !== "now") continue;
-    // A note ranked before the date existed reads as today's rather than
-    // as infinitely old, which would open the app with a false accusation.
-    const on = n.rankedOn ?? key;
+    if (n.todayOn === null) continue;
+    const on = n.todayOn;
     if (n.doneAt !== null) {
       if (on === key) done.push(n);
     } else if (on === key) {
@@ -63,13 +61,13 @@ export function todayOf(notes: Note[], key: string): Today {
   }
 
   const oldestFirst = (a: Note, b: Note) =>
-    (a.rankedOn ?? "").localeCompare(b.rankedOn ?? "");
+    (a.todayOn ?? "").localeCompare(b.todayOn ?? "");
   carried.sort(oldestFirst);
   return { open, done, carried, finished };
 }
 
 /** How long something has been sitting on today. Zero when it is today's. */
 export function ageOf(note: Note, key: string): number {
-  if (!note.rankedOn) return 0;
-  return Math.max(0, daysBetween(note.rankedOn, key));
+  if (!note.todayOn) return 0;
+  return Math.max(0, daysBetween(note.todayOn, key));
 }

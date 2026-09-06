@@ -112,7 +112,7 @@ export function Today({
             note={n}
             days={ageOf(n, todayKey)}
             onTick={() => patchNote(n.id, { doneAt: new Date().toISOString() })}
-            onDrop={() => patchNote(n.id, { priority: null })}
+            onDrop={() => patchNote(n.id, { todayOn: null })}
             onOpen={onOpen}
           />
         ))}
@@ -122,7 +122,7 @@ export function Today({
             note={n}
             days={0}
             onTick={() => patchNote(n.id, { doneAt: new Date().toISOString() })}
-            onDrop={() => patchNote(n.id, { priority: null })}
+            onDrop={() => patchNote(n.id, { todayOn: null })}
             onOpen={onOpen}
           />
         ))}
@@ -133,7 +133,7 @@ export function Today({
             days={0}
             finished
             onTick={() => patchNote(n.id, { doneAt: null })}
-            onDrop={() => patchNote(n.id, { priority: null })}
+            onDrop={() => patchNote(n.id, { todayOn: null })}
             onOpen={onOpen}
           />
         ))}

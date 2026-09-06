@@ -48,7 +48,9 @@ export function isSettled(
 ): boolean {
   if (item.doneAt === null) return false;
   if (cadence === null) return true;
-  return periodKey(cadence, new Date(item.doneAt)) === periodKey(cadence, today);
+  return (
+    periodKey(cadence, new Date(item.doneAt)) === periodKey(cadence, today)
+  );
 }
 
 export function describeCadence(cadence: Cadence): string {

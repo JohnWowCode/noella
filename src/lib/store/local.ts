@@ -1,5 +1,7 @@
 import { deleteBlob, getBlob, putBlob } from "../images";
 import { detectTask, parseTags } from "../notes";
+import { priorityOf } from "../priority";
+import type { Cadence } from "../recurrence";
 import { marksOf } from "../stickers";
 import {
   DEFAULT_SETTINGS,
@@ -40,24 +42,50 @@ function migrate(snapshot: Snapshot): Snapshot {
   const notes = snapshot.notes.map((stored) => {
     // Read as the loose shape it is on disk: a wall written by an older build
     // has fields this one dropped, and none of them are on `Note` any more.
-    const n = stored as Note & { icon?: string | null };
+    const n = stored as Note & {
+      icon?: string | null;
+      projectStatus?: string | null;
+      isList?: boolean;
+      listCadence?: Cadence | null;
+      rankedOn?: string | null;
+    };
+    /* eslint-disable @typescript-eslint/no-unused-vars */
+    const {
+      projectStatus: _wasProject,
+      isList: _wasList,
+      listCadence,
+      rankedOn,
+      icon: _sticker,
+      ...rest
+    } = n;
+    /* eslint-enable @typescript-eslint/no-unused-vars */
     return {
-      ...n,
+      ...rest,
       images: Array.isArray(n.images) ? n.images : [],
-      projectStatus: n.projectStatus ?? null,
       parentId: n.parentId ?? null,
-      listCadence: n.listCadence ?? null,
+      /*
+       * Projects and lists are gone as kinds. Nothing is lost by it: a project
+       * was a note with a status and a list was a note with a cadence, and a
+       * note has always been able to hold notes. The cadence survives as a
+       * property of any note; the status does not, because "idea / active /
+       * paused / done" is answered better by the priority beside it and the
+       * tick on it.
+       */
+      repeats: listCadence ?? null,
       amount: typeof n.amount === "number" ? n.amount : null,
       order: typeof n.order === "number" ? n.order : 0,
       estimateMinutes: n.estimateMinutes ?? null,
       actualMinutes: n.actualMinutes ?? null,
       snoozedUntil: n.snoozedUntil ?? null,
-      isList: n.isList ?? false,
       // A sticker was one glyph; a mark set is a list of reasons. An old note
       // arrives with its single icon read across (see marksOf) rather than lost.
-      icons: marksOf(n),
-      priority: n.priority ?? null,
-      rankedOn: n.rankedOn ?? null,
+      icons: marksOf({ icons: n.icons, icon: _sticker }),
+      // Now / Next / Later split into "how much it matters" and "am I doing
+      // it today", which were always two questions wearing one field.
+      priority: priorityOf(n.priority),
+      todayOn:
+        n.todayOn ??
+        ((n.priority as string | null) === "now" ? (rankedOn ?? null) : null),
     };
   });
 
@@ -182,17 +210,15 @@ export class LocalStore implements Store {
       colorId: input.colorId,
       tags: parseTags(body),
       images: input.images ?? [],
-      projectStatus: input.projectStatus ?? null,
       parentId: input.parentId ?? null,
       icons: marksOf({ icons: input.icons ?? [] }),
       priority: input.priority ?? null,
-      rankedOn: input.priority === "now" ? todayKey() : null,
-      listCadence: null,
+      todayOn: null,
+      repeats: input.repeats ?? null,
       amount: null,
       estimateMinutes: null,
       actualMinutes: null,
       snoozedUntil: null,
-      isList: input.isList ?? false,
       // New steps land at the bottom of their project's list unless placed.
       order:
         input.order ??
@@ -238,17 +264,13 @@ export class LocalStore implements Store {
 
     /*
      * Stamped here rather than at each call site, so every route in gets it:
-     * the card menu, the compose box, an MCP change queued by Claude, and an
-     * imported wall. Re-saying "now" on something already on today is not a
-     * new commitment, so the original day survives — otherwise a note could
-     * never carry over, because touching it would reset its age.
+     * the card, the Work screen, an MCP change queued by Claude, an imported
+     * wall. Putting something on today that is already on today is not a new
+     * promise, so the original day survives — otherwise nothing could ever
+     * carry over, because touching it would reset its age.
      */
-    if (patch.priority !== undefined) {
-      next.rankedOn =
-        patch.priority === "now"
-          ? ((previous.priority === "now" ? previous.rankedOn : null) ??
-            todayKey())
-          : null;
+    if (patch.todayOn !== undefined && patch.todayOn !== null) {
+      next.todayOn = previous.todayOn ?? todayKey();
     }
 
     // Images dropped from a note lose their bytes too, or IndexedDB only grows.

@@ -13,8 +13,12 @@ import type { Note } from "@/lib/types";
 const COLLAPSED = 6;
 
 /**
- * Every tag on the wall, heaviest first. Colour is the spine; this is the
- * cross-cut, and it is the only place you can see the whole cross-cut at once.
+ * Every tag on the wall, most recently used first.
+ *
+ * It used to be heaviest first, which sounds right and is not: the tag you
+ * used on nine notes eight months ago sat at the front for ever, and the one
+ * you invented this morning — the one you are in the middle of using — was in
+ * the tail behind "+6 more". What you touched last is what you are working on.
  */
 export function TagIndex({
   notes,
@@ -28,13 +32,22 @@ export function TagIndex({
   const [expanded, setExpanded] = useState(false);
 
   const tags = useMemo(() => {
-    const counts = new Map<string, number>();
+    const seen = new Map<string, { count: number; last: string }>();
     for (const n of notes) {
       if (n.archivedAt !== null) continue;
-      for (const t of n.tags) counts.set(t, (counts.get(t) ?? 0) + 1);
+      // The later of the two: editing a note to add a tag counts as using it.
+      const touched = n.updatedAt > n.createdAt ? n.updatedAt : n.createdAt;
+      for (const t of n.tags) {
+        const at = seen.get(t);
+        if (!at) seen.set(t, { count: 1, last: touched });
+        else {
+          at.count += 1;
+          if (touched > at.last) at.last = touched;
+        }
+      }
     }
-    return [...counts.entries()].sort(
-      (a, b) => b[1] - a[1] || a[0].localeCompare(b[0]),
+    return [...seen.entries()].sort(
+      (a, b) => b[1].last.localeCompare(a[1].last) || b[1].count - a[1].count,
     );
   }, [notes]);
 
@@ -45,7 +58,7 @@ export function TagIndex({
 
   return (
     <div className="mt-3 flex flex-wrap items-center gap-x-3.5 gap-y-1.5">
-      {shown.map(([tag, count]) => (
+      {shown.map(([tag, { count }]) => (
         <button
           key={tag}
           type="button"

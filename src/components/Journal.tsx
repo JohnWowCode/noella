@@ -10,25 +10,18 @@ import { Icon } from "./Icon";
 import { Lightbox } from "./NoteImages";
 
 /**
- * Dailies.
+ * The journal.
  *
- * Borrowed straight from film and animation, where the dailies are the raw
- * footage shot that day, screened at the end of it. Nobody grades them and
- * nobody ships them — the point is standing in front of a day's work and
- * seeing that it exists. That is exactly the thing missing from a notes app:
- * you tick something, the card goes grey, and by Friday you cannot name one
- * thing you did all week.
+ * You tick something, the card goes grey, and by Friday you cannot name one
+ * thing you did all week. This is the answer: the wall cut by day and shown
+ * as pictures — everything you dropped in and everything you finished, newest
+ * day first.
  *
- * So this is not a new kind of note. It is the wall, cut by day and shown as
- * pictures: everything you dropped in, everything you finished, per day,
- * newest first. Drag a screenshot onto it and it becomes a note like any other
- * — searchable, markable, filable — that also happens to be today's evidence.
- *
- * Names considered and rejected: Proof and Receipts (both make it sound like
- * an argument you are having with somebody), Showreel (implies an audience),
- * Log (implies a chore).
+ * Not a new kind of note. Drag a screenshot onto it and it becomes an ordinary
+ * note — searchable, markable, filable — that also happens to be the day's
+ * evidence.
  */
-export function Dailies({
+export function Journal({
   todayKey,
   onOpen,
 }: {

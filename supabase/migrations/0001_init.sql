@@ -40,20 +40,21 @@ create table public.notes (
   is_task     boolean not null default false,
   done_at     timestamptz,
   due_at      timestamptz,
-  -- A project is a note you promoted; non-null means this note is one.
-  project_status text
-              check (project_status in ('idea', 'active', 'paused', 'done')),
   -- What this note is inside, at any depth. The cascade is load-bearing:
   -- deleting a container takes everything under it, however deep.
+  --
+  -- This is also the only thing that makes a note a container. There were two
+  -- more columns here — a project status and a list flag — and neither said
+  -- anything the tree does not: a project was a note with a status, a list was
+  -- a note with a cadence, and both were "a note with things inside it".
   parent_id   uuid references public.notes (id) on delete cascade,
 
-  -- A list is a note you promoted, like a project, but inert: no status, no
-  -- claim on today. Give it a cadence and its items un-tick when the period
-  -- turns, which is all a bill ever was — a list of things that come back
-  -- every month. Bills had five columns of their own here; they now have none.
-  is_list       boolean not null default false,
-  list_cadence  text check (list_cadence in ('weekly', 'monthly', 'yearly')),
-  -- Optional money on a list item, so a recurring list can total itself.
+  -- Give any note a cadence and what is inside it un-ticks when the period
+  -- turns, which is all a bill ever was: a handful of things that come back
+  -- every month. Bills had five columns of their own here; they now have none,
+  -- and this is a property rather than a species.
+  repeats     text check (repeats in ('weekly', 'monthly', 'yearly')),
+  -- Optional money on an item, so a recurring room can total itself.
   amount        numeric(12, 2) check (amount >= 0),
 
   -- What you guessed against what it took. Nothing corrects a bad estimate
@@ -72,12 +73,12 @@ create table public.notes (
   icons       text[] not null default '{}'
               check (array_length(icons, 1) is null or array_length(icons, 1) <= 4),
   -- Three buckets, never a number: a 1-10 field is an afternoon of deciding.
-  priority    text check (priority in ('now', 'next', 'later')),
-  -- The day "now" was said, 'YYYY-MM-DD' local. Now means today, and a label
-  -- with no date stops meaning today about a week after you write it — this
-  -- is what separates what you chose this morning from what you have been
-  -- carrying since March.
-  ranked_on   text check (ranked_on is null or ranked_on ~ '^\d{4}-\d{2}-\d{2}$'),
+  priority    text check (priority in ('high', 'mid', 'low')),
+  -- The day this was put on today, 'YYYY-MM-DD' local. A flag with no date
+  -- stops meaning today about a week after you set it — this is what separates
+  -- what you chose this morning from what you have carried since March. Kept
+  -- apart from priority, which is weight rather than timing.
+  today_on    text check (today_on is null or today_on ~ '^\d{4}-\d{2}-\d{2}$'),
   pinned      boolean not null default false,
   visibility  text not null default 'private'
               check (visibility in ('private', 'unlisted', 'public')),
@@ -97,22 +98,14 @@ create table public.notes (
   -- one; the app refuses to file a note inside its own descendant, and a
   -- recursive trigger is the way to enforce it here when this is applied.
   --
-  -- A note is a project or a list, never both. Both are promotions of the
-  -- same row, and the two panels answer different questions.
-  constraint notes_project_or_list
-    check (project_status is null or is_list = false),
-  -- A cadence is a property of a list. Nothing else recurs.
-  constraint notes_cadence_needs_list
-    check (list_cadence is null or is_list)
+  -- No kind constraints left to write, because there are no kinds.
 );
 
 create index notes_owner_created_idx on public.notes (owner_id, created_at desc);
 create index notes_parent_idx on public.notes (parent_id, created_at)
   where parent_id is not null;
-create index notes_project_idx on public.notes (owner_id, project_status)
-  where project_status is not null;
-create index notes_list_idx on public.notes (owner_id)
-  where is_list;
+create index notes_repeats_idx on public.notes (owner_id)
+  where repeats is not null;
 create index notes_priority_idx on public.notes (owner_id, priority)
   where priority is not null;
 -- Ranking reads siblings in order, so the order column is part of the key.
@@ -127,8 +120,8 @@ create table public.settings (
 create index notes_search_idx        on public.notes using gin (search_vector);
 create index notes_tags_idx          on public.notes using gin (tags);
 create index notes_icons_idx         on public.notes using gin (icons);
-create index notes_today_idx         on public.notes (owner_id, ranked_on)
-  where priority = 'now' and archived_at is null;
+create index notes_today_idx         on public.notes (owner_id, today_on)
+  where today_on is not null and archived_at is null;
 create index notes_color_idx         on public.notes (color_id);
 
 -- ----------------------------------------------------------------- images ---

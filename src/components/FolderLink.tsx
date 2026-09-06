@@ -15,9 +15,10 @@ import {
   type Envelope,
   type Folder,
 } from "@/lib/bridge/folder";
-import { isList, isProject } from "@/lib/projects";
+import { priorityOf } from "@/lib/priority";
+import { todayKey } from "@/lib/clock";
 import { useNoella } from "@/lib/store/provider";
-import type { NewNote, Note } from "@/lib/types";
+import type { NewNote } from "@/lib/types";
 
 /** How often a visible tab looks for changes Claude queued. */
 const POLL_MS = 4000;
@@ -80,10 +81,12 @@ export function FolderLink() {
               ? (notes.find((n) => n.id === op.parentId)?.id ?? null)
               : null,
             icons: op.icons ?? (op.icon ? [op.icon] : []),
-            priority: op.priority ?? null,
+            priority: priorityOf(op.priority),
           };
-          if (op.kind === "project") input.projectStatus = "idea";
-          if (op.kind === "list") input.isList = true;
+          // "project" and "list" were kinds; they are not any more. Anything
+          // that holds things is a room, so an older server asking for one
+          // just gets a note, which is what it will become the moment
+          // something is put inside it.
           if (op.kind === "todo") input.isTask = true;
           addNote(input);
           return true;
@@ -111,20 +114,13 @@ export function FolderLink() {
           patchNote(op.noteId ?? "", { icons: op.icons ?? [] });
           return true;
         case "set_priority":
+          patchNote(op.noteId ?? "", { priority: priorityOf(op.priority) });
+          return true;
+        case "set_today":
           patchNote(op.noteId ?? "", {
-            priority: (op.priority ?? null) as Note["priority"],
+            todayOn: op.today === false ? null : todayKey(),
           });
           return true;
-        case "set_status": {
-          const target = notes.find((n) => n.id === op.noteId);
-          // Only a project has a status; refusing quietly beats corrupting a
-          // plain note into something the rest of the app cannot read.
-          if (!target || !isProject(target) || isList(target)) return true;
-          patchNote(target.id, {
-            projectStatus: op.status as typeof target.projectStatus,
-          });
-          return true;
-        }
         default:
           // A newer server queued something this build does not know. Leaving
           // it in place would jam the queue forever, so it is dropped.

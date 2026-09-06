@@ -3,14 +3,14 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { seqLabel } from "@/lib/format";
-import { isProject, projectTitle, projectsOf, stepsOf, nextActionOf } from "@/lib/projects";
-import { reorder } from "@/lib/order";
+import { contentsOf, titleOf } from "@/lib/rooms";
+import { todayKey } from "@/lib/clock";
 import { useNoella } from "@/lib/store/provider";
 import type { Note } from "@/lib/types";
 
 interface Item {
   id: string;
-  group: "Go" | "Do" | "Projects" | "Notes";
+  group: "Go" | "Do" | "Rooms" | "Notes";
   label: string;
   hint?: string;
   /** Flat block of the note's world, so results are scannable by colour. */
@@ -58,13 +58,24 @@ export function Palette() {
     if (open) inputRef.current?.focus();
   }, [open]);
 
-  const active = useMemo(
-    () => projectsOf(notes).filter((p) => p.projectStatus === "active"),
+  /*
+   * Rooms that still have something open in them, busiest first. This used to
+   * be "active projects", which only knew about the handful of things you had
+   * promoted; a room is anything holding unfinished work.
+   */
+  const rooms = useMemo(
+    () =>
+      notes
+        .filter((n) => {
+          if (n.archivedAt !== null) return false;
+          const items = contentsOf(notes, n.id);
+          return items.length > 0 && items.some((i) => i.isTask && !i.doneAt);
+        })
+        .sort(
+          (a, b) => a.order - b.order || b.updatedAt.localeCompare(a.updatedAt),
+        )
+        .slice(0, 8),
     [notes],
-  );
-  const todaysStep = useMemo(
-    () => (active[0] ? nextActionOf(stepsOf(notes, active[0].id)) : null),
-    [notes, active],
   );
 
   const items = useMemo<Item[]>(() => {
@@ -84,18 +95,6 @@ export function Palette() {
     });
     out.push(go("Home", "/", "everything, one screen"));
 
-    if (todaysStep && active[0]) {
-      out.push({
-        id: "do:done",
-        group: "Do",
-        label: `Done: ${todaysStep.body}`,
-        hint: projectTitle(active[0]),
-        run: () => {
-          patchNote(todaysStep.id, { doneAt: new Date().toISOString() });
-          close();
-        },
-      });
-    }
     out.push({
       id: "do:export",
       group: "Do",
@@ -117,18 +116,19 @@ export function Palette() {
     });
 
     // Make any project today's, from anywhere.
-    for (const p of projectsOf(notes)) {
+    for (const room of rooms) {
+      const next = contentsOf(notes, room.id).find(
+        (i) => i.isTask && i.doneAt === null,
+      );
+      if (!next) continue;
       out.push({
-        id: `proj:${p.id}`,
-        group: "Projects",
-        label: projectTitle(p),
-        hint: `${p.projectStatus} — make it today's`,
-        swatch: p.colorId,
+        id: `room:${room.id}`,
+        group: "Rooms",
+        label: titleOf(room),
+        hint: `${titleOf(next)} — put it on today`,
+        swatch: room.colorId,
         run: () => {
-          for (const patch of reorder(active, p.id, -1)) {
-            patchNote(patch.id, { order: patch.order });
-          }
-          patchNote(p.id, { projectStatus: "active", order: -1 });
+          patchNote(next.id, { todayOn: todayKey() });
           router.push("/");
           close();
         },
@@ -140,7 +140,6 @@ export function Palette() {
         .filter(
           (n) =>
             n.archivedAt === null &&
-            !isProject(n) &&
             (hit(n.body) || n.tags.some((t) => hit(t))),
         )
         .slice(0, MAX_NOTES);
@@ -160,9 +159,11 @@ export function Palette() {
     }
 
     return needle
-      ? out.filter((i) => hit(i.label) || hit(i.hint ?? "") || i.group === "Notes")
+      ? out.filter(
+          (i) => hit(i.label) || hit(i.hint ?? "") || i.group === "Notes",
+        )
       : out.filter((i) => i.group !== "Notes");
-  }, [q, notes, active, todaysStep, router, patchNote, exportBackup, close]);
+  }, [q, notes, rooms, router, patchNote, exportBackup, close]);
 
   // Same adjust-during-render trick: a new query must not keep the old row
   // highlighted for a frame.
@@ -223,7 +224,9 @@ export function Palette() {
 
         <div ref={listRef} className="max-h-[52vh] overflow-y-auto">
           {items.length === 0 && (
-            <p className="label px-5 py-8 text-center text-mute">Nothing by that name.</p>
+            <p className="label px-5 py-8 text-center text-mute">
+              Nothing by that name.
+            </p>
           )}
           {groups.map((g) => {
             const rows = items.filter((i) => i.group === g);
