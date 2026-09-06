@@ -96,6 +96,10 @@ const MARKS: Record<string, Mark> = {
   play: { fill: "M6 3l14 9-14 9z" },
   chevron: { d: "M9 4l8 8-8 8" },
   ring: { d: "M12 3a9 9 0 100 18 9 9 0 000-18z" },
+  clip: {
+    d: "M20 11.5 12 19.5a5 5 0 01-7-7l8-8a3.5 3.5 0 015 5l-8 8a2 2 0 01-3-3l7.5-7.5",
+  },
+  swatches: { d: "M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM17.5 14v7M14 17.5h7" },
 };
 
 export type IconName = keyof typeof MARKS;

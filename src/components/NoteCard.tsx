@@ -99,16 +99,32 @@ export function NoteCard({
   // palette now runs from the palest yellow to a near-black violet.
   const onColor = color !== null;
   const surface = onColor ? surfaceStyle(color) : undefined;
+  /*
+   * One line of the body, to the pixel: 18px at 1.62 is 29px, and the heading
+   * variant's 28px at leading-tight is 34px. The two chrome gutters take that
+   * height and centre themselves in it, so a 15px icon and an 18px sentence
+   * sit on the same optical line instead of the icon riding high.
+   */
+  const line = heading ? "h-[34px]" : "h-[29px]";
 
   return (
     <article
       id={`note-${note.id}`}
+      /*
+       * The reference and the time, on the card rather than in it.
+       *
+       * Both were on the face: NOTE 0041 went first, and the clock followed
+       * it here. The wall is newest-first, so its order already says what the
+       * timestamp said, and eighty pixels of every single row was going to a
+       * number nobody reads — enough to push most notes onto a second line.
+       */
+      title={`${seqLabel(note.seq)} · ${stamp(note.createdAt)}`}
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
         e.preventDefault();
         void addImages(imageFilesFrom(e.dataTransfer));
       }}
-      className={`group scroll-mt-4 border px-6 py-5 ${
+      className={`group scroll-mt-4 border px-4 py-3 sm:px-5 ${
         onColor ? "" : "border-rule bg-field"
       } ${archived ? "opacity-60" : ""}`}
       style={{
@@ -147,77 +163,84 @@ export function NoteCard({
         </p>
       )}
 
-      <header
-        className={`label flex flex-wrap items-center gap-x-2.5 gap-y-1.5 ${
-          onColor ? "opacity-70" : "text-mute"
-        }`}
-      >
-        {note.isTask && (
-          <button
-            type="button"
-            onClick={() =>
-              patchNote(note.id, {
-                doneAt: done ? null : new Date().toISOString(),
-              })
-            }
-            aria-label={done ? "Mark not done" : "Mark done"}
-            className="tap mr-1 grid h-4 w-4 place-items-center border border-current text-[10px] leading-none"
-          >
-            {done ? "×" : ""}
-          </button>
-        )}
+      {/*
+        One line, not three.
+
+        The card used to open with a meta row, then a twelve-pixel gap, then
+        the words: a one-line note came to 110px tall of which 29 were the
+        note. Everything above the sentence was chrome you had already read,
+        held apart from the sentence it described — forehead.
+
+        It is one row now. What the note *is* sits in a gutter to the left of
+        the words, what you can *do* to it in a gutter to the right, and both
+        gutters are exactly one line of body text tall, so a short note is a
+        short card and forty of them fit where twenty did.
+      */}
+      <div className="flex items-start gap-x-3">
         {/*
-          NOTE 0007 is gone from the face of the card. It is a real handle —
-          the MCP tools take it, and it is still in the data and the title
-          attribute — but it opened every single card with four characters of
-          machine noise you never once needed to read.
+          A fixed gutter, so the sentences line up.
+
+          Sized to a tickbox and two marks, which is what most notes carry, so
+          the words start at the same x down the whole wall and the eye has one
+          edge to run along instead of a ragged one. A note with a rank chip or
+          four marks pushes past it — which is the right exception, because
+          those are the ones meant to stand out.
         */}
-        {list ? (
-          <>
-            <span>
-              {note.listCadence ? `${note.listCadence} list` : "list"} ·{" "}
+        <span
+          className={`label flex ${line} min-w-[4.25rem] shrink-0 items-center gap-2 ${
+            onColor ? "opacity-70" : "text-mute"
+          }`}
+        >
+          {note.isTask && (
+            <button
+              type="button"
+              onClick={() =>
+                patchNote(note.id, {
+                  doneAt: done ? null : new Date().toISOString(),
+                })
+              }
+              aria-label={done ? "Mark not done" : "Mark done"}
+              className="tap grid h-4 w-4 shrink-0 place-items-center border border-current text-[10px] leading-none"
+            >
+              {done ? "×" : ""}
+            </button>
+          )}
+
+          {/* What it is, when it is not simply a note. */}
+          {list ? (
+            <span className="shrink-0">
+              {note.listCadence ? `${note.listCadence} list` : "list"}{" "}
               {steps.length}
             </span>
-            <Dot />
-          </>
-        ) : project ? (
-          <>
+          ) : project ? (
             <span
-              className={
+              className={`shrink-0 px-1.5 py-0.5 ${
                 note.projectStatus === "active"
                   ? onColor
-                    ? "bg-[var(--on)] px-1.5 py-0.5 text-[var(--on-inv)]"
-                    : "bg-ink px-1.5 py-0.5 text-paper"
-                  : ""
-              }
+                    ? "bg-[var(--on)] text-[var(--on-inv)]"
+                    : "bg-ink text-paper"
+                  : "border border-current/35"
+              }`}
             >
-              project · {note.projectStatus}
+              project {note.projectStatus}
             </span>
-            <Dot />
-          </>
-        ) : (
-          // Visibility is identical on every note until sharing ships, so it
-          // earns its place on a card only when it is *not* the default.
-          note.visibility !== "private" && (
-            <>
-              <span>{note.visibility}</span>
-              <Dot />
-            </>
-          )
-        )}
-        {/* Word count and image count both left. A number counting the words
-            you can see, above the words you can see, is not information. */}
-        {note.priority && (
-          <>
-            {/*
-              On a plain card the chip is the priority colour. On a coloured
-              one it cannot be: a red NOW on a red card is red on red, and the
-              same went for NEXT on orange. There it takes the card's own ink
-              and carries the priority as a small block instead, which reads
-              at any pairing.
-            */}
+          ) : (
+            // Visibility is identical on every note until sharing ships, so
+            // it earns its place on a card only when it is not the default.
+            note.visibility !== "private" && (
+              <span className="shrink-0">{note.visibility}</span>
+            )
+          )}
+
+          {/*
+            On a plain card the chip is the priority colour. On a coloured one
+            it cannot be: a red NOW on a red card is red on red, and the same
+            went for NEXT on orange. There it takes the card's own ink and
+            carries the priority as a small block instead.
+          */}
+          {note.priority && (
             <span
-              className={`flex items-center gap-1.5 px-1.5 py-0.5 ${
+              className={`flex shrink-0 items-center gap-1.5 px-1.5 py-0.5 ${
                 onColor ? "bg-[var(--on)] text-[var(--on-inv)]" : ""
               }`}
               style={
@@ -238,90 +261,100 @@ export function NoteCard({
               )}
               {PRIORITY[note.priority].label}
             </span>
-            <Dot />
-          </>
-        )}
-        {/*
-          The marks, in the meta row.
-
-          They spent one commit beside the body as a column, which on a
-          one-line note put the second mark on a line of its own underneath —
-          it read as a glyph that had fallen off the card. They belong up here
-          anyway: this row is already everything the note *is* rather than
-          anything it says, and four marks cost it no height at all.
-        */}
-        {marks.length > 0 && (
-          <>
-            <span className="flex items-center gap-1.5">
-              {marks.map((m) => (
-                <span key={m} title={markLabel(m)} className="flex">
-                  <Icon name={m} size={heading ? 17 : 15} />
-                </span>
-              ))}
-            </span>
-            <Dot />
-          </>
-        )}
-        {color && (
-          <>
-            <span
-              aria-hidden
-              title={color.name ?? swatchName(colors.indexOf(color))}
-              className="h-2.5 w-2.5 shrink-0 border border-current/25"
-              style={{ backgroundColor: "var(--accent)" }}
-            />
-            <Dot />
-          </>
-        )}
-        <span title={seqLabel(note.seq)}>{stamp(note.createdAt)}</span>
-        {archived && (
-          <>
-            <Dot />
-            <span>archived</span>
-          </>
-        )}
-
-        {/*
-          Always visible, never on hover.
-
-          Everything on a card used to appear only when the pointer was over
-          it, which on a phone means never — and a favourite you cannot see is
-          not a favourite. The star and the menu are simply here.
-        */}
-        <span className="ml-auto flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => patchNote(note.id, { pinned: !note.pinned })}
-            aria-pressed={note.pinned}
-            aria-label={
-              note.pinned ? "Remove from favourites" : "Add to favourites"
-            }
-            className={`tap grid place-items-center px-1.5 py-1.5 ${
-              note.pinned ? "opacity-100" : "opacity-35 hover:opacity-100"
-            }`}
-          >
-            <Icon name={note.pinned ? "starFilled" : "star"} size={15} />
-          </button>
-          {!heading && onOpen && inside === 0 && (
-            <Action onClick={() => onOpen(note.id)}>Open</Action>
           )}
-          {/*
-            Edit is a double-click on the words, which is where the hand
-            already is — on a wall of forty, a button per card for a gesture
-            nobody needs told about twice.
 
-            Except on a touch screen, where double-tap means zoom and there is
-            no hover to reveal anything. Shipping only the gesture made editing
-            unreachable on a phone in one tap, so the button is still here when
-            the device cannot hover. CSS decides, not JavaScript: no hydration
-            mismatch, and it follows a keyboard being plugged in.
+          {marks.map((m) => (
+            <span key={m} title={markLabel(m)} className="flex shrink-0">
+              <Icon name={m} size={heading ? 18 : 16} />
+            </span>
+          ))}
+        </span>
+
+        {editing ? (
+          <textarea
+            ref={areaRef}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              // Escape and ⌘↵ both put it away; blurring does too. Editing
+              // should never be a mode you have to hunt your way out of.
+              if (e.key === "Escape") commit();
+              if ((e.metaKey || e.ctrlKey) && e.key === "Enter") commit();
+            }}
+            rows={3}
+            className="prose-note min-w-0 flex-1 resize-none border border-current
+                       bg-transparent px-2 py-1 outline-none"
+          />
+        ) : note.body.length > 0 ? (
+          <p
+            /*
+             * Two ways in, one gesture each.
+             *
+             * Double-click where the hand already is, for anything with a
+             * pointer. On a touch screen double-tap means zoom, so a single
+             * tap on the words opens the editor instead — which is a target
+             * the width of the card rather than a fourth 23px glyph crowding
+             * the star and the menu. Decided at the tap, not at render, so
+             * there is no hydration mismatch and it follows a keyboard being
+             * plugged in.
+             */
+            onClick={() => {
+              if (window.matchMedia("(hover: none)").matches) setEditing(true);
+            }}
+            onDoubleClick={() => setEditing(true)}
+            className={`prose-note min-w-0 flex-1 whitespace-pre-wrap ${
+              heading ? "text-[24px] leading-tight sm:text-[28px]" : ""
+            } ${done ? "line-through opacity-55" : ""}`}
+          >
+            <Highlight text={note.body} query={query} />
+          </p>
+        ) : (
+          <span className="flex-1" />
+        )}
+
+        {/*
+          Two controls, not four.
+
+          This row was a star, a chevron, an Edit button and a menu — four
+          targets inside seventy pixels, which on a phone means four 44px tap
+          zones piled on top of each other, each stealing the next one's taps.
+          Measured, not guessed: the star was 23px wide and a thumb landing
+          fourteen pixels off its centre opened the card instead.
+
+          Favouriting stays on the face because a favourite you cannot see is
+          not a favourite. Opening and editing are one tap deeper, in the menu
+          where the other nine actions already live. The gap widens on a
+          touch screen, where the two hit areas are the size of a thumb.
+        */}
+        <span
+          className={`label flex ${line} shrink-0 items-center gap-1 [@media(hover:none)]:gap-5 ${
+            onColor ? "opacity-70" : "text-mute"
+          }`}
+        >
+          {archived && <span>archived</span>}
+          {/*
+            Editing is a mode, so it gets the slot rather than a slot of its
+            own. Blur, Escape and ⌘↵ all commit as well, but an editor with no
+            visible way out reads as something you have broken — and on a
+            phone "tap somewhere else" means tapping into another card.
           */}
           {editing ? (
             <Action onClick={() => setEditing(false)}>Done</Action>
           ) : (
-            <span className="hidden [@media(hover:none)]:inline">
-              <Action onClick={() => setEditing(true)}>Edit</Action>
-            </span>
+            <button
+              type="button"
+              onClick={() => patchNote(note.id, { pinned: !note.pinned })}
+              aria-pressed={note.pinned}
+              aria-label={
+                note.pinned ? "Remove from favourites" : "Add to favourites"
+              }
+              className={`tap grid place-items-center px-1.5 ${
+                note.pinned ? "opacity-100" : "opacity-35 hover:opacity-100"
+              }`}
+            >
+              <Icon name={note.pinned ? "starFilled" : "star"} size={15} />
+            </button>
           )}
           <Action
             onClick={() => {
@@ -335,7 +368,7 @@ export function NoteCard({
             <Icon name="more" size={15} />
           </Action>
         </span>
-      </header>
+      </div>
 
       {/*
         Everything else, once asked for.
@@ -347,6 +380,11 @@ export function NoteCard({
       */}
       {menu && (
         <div className="mt-3 flex flex-wrap items-center gap-1.5 border border-current/25 px-2 py-2">
+          {!heading && onOpen && (
+            <Action onClick={() => onOpen(note.id)}>
+              {inside > 0 ? `Open · ${inside}` : "Open"}
+            </Action>
+          )}
           <Action
             onClick={() => {
               setEditing(true);
@@ -551,36 +589,6 @@ export function NoteCard({
         />
       )}
 
-      {editing ? (
-        <textarea
-          ref={areaRef}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={commit}
-          onKeyDown={(e) => {
-            // Escape and ⌘↵ both put it away; blurring does too. Editing
-            // should never be a mode you have to hunt your way out of.
-            if (e.key === "Escape") commit();
-            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") commit();
-          }}
-          rows={3}
-          className="prose-note mt-3 block w-full resize-none border border-current
-                     bg-transparent px-3 py-2 outline-none"
-        />
-      ) : (
-        note.body.length > 0 && (
-          <div onDoubleClick={() => setEditing(true)} className="mt-3">
-            <p
-              className={`prose-note min-w-0 flex-1 whitespace-pre-wrap ${
-                heading ? "text-[24px] leading-tight sm:text-[28px]" : ""
-              } ${done ? "line-through opacity-55" : ""}`}
-            >
-              <Highlight text={note.body} query={query} />
-            </p>
-          </div>
-        )
-      )}
-
       <NoteImages images={note.images} onOpen={setViewing} />
 
       {project && (
@@ -763,10 +771,6 @@ function Mover({
       )}
     </div>
   );
-}
-
-function Dot() {
-  return <span aria-hidden>·</span>;
 }
 
 function Action({

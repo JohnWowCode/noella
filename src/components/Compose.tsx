@@ -272,8 +272,13 @@ export function Compose({
          * rant instead of scrolling inside itself — but that also makes `rows`
          * meaningless, and an empty box collapsed to a couple of lines. A
          * floor gives it presence to start with; growing is unaffected.
+         *
+         * That floor was eleven rem — a hundred and seventy pixels of blank
+         * cream above the fold, the largest empty thing on the screen, held
+         * open for a rant that had not been typed yet. Three lines is enough
+         * to say "write as much as you like"; the rant makes its own room.
          */
-        className="prose-note block min-h-44 w-full resize-none bg-transparent px-5 py-5
+        className="prose-note block min-h-32 w-full resize-none bg-transparent px-5 py-4
                    text-[21px] leading-[1.5] outline-none placeholder:text-mute"
       />
 
@@ -397,7 +402,7 @@ export function Compose({
         <Popover
           label="All folder colours"
           set={false}
-          current={<Icon name="grid" size={15} />}
+          current={<Icon name="swatches" size={15} />}
         >
           {(close) => (
             <Palette
@@ -508,7 +513,7 @@ export function Compose({
           title="Add a photo or video"
           className="grid h-9 w-9 place-items-center border border-rule text-[17px] leading-none text-mute hover:border-ink hover:text-ink"
         >
-          <Icon name="plus" size={16} />
+          <Icon name="clip" size={16} />
         </button>
 
         <button
