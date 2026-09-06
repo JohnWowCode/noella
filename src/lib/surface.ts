@@ -1,31 +1,38 @@
-import { readableInk } from "./store/defaults";
 import type { Color } from "./types";
 
 /**
- * The two CSS variables every coloured surface exposes.
+ * A coloured card, as a tint rather than a slab.
  *
- * Cards used to hardcode `color: #111` and buttons on them used
- * `hover:bg-[#111] hover:text-white`. That worked only because every swatch was
- * a mid-tone. With deep violet and deep red in the palette, black type on the
- * card is unreadable and a black hover fill is invisible — so the pair is
- * computed once, here, and everything on the card refers to it.
+ * Every card used to be filled with its folder's colour at full saturation, so
+ * a wall of eight notes was eight fully saturated rectangles and the colour
+ * shouted louder than anything written on it. The hue is a hint now: the
+ * surface is that colour mixed into the paper, the text stays the ordinary
+ * ink, and the pure hue is kept for the places where a small mark does the
+ * identifying — the edge, the marker, the folder rail.
  *
- * `--on` is the legible ink for this colour; `--on-inv` is the colour itself,
- * which is what an inverted control fills its text with.
+ * The strengths are variables rather than constants because dark needs more of
+ * the hue to read at all: 13% of blue over near-white paper is a visible tint,
+ * and 13% over a near-black canvas is nothing.
  */
 export function surfaceStyle(color: Color): React.CSSProperties {
-  const ink = readableInk(color.hex);
   return {
-    backgroundColor: color.hex,
-    color: ink,
-    ["--on" as string]: ink,
-    ["--on-inv" as string]: color.hex,
+    ["--accent" as string]: color.hex,
+    backgroundColor: `color-mix(in srgb, ${color.hex} var(--tint), var(--paper))`,
+    borderColor: `color-mix(in srgb, ${color.hex} var(--tint-edge), var(--rule))`,
+    /*
+     * Controls on a tinted card are ordinary ink on ordinary paper, because
+     * the card is now near enough to paper that anything else would be wrong.
+     * The names stay so the call sites do not all have to change; what they
+     * mean has simply stopped being per-colour.
+     */
+    ["--on" as string]: "var(--ink)",
+    ["--on-inv" as string]: "var(--paper)",
   };
 }
 
-/** A control on a coloured card: outlined, inverting to solid ink on hover. */
+/** A control on a coloured card. Same ink as everywhere else, now. */
 export const ON_COLOR_BUTTON =
-  "border-current hover:bg-[var(--on)] hover:text-[var(--on-inv)]";
+  "border-current/35 hover:bg-[var(--on)] hover:text-[var(--on-inv)]";
 
 /** The same control, already active. */
 export const ON_COLOR_ACTIVE = "bg-[var(--on)] text-[var(--on-inv)]";

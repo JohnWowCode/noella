@@ -263,6 +263,57 @@ without a word being taken in. On a coloured card the chip flips to the card's
 own ink and carries the rank as a small block instead — a red NOW on a red card
 was red on red.
 
+## Hue as a hint, not a fill
+
+A card used to be *filled* with its folder's colour at full saturation, so a
+wall of eight notes was eight saturated rectangles and the colour shouted
+louder than anything written on it.
+
+The hue is a tint now — `color-mix(in srgb, <hue> var(--tint), var(--paper))` —
+so the surface is that colour stirred into the paper and the text stays the
+ordinary ink. The pure hue is kept for the places where a small mark does the
+identifying: the folder square in the card's meta row, the rail, the chip. The
+saturated left edge belongs to priority, which is the one thing worth reading
+down a margin.
+
+The strength is a variable, not a constant, because dark needs more of the hue
+to register at all: 13% of blue over near-white paper is a visible tint, and
+the same 13% over a near-black canvas is nothing. Dark takes 26%.
+
+The side effect is contrast. Body text on a full-saturation card measured 5.26
+at worst; on a tint it measures 16.96 in light and 14.11 in dark, because the
+card is now near enough to paper that ordinary ink is simply correct.
+
+## Big enough for a thumb
+
+A tick box is 16px because 16px is the right size for a tick box. It is the
+wrong size for a finger, and ticking things off is one of the three things this
+is for.
+
+Measured on a phone: the checkbox, the remove ×, the favourite star and the
+card actions were all under 28px. They are drawn at exactly the same size and
+carry a 44px hit area behind them, via a pseudo-element that takes no space in
+the layout — only on devices that cannot hover, because a mouse does not need
+the help and overlapping hit areas would make a dense row worse.
+
+Tested by probing actual points rather than reading box sizes, since a
+pseudo-element hit area does not appear in `getBoundingClientRect`: every
+control is reachable 14px off its centre, and none of them steals its
+neighbour's taps.
+
+The 36-swatch palette goes six across instead of twelve on touch. Twelve is one
+hue per column and the better reading; twelve thumb-sized swatches do not fit
+a 390px phone.
+
+## Editing on a phone
+
+Double-clicking the words is the desktop gesture. On a touch screen double-tap
+means zoom and there is no hover to reveal anything, so shipping only the
+gesture made editing a two-tap trip through a menu — on a device where this app
+is mostly used. The button is still there when the device cannot hover, decided
+in CSS rather than JavaScript: no hydration mismatch, and it follows a keyboard
+being plugged in.
+
 ## The colours you actually use
 
 Thirty-six is the right number to have and the wrong number to choose from

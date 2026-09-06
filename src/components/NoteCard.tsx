@@ -114,8 +114,8 @@ export function NoteCard({
         e.preventDefault();
         void addImages(imageFilesFrom(e.dataTransfer));
       }}
-      className={`group scroll-mt-4 border border-rule px-6 py-5 ${
-        onColor ? "" : "bg-field"
+      className={`group scroll-mt-4 border px-6 py-5 ${
+        onColor ? "" : "border-rule bg-field"
       } ${archived ? "opacity-60" : ""}`}
       style={{
         ...surface,
@@ -169,7 +169,7 @@ export function NoteCard({
               })
             }
             aria-label={done ? "Mark not done" : "Mark done"}
-            className="mr-1 grid h-4 w-4 place-items-center border border-current text-[10px] leading-none"
+            className="tap mr-1 grid h-4 w-4 place-items-center border border-current text-[10px] leading-none"
           >
             {done ? "×" : ""}
           </button>
@@ -249,6 +249,17 @@ export function NoteCard({
             <Dot />
           </>
         )}
+        {color && (
+          <>
+            <span
+              aria-hidden
+              title={color.name ?? swatchName(colors.indexOf(color))}
+              className="h-2.5 w-2.5 shrink-0 border border-current/25"
+              style={{ backgroundColor: "var(--accent)" }}
+            />
+            <Dot />
+          </>
+        )}
         <span title={seqLabel(note.seq)}>{stamp(note.createdAt)}</span>
         {archived && (
           <>
@@ -270,7 +281,7 @@ export function NoteCard({
             onClick={() => patchNote(note.id, { pinned: !note.pinned })}
             aria-pressed={note.pinned}
             aria-label={note.pinned ? "Remove from favourites" : "Add to favourites"}
-            className={`grid place-items-center px-1.5 py-1 ${
+            className={`tap grid place-items-center px-1.5 py-1.5 ${
               note.pinned ? "opacity-100" : "opacity-35 hover:opacity-100"
             }`}
           >
@@ -280,14 +291,22 @@ export function NoteCard({
             <Action onClick={() => onOpen(note.id)}>Open</Action>
           )}
           {/*
-            Edit is a double-click on the words themselves, which is where the
-            hand already is. It sat here on every card doing what the text
-            could do, and on a wall of forty that was forty buttons for a
-            gesture nobody needs told about twice. It stays in the ⋯ menu, and
-            appears here only while you are in it, as the way out.
+            Edit is a double-click on the words, which is where the hand
+            already is — on a wall of forty, a button per card for a gesture
+            nobody needs told about twice.
+
+            Except on a touch screen, where double-tap means zoom and there is
+            no hover to reveal anything. Shipping only the gesture made editing
+            unreachable on a phone in one tap, so the button is still here when
+            the device cannot hover. CSS decides, not JavaScript: no hydration
+            mismatch, and it follows a keyboard being plugged in.
           */}
-          {editing && (
+          {editing ? (
             <Action onClick={() => setEditing(false)}>Done</Action>
+          ) : (
+            <span className="hidden [@media(hover:none)]:inline">
+              <Action onClick={() => setEditing(true)}>Edit</Action>
+            </span>
           )}
           <Action
             onClick={() => {

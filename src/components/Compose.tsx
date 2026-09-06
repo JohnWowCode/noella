@@ -307,7 +307,7 @@ export function Compose({
             onMouseDown={hold}
             onClick={() => setBurst([])}
             aria-label="Clear"
-            className="shrink-0 hover:text-ink"
+            className="tap shrink-0 px-1 hover:text-ink"
           >
             ×
           </button>
@@ -539,9 +539,14 @@ function Palette({
 
   return (
     <span className="flex flex-col gap-2">
+      {/* Twelve across is one hue per column, which is the right reading —
+          and 12 × 32px does not fit a 390px phone. Six across on small
+          screens keeps the bands intact and the swatches thumb-sized. */}
       <span
         className="grid gap-[3px]"
-        style={{ gridTemplateColumns: `repeat(${hues}, minmax(0, 1fr))` }}
+        style={{
+          gridTemplateColumns: `repeat(var(--palette-cols, ${hues}), minmax(0, 1fr))`,
+        }}
       >
         {colors.map((c, index) => (
           <button
@@ -551,7 +556,7 @@ function Palette({
             onClick={() => onColorId(c.id === colorId ? null : c.id)}
             aria-pressed={c.id === colorId}
             title={c.name ?? swatchName(index)}
-            className={`h-6 w-6 border ${
+            className={`h-6 w-6 border [@media(hover:none)]:h-8 [@media(hover:none)]:w-8 ${
               c.id === colorId
                 ? "border-ink ring-2 ring-ink ring-inset"
                 : "border-rule-soft hover:border-ink"

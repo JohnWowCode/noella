@@ -107,7 +107,7 @@ export function ProjectPanel({
                   aria-label={
                     step.doneAt ? "Mark step not done" : "Mark step done"
                   }
-                  className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center border border-current text-[10px] leading-none"
+                  className="tap mt-0.5 grid h-4 w-4 shrink-0 place-items-center border border-current text-[10px] leading-none"
                 >
                   {step.doneAt ? "×" : ""}
                 </button>
@@ -141,7 +141,7 @@ export function ProjectPanel({
                   }}
                   disabled={i === 0}
                   aria-label="Move step up"
-                  className="label disabled:opacity-30"
+                  className="tap label px-1 disabled:opacity-30"
                 >
                   ↑
                 </button>
@@ -154,14 +154,14 @@ export function ProjectPanel({
                   }}
                   disabled={i === steps.length - 1}
                   aria-label="Move step down"
-                  className="label disabled:opacity-30"
+                  className="tap label px-1 disabled:opacity-30"
                 >
                   ↓
                 </button>
                 <button
                   type="button"
                   onClick={() => removeNote(step.id)}
-                  className="label underline decoration-1 underline-offset-2"
+                  className="tap label px-1 underline decoration-1 underline-offset-2"
                 >
                   Del
                 </button>

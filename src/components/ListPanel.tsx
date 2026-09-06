@@ -159,7 +159,7 @@ export function ListPanel({
                     })
                   }
                   aria-label={done ? "Untick" : "Tick"}
-                  className={`grid h-5 w-5 shrink-0 place-items-center border text-[11px] leading-none ${
+                  className={`tap grid h-5 w-5 shrink-0 place-items-center border text-[11px] leading-none ${
                     done
                       ? onColor
                         ? "border-current bg-[var(--on)] text-[var(--on-inv)]"
@@ -181,7 +181,7 @@ export function ListPanel({
                   type="button"
                   onClick={() => removeNote(item.id)}
                   aria-label="Remove item"
-                  className="label shrink-0 opacity-0 transition-opacity group-hover/item:opacity-60 hover:!opacity-100 focus:opacity-100"
+                  className="tap label shrink-0 px-1 opacity-0 transition-opacity group-hover/item:opacity-60 hover:!opacity-100 focus:opacity-100"
                 >
                   ×
                 </button>

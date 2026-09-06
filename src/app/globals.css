@@ -21,6 +21,10 @@
      #111 is what made a wall of notes look like a form to fill in. */
   --rule: #cdc6b8;
   --rule-soft: #e2dcd0;
+
+  /* How much of a folder's hue reaches the card it is on, and its edge. */
+  --tint: 13%;
+  --tint-edge: 45%;
 }
 
 /*
@@ -37,6 +41,11 @@
   --mute: #948f87;
   --rule: #34363c;
   --rule-soft: #26282c;
+
+  /* Dark needs more of the hue: 13% of blue over a near-black canvas is
+     nothing at all, where the same 13% over paper is a visible tint. */
+  --tint: 26%;
+  --tint-edge: 55%;
 }
 
 @theme inline {
@@ -169,4 +178,38 @@
   line-height: 1.12;
   letter-spacing: -0.022em;
   text-wrap: balance;
+}
+
+/*
+ * A hit area big enough for a thumb, without changing what is drawn.
+ *
+ * A tick box is 16px because 16px is the right size for a tick box; it is the
+ * wrong size for a finger. Measured on a phone, the checkbox, the remove ×,
+ * the favourite star and the card actions were all under 28px, which made
+ * ticking something off — one of the things this app is for — a game of
+ * chance.
+ *
+ * The pseudo-element takes no space in the layout, so nothing moves and
+ * nothing needs a second set of sizes. Only on devices that cannot hover,
+ * because a mouse does not need the help and overlapping hit areas would
+ * make a dense row worse, not better.
+ */
+@utility tap {
+  position: relative;
+}
+
+@media (hover: none) {
+  /* Six columns of thumb-sized swatches instead of twelve tight ones. */
+  :root {
+    --palette-cols: 6;
+  }
+
+  .tap::after {
+    content: "";
+    position: absolute;
+    inset: 50%;
+    width: 44px;
+    height: 44px;
+    transform: translate(-50%, -50%);
+  }
 }
