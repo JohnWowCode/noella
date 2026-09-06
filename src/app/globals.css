@@ -60,6 +60,50 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/*
+ * Reading, as four variables.
+ *
+ * Which typeface suits you is taste and eyesight, so it is a setting rather
+ * than an opinion. How much air the text has is not taste: every study that
+ * found a dyslexia-friendly typeface helping lost the effect once the control
+ * font was given the same letter and word spacing. Spacing is doing the work,
+ * so spacing gets its own switch and it is the one worth reaching for.
+ *
+ * Set on the root element by a boot script before first paint, so nothing
+ * reflows in your face on the way in.
+ */
+:root {
+  --font-body: var(--font-literata), Georgia, "Times New Roman", serif;
+  --read-size: 18px;
+  --read-leading: 1.62;
+  --read-tracking: 0em;
+  --read-word: normal;
+}
+
+html[data-face="atkinson"] {
+  --font-body: var(--font-atkinson), system-ui, "Segoe UI", sans-serif;
+}
+
+html[data-face="lexend"] {
+  --font-body: var(--font-lexend), system-ui, "Segoe UI", sans-serif;
+  /* Lexend's own metrics already run wide; matching Literata's leading here
+     keeps switching from feeling like the page grew. */
+  --read-leading: 1.55;
+}
+
+html[data-face="system"] {
+  --font-body: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+}
+
+html[data-roomy] {
+  --read-leading: 1.95;
+  --read-tracking: 0.014em;
+  --read-word: 0.08em;
+}
+
+html[data-size="large"] { --read-size: 20px; }
+html[data-size="huge"] { --read-size: 23px; }
+
 @theme {
   /* 80ms linear, or none. No easing curves, no spring physics. */
   --default-transition-duration: 80ms;
@@ -74,8 +118,23 @@
     -webkit-text-size-adjust: 100%;
   }
 
+  /*
+   * The notch, the rounded corners and the home indicator.
+   *
+   * The viewport is set to cover, which is what makes the paper run edge to
+   * edge behind the status bar instead of leaving a grey letterbox — but it
+   * also means the page is responsible for keeping its own content out from
+   * under the hardware. Nothing was, so on a real phone the footer sat under
+   * the home indicator and a landscape notch cut into the left margin. None
+   * of that shows up in a simulator with square corners.
+   */
   body {
-    font-family: var(--font-literata), Georgia, serif;
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  body {
+    font-family: var(--font-body);
   }
 
   ::selection {
@@ -148,9 +207,11 @@
 /* Note bodies. The vendored file carries the weight axis only, so size and
    leading do the work rather than optical sizing. */
 @utility prose-note {
-  font-family: var(--font-literata), Georgia, serif;
-  font-size: 18px;
-  line-height: 1.62;
+  font-family: var(--font-body);
+  font-size: var(--read-size);
+  line-height: var(--read-leading);
+  letter-spacing: var(--read-tracking);
+  word-spacing: var(--read-word);
   text-wrap: pretty;
 }
 
@@ -164,7 +225,7 @@
  * shouting and starts speaking.
  */
 @utility title {
-  font-family: var(--font-literata), Georgia, serif;
+  font-family: var(--font-body);
   font-size: 19px;
   font-weight: 640;
   line-height: 1.2;
@@ -173,7 +234,7 @@
 
 /* A statement: the move, the empty screen, the one thing being asked. */
 @utility display {
-  font-family: var(--font-literata), Georgia, serif;
+  font-family: var(--font-body);
   font-weight: 560;
   line-height: 1.12;
   letter-spacing: -0.022em;

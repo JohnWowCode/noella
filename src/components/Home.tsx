@@ -23,12 +23,13 @@ import { ON_COLOR_BUTTON, surfaceStyle } from "@/lib/surface";
 import type { Color, Note } from "@/lib/types";
 import { Footer, Header } from "./Chrome";
 import { Compose } from "./Compose";
+import { Dailies } from "./Dailies";
 import { DataMenu } from "./DataMenu";
 import { FolderLink } from "./FolderLink";
-import { Jester } from "./Jester";
+import { Work } from "./Work";
 import { NoteCard } from "./NoteCard";
 import { TagIndex } from "./TagIndex";
-import { Today } from "./Today";
+import { Reading } from "./Reading";
 import { ThemeToggle } from "./ThemeToggle";
 
 /** Cards rendered per page. Enough to fill any screen, cheap enough to be instant. */
@@ -62,6 +63,29 @@ const GROUPINGS = {
 
 type Grouping = "none" | "folder" | "mark" | "kind" | "priority";
 
+/**
+ * Three areas, one page.
+ *
+ * Everything used to be one column: write, then a jester, then five filter
+ * rows, then every note you have ever written, then the ledger. That is fine
+ * at forty notes and unusable at four hundred, and it meant the part about
+ * doing the work and the part about keeping it were competing for the same
+ * screen.
+ *
+ * The box you write in never moves — capture must not be behind a tab — and
+ * below it you choose what you are looking at. Where you were is remembered,
+ * so the app opens where you left it rather than somewhere it prefers.
+ */
+const AREAS = {
+  work: "Work",
+  wall: "Wall",
+  dailies: "Dailies",
+} as const;
+
+type Area = keyof typeof AREAS;
+
+const AREA_KEY = "noella.area";
+
 type View =
   | "all"
   | "todo"
@@ -92,6 +116,15 @@ export function Home() {
   const [limit, setLimit] = useState(PAGE);
   /** The container you are standing in, or null for the top of the wall. */
   const [inside, setInside] = useState<string | null>(null);
+  /*
+   * Work first, because that is the question the app is for.
+   *
+   * It opened on the wall, which meant Today — the one list with an end to it
+   * — was somewhere you had to go and find, and a new wall never showed it at
+   * all. Wall is one tap away and where you were last is remembered, so the
+   * only person who gets this default is somebody who has not chosen yet.
+   */
+  const [area, setArea] = useState<Area>("work");
   const [group, setGroup] = useState<Grouping>("none");
   const [level, setLevel] = useState<Priority | null>(null);
   /** One mark, used as a filter. Marks are the tags now. */
@@ -129,6 +162,42 @@ export function Home() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  // Read after mount, on a microtask, so the server markup matches and the
+  // choice does not cascade a render.
+  useEffect(() => {
+    let live = true;
+    const stored = (() => {
+      try {
+        return localStorage.getItem(AREA_KEY);
+      } catch {
+        return null;
+      }
+    })();
+    Promise.resolve().then(() => {
+      if (live && stored && stored in AREAS) setArea(stored as Area);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const go = useCallback((next: Area) => {
+    setArea(next);
+    window.scrollTo({ top: 0 });
+    try {
+      localStorage.setItem(AREA_KEY, next);
+    } catch {
+      // Storage blocked; the choice still holds for this session.
+    }
+  }, []);
+
+  /*
+   * Standing inside a folder is a wall view by definition — Work and Dailies
+   * are about the whole thing, not about one container — so going in shows
+   * the contents without silently changing which area you chose.
+   */
+  const showing: Area = inside ? "wall" : area;
 
   const here = useMemo(
     () => (inside ? (notes.find((n) => n.id === inside) ?? null) : null),
@@ -350,14 +419,13 @@ export function Home() {
   const activeWorld = colors.find((c) => c.id === world) ?? null;
   // The bands below the list are about the whole wall over weeks, so they only
   // belong on the unfiltered top level.
-  const quiet =
-    view === "all" &&
-    world === null &&
-    tag === null &&
-    level === null &&
-    mark === null &&
-    !query &&
-    !inside;
+  /*
+   * These used to hang below the wall and only when the wall was unfiltered,
+   * because a summary of eight weeks under a search result is nonsense. They
+   * have their own areas now, so the only thing left to check is that you are
+   * not standing inside a folder.
+   */
+  const quiet = !inside;
 
   const open = useCallback((id: string) => {
     setInside(id);
@@ -421,6 +489,7 @@ export function Home() {
               className="label w-28 border border-rule bg-field px-3 py-2
                          outline-none placeholder:text-mute focus:w-44"
             />
+            <Reading />
             <ThemeToggle />
           </>
         }
@@ -495,23 +564,75 @@ export function Home() {
         />
 
         {/*
-          What you promised, above what you have.
+          The one bit of navigation in the app.
 
-          The jester answers "I cannot choose" and the wall answers "what have
-          I got"; neither answers "what did I say I would do today", which is
-          the only question with an end to it. It sits directly under the box
-          you write in and above everything else, and it is not there at all
-          until you have put something on it.
+          Three words, underlined where you are. Not tabs, not a sidebar, not
+          a hamburger: the whole app is still one page and the box you write
+          in is still above this, so nothing about capture got slower.
         */}
-        {!inside && todayKey && <Today todayKey={todayKey} onOpen={open} />}
-
         {!inside && (
-          <div className="mt-4">
-            <Jester />
-          </div>
+          <nav
+            aria-label="Areas"
+            className="mt-5 flex items-center gap-1 border-b border-rule-soft"
+          >
+            {(Object.keys(AREAS) as Area[]).map((id) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => go(id)}
+                aria-current={area === id ? "page" : undefined}
+                className={`label px-3 py-2.5 ${
+                  area === id
+                    ? "-mb-px border-b-2 border-ink text-ink"
+                    : "text-mute hover:text-ink"
+                }`}
+              >
+                {AREAS[id]}
+              </button>
+            ))}
+          </nav>
         )}
 
-        {live.length > 0 && !inside && (
+        {showing === "work" && todayKey && (
+          <>
+            <Work todayKey={todayKey} onOpen={open} />
+
+            {/* Projects that have gone quiet. A doing question, so it lives
+                with the doing rather than under four hundred notes. */}
+            {quiet && drift.length > 0 && (
+              <section className="mt-12">
+                <h2 className="title mb-3 flex flex-wrap items-baseline gap-x-2.5">
+                  Still want these?
+                  <span className="label font-normal text-mute">
+                    no wrong answer
+                  </span>
+                </h2>
+                <div className="flex flex-col gap-2">
+                  {drift.map((p) => (
+                    <Drifting
+                      key={p.id}
+                      project={p}
+                      quiet={quietDays(notes, p, todayKey ?? "")}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+          </>
+        )}
+
+        {showing === "dailies" && (
+          <>
+            <Dailies todayKey={todayKey} onOpen={open} />
+
+            {/* The same record as the days above, zoomed out to eight weeks. */}
+            {quiet && cells.some((c) => c.moves > 0) && (
+              <Ledger cells={cells} week={week} />
+            )}
+          </>
+        )}
+
+        {showing === "wall" && live.length > 0 && !inside && (
           <>
             {/*
               Nothing on this row exists until it means something.
@@ -531,7 +652,19 @@ export function Home() {
               counts.byMark.size > 0 ||
               live.length >= GROUPABLE ||
               filtered) && (
-              <div className="mt-7 flex flex-wrap items-center gap-1.5">
+              <div
+                /*
+                 * One swipeable line on a phone, wrapped rows on a desktop.
+                 *
+                 * Measured on a 375px screen this band was four rows and about
+                 * 250px — you scrolled past a wall of filters to reach the
+                 * wall. Sideways is the cheap direction on a phone and the
+                 * gesture everybody already has.
+                 */
+                className="mt-7 flex items-center gap-1.5 overflow-x-auto pb-1
+                           [-ms-overflow-style:none] [scrollbar-width:none]
+                           [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:overflow-visible sm:pb-0"
+              >
                 {counts.todo > 0 && (
                   <Chip
                     on={view === "todo"}
@@ -683,7 +816,7 @@ export function Home() {
           </>
         )}
 
-        {activeWorld && (
+        {showing === "wall" && activeWorld && (
           <WorldBand
             color={activeWorld}
             index={colors.indexOf(activeWorld)}
@@ -695,61 +828,63 @@ export function Home() {
           />
         )}
 
-        <section className="mt-5 flex flex-col gap-3">
-          {!ready ? (
-            <Empty>Reading what you have…</Empty>
-          ) : notes.length === 0 ? (
-            <FirstRun />
-          ) : visible.length === 0 ? (
-            <Empty>
-              {view === "archive"
-                ? "Nothing archived."
-                : inside
-                  ? `Nothing in ${projectTitle(here!)} yet. Put something in it up there.`
-                  : "Nothing here. Try another folder, or clear the filters."}
-            </Empty>
-          ) : (
-            groups.map((band) => (
-              <section key={band.key} className="flex flex-col gap-3">
-                {band.name !== null && (
-                  <h3 className="title mt-3 flex items-baseline gap-2.5 first:mt-0">
-                    {band.swatch && (
-                      <span
-                        aria-hidden
-                        className="h-3.5 w-3.5 self-center border border-rule"
-                        style={{ backgroundColor: band.swatch }}
-                      />
-                    )}
-                    {band.icon && (
-                      <span className="self-center">
-                        <Icon name={band.icon} size={17} />
+        {showing === "wall" && (
+          <section className="mt-5 flex flex-col gap-3">
+            {!ready ? (
+              <Empty>Reading what you have…</Empty>
+            ) : notes.length === 0 ? (
+              <FirstRun />
+            ) : visible.length === 0 ? (
+              <Empty>
+                {view === "archive"
+                  ? "Nothing archived."
+                  : inside
+                    ? `Nothing in ${projectTitle(here!)} yet. Put something in it up there.`
+                    : "Nothing here. Try another folder, or clear the filters."}
+              </Empty>
+            ) : (
+              groups.map((band) => (
+                <section key={band.key} className="flex flex-col gap-3">
+                  {band.name !== null && (
+                    <h3 className="title mt-3 flex items-baseline gap-2.5 first:mt-0">
+                      {band.swatch && (
+                        <span
+                          aria-hidden
+                          className="h-3.5 w-3.5 self-center border border-rule"
+                          style={{ backgroundColor: band.swatch }}
+                        />
+                      )}
+                      {band.icon && (
+                        <span className="self-center">
+                          <Icon name={band.icon} size={17} />
+                        </span>
+                      )}
+                      {band.name}
+                      <span className="label font-normal text-mute tabular-nums">
+                        {band.rows.length}
                       </span>
-                    )}
-                    {band.name}
-                    <span className="label font-normal text-mute tabular-nums">
-                      {band.rows.length}
-                    </span>
-                  </h3>
-                )}
-                {band.rows.map((n) => (
-                  <NoteCard
-                    key={n.id}
-                    note={n}
-                    query={query}
-                    onTag={setTag}
-                    onOpen={open}
-                    // While searching you are looking at the whole tree, so a
-                    // result has to say where it came from or it is just a
-                    // sentence with no address.
-                    path={searching ? pathTo(notes, n.id) : undefined}
-                  />
-                ))}
-              </section>
-            ))
-          )}
-        </section>
+                    </h3>
+                  )}
+                  {band.rows.map((n) => (
+                    <NoteCard
+                      key={n.id}
+                      note={n}
+                      query={query}
+                      onTag={setTag}
+                      onOpen={open}
+                      // While searching you are looking at the whole tree, so a
+                      // result has to say where it came from or it is just a
+                      // sentence with no address.
+                      path={searching ? pathTo(notes, n.id) : undefined}
+                    />
+                  ))}
+                </section>
+              ))
+            )}
+          </section>
+        )}
 
-        {more > 0 && (
+        {showing === "wall" && more > 0 && (
           <div ref={moreRef} className="mt-3">
             <button
               type="button"
@@ -759,33 +894,6 @@ export function Home() {
               {more} more
             </button>
           </div>
-        )}
-
-        {/* Both of these are about the shape of a few weeks, not about what is
-            in front of you, so they sit under the list and only when the list
-            is the whole list. */}
-        {quiet && drift.length > 0 && (
-          <section className="mt-12">
-            <h2 className="title mb-3 flex flex-wrap items-baseline gap-x-2.5">
-              Still want these?
-              <span className="label font-normal text-mute">
-                no wrong answer
-              </span>
-            </h2>
-            <div className="flex flex-col gap-2">
-              {drift.map((p) => (
-                <Drifting
-                  key={p.id}
-                  project={p}
-                  quiet={quietDays(notes, p, todayKey ?? "")}
-                />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {quiet && cells.some((c) => c.moves > 0) && (
-          <Ledger cells={cells} week={week} />
         )}
 
         {ready && notes.length > 0 && (
@@ -964,7 +1072,11 @@ function Marks({
   const hidden = ranked.length - shown.length;
 
   return (
-    <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+    <div
+      className="mt-2.5 flex items-center gap-1.5 overflow-x-auto pb-1
+                 [-ms-overflow-style:none] [scrollbar-width:none]
+                 [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:overflow-visible sm:pb-0"
+    >
       {shown.map((m) => {
         const on = m === active;
         return (
@@ -1030,7 +1142,11 @@ function Worlds({
   if (used.length === 0) return null;
 
   return (
-    <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+    <div
+      className="mt-2.5 flex items-center gap-1.5 overflow-x-auto pb-1
+                 [-ms-overflow-style:none] [scrollbar-width:none]
+                 [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:overflow-visible sm:pb-0"
+    >
       {used.map((c) => {
         const index = colors.indexOf(c);
         return (

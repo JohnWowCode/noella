@@ -2,6 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { seqLabel, stamp } from "@/lib/format";
+import {
+  configured,
+  readDestination,
+  send,
+  type Destination,
+} from "@/lib/send";
 import { imageFilesFrom } from "@/lib/images";
 import { isList, isProject, projectTitle, stepsOf } from "@/lib/projects";
 import { PRIORITIES, PRIORITY } from "@/lib/priority";
@@ -46,6 +52,13 @@ export function NoteCard({
   const [recolouring, setRecolouring] = useState(false);
   const [menu, setMenu] = useState(false);
   const [marking, setMarking] = useState(false);
+  /*
+   * Read on mount rather than in render: it is a device setting in
+   * localStorage, and reading storage during render is both impure and a
+   * hydration mismatch waiting to happen.
+   */
+  const [destination, setDestination] = useState<Destination | null>(null);
+  const [sent, setSent] = useState<string | null>(null);
   const areaRef = useRef<HTMLTextAreaElement>(null);
 
   const color = colorOf(note);
@@ -63,6 +76,17 @@ export function NoteCard({
    * put a note inside a note.
    */
   const targets = placesFor(notes, note.id);
+
+  useEffect(() => {
+    let live = true;
+    const stored = readDestination();
+    Promise.resolve().then(() => {
+      if (live && configured(stored)) setDestination(stored);
+    });
+    return () => {
+      live = false;
+    };
+  }, [menu]);
 
   useEffect(() => {
     if (editing) {
@@ -176,7 +200,20 @@ export function NoteCard({
         gutters are exactly one line of body text tall, so a short note is a
         short card and forty of them fit where twenty did.
       */}
-      <div className="flex items-start gap-x-3">
+      {/*
+        Three columns on a desktop, two rows on a phone.
+
+        Measured on a 375px screen: the gutters took 110px, the buttons took
+        74, and the sentence — the entire reason the card exists — was left
+        with about a hundred, narrow enough that "wowcool.world" was clipped
+        mid-word. There is no arrangement of three columns that fits there.
+
+        So below 640px it wraps: the chrome and the actions share one short
+        line, the words get the full width underneath. Above it, nothing
+        changes. Flex order does the whole thing, so it is one DOM either way
+        and the tab order stays the reading order.
+      */}
+      <div className="flex flex-wrap items-start gap-x-3 gap-y-1 sm:flex-nowrap">
         {/*
           A fixed gutter, so the sentences line up.
 
@@ -187,7 +224,7 @@ export function NoteCard({
           those are the ones meant to stand out.
         */}
         <span
-          className={`label flex ${line} min-w-[4.25rem] shrink-0 items-center gap-2 ${
+          className={`label order-1 flex ${line} shrink-0 items-center gap-2 sm:min-w-[4.25rem] ${
             onColor ? "opacity-70" : "text-mute"
           }`}
         >
@@ -283,8 +320,6 @@ export function NoteCard({
               if ((e.metaKey || e.ctrlKey) && e.key === "Enter") commit();
             }}
             rows={3}
-            className="prose-note min-w-0 flex-1 resize-none border border-current
-                       bg-transparent px-2 py-1 outline-none"
           />
         ) : note.body.length > 0 ? (
           <p
@@ -303,14 +338,14 @@ export function NoteCard({
               if (window.matchMedia("(hover: none)").matches) setEditing(true);
             }}
             onDoubleClick={() => setEditing(true)}
-            className={`prose-note min-w-0 flex-1 whitespace-pre-wrap ${
+            className={`prose-note order-3 w-full min-w-0 [overflow-wrap:anywhere] whitespace-pre-wrap sm:order-2 sm:w-auto sm:flex-1 ${
               heading ? "text-[24px] leading-tight sm:text-[28px]" : ""
             } ${done ? "line-through opacity-55" : ""}`}
           >
             <Highlight text={note.body} query={query} />
           </p>
         ) : (
-          <span className="flex-1" />
+          <span className="order-3 flex-1 sm:order-2" />
         )}
 
         {/*
@@ -328,7 +363,7 @@ export function NoteCard({
           touch screen, where the two hit areas are the size of a thumb.
         */}
         <span
-          className={`label flex ${line} shrink-0 items-center gap-1 [@media(hover:none)]:gap-5 ${
+          className={`label order-2 ml-auto flex ${line} shrink-0 items-center gap-1 sm:order-3 [@media(hover:none)]:gap-5 ${
             onColor ? "opacity-70" : "text-mute"
           }`}
         >
@@ -458,6 +493,38 @@ export function NoteCard({
               }
             >
               {note.isTask ? "Untask" : "Task"}
+            </Action>
+          )}
+          {destination && (
+            <Action
+              onClick={() => {
+                setSent("…");
+                void send(destination, {
+                  id: note.id,
+                  ref: seqLabel(note.seq),
+                  title: note.body.split("\n", 1)[0],
+                  body: note.body,
+                  marks,
+                  tags: note.tags,
+                  priority: note.priority,
+                  done: done,
+                  createdAt: note.createdAt,
+                  url: `${window.location.origin}${window.location.pathname}#note-${note.id}`,
+                }).then((r) => {
+                  setSent(
+                    r.ok
+                      ? r.how === "opened"
+                        ? "Opened"
+                        : "Sent"
+                      : r.how === "copied"
+                        ? `Copied instead — ${r.why}`
+                        : r.why,
+                  );
+                  window.setTimeout(() => setSent(null), 5000);
+                });
+              }}
+            >
+              {sent ?? `Send to ${destination.name}`}
             </Action>
           )}
           <Action

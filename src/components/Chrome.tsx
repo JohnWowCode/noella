@@ -37,7 +37,12 @@ export function Header({ right }: { right?: React.ReactNode }) {
 export function Footer() {
   return (
     <footer className="mt-16 border-t border-rule-soft">
-      <div className="mx-auto max-w-3xl px-5 py-7 sm:px-6">
+      <div
+        // Clear of the home indicator, which the covered viewport puts the
+        // page underneath rather than beside.
+        style={{ paddingBottom: "calc(1.75rem + env(safe-area-inset-bottom))" }}
+        className="mx-auto max-w-3xl px-5 pt-7 sm:px-6"
+      >
         <p className="prose-note text-[14px] text-mute">
           Everything here lives on this device. No server, no account, nothing
           leaves.
@@ -63,7 +68,8 @@ export function NavLink({
   const pathname = usePathname();
   // The export serves /wall/ as well as /wall, so compare on the trimmed path.
   const here = (pathname ?? "/").replace(/\/+$/, "") || "/";
-  const current = here === href.replace(/\/+$/, "") || (href === "/" && here === "/");
+  const current =
+    here === href.replace(/\/+$/, "") || (href === "/" && here === "/");
 
   return (
     <Link

@@ -1,0 +1,8 @@
+Lexend
+Copyright the Lexend Project Authors (https://github.com/googlefonts/lexend).
+Licensed under the SIL Open Font License, Version 1.1.
+https://openfontlicense.org
+
+Bundled here as the latin subset only, taken from Google Fonts. The OFL
+permits bundling and redistribution with software; it does not permit selling
+the font by itself.

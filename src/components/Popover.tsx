@@ -85,7 +85,13 @@ export function Popover({
         aria-expanded={open}
         aria-label={label}
         title={label}
-        className={`grid h-9 min-w-9 place-items-center border px-2 text-[16px] leading-none ${
+        /*
+         * Nine rem-units is a comfortable mouse target and an uncomfortable
+         * thumb one. It grows on a device that has no pointer, where the same
+         * button is being hit with a finger and there is more room going
+         * spare than there is patience.
+         */
+        className={`grid h-9 min-w-9 place-items-center border px-2 text-[16px] leading-none [@media(hover:none)]:h-11 [@media(hover:none)]:min-w-11 ${
           set || open ? "border-ink" : "border-rule text-mute hover:border-ink"
         }`}
       >

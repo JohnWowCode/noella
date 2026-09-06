@@ -278,7 +278,7 @@ export function Compose({
          * open for a rant that had not been typed yet. Three lines is enough
          * to say "write as much as you like"; the rant makes its own room.
          */
-        className="prose-note block min-h-32 w-full resize-none bg-transparent px-5 py-4
+        className="prose-note block min-h-24 w-full resize-none bg-transparent px-4 py-3.5 sm:min-h-32 sm:px-5 sm:py-4
                    text-[21px] leading-[1.5] outline-none placeholder:text-mute"
       />
 
@@ -521,12 +521,22 @@ export function Compose({
           onMouseDown={hold}
           onClick={save}
           disabled={!ready}
-          className="label ml-auto border-2 border-ink bg-ink px-4 py-2 text-paper
+          aria-label={parentName ? `Put it in ${parentName}` : "Keep it"}
+          className="label ml-auto grid h-11 min-w-11 place-items-center border-2 border-ink bg-ink px-3 text-paper
                      enabled:hover:bg-transparent enabled:hover:text-ink
                      disabled:cursor-not-allowed disabled:border-rule disabled:bg-transparent
-                     disabled:text-mute"
+                     disabled:text-mute sm:h-auto sm:px-4 sm:py-2"
         >
-          {parentName ? "Put it in" : "Keep it"} · ↵
+          {/*
+            Six controls and a worded button do not fit across 375px, so the
+            button wrapped onto a line of its own and the box grew a row of
+            empty. The words are a desktop luxury; the return glyph says the
+            same thing and the label is still on the button for a reader.
+          */}
+          <span className="hidden sm:inline">
+            {parentName ? "Put it in" : "Keep it"} ·{" "}
+          </span>
+          ↵
         </button>
       </div>
     </section>

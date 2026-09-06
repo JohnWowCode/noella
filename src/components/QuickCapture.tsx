@@ -161,8 +161,9 @@ export function QuickCapture() {
           type="button"
           onClick={() => setOpen(true)}
           aria-label="Capture a note"
-          className="label fixed right-5 bottom-5 z-40 border border-rule
-                     bg-ink px-5 py-4 text-paper shadow-lg hover:bg-paper hover:text-ink sm:right-8 sm:bottom-8"
+          style={{ bottom: "calc(1.25rem + env(safe-area-inset-bottom))" }}
+          className="label fixed right-5 z-40 border border-rule
+                     bg-ink px-5 py-4 text-paper shadow-lg hover:bg-paper hover:text-ink sm:right-8"
         >
           + Note
         </button>
@@ -171,8 +172,9 @@ export function QuickCapture() {
       {saved && (
         <p
           role="status"
-          className="label fixed right-5 bottom-5 z-40 border border-rule
-                     bg-field px-5 py-4 sm:right-8 sm:bottom-8"
+          style={{ bottom: "calc(1.25rem + env(safe-area-inset-bottom))" }}
+          className="label fixed right-5 z-40 border border-rule
+                     bg-field px-5 py-4 sm:right-8"
         >
           Saved
         </p>
@@ -221,7 +223,11 @@ export function QuickCapture() {
               if (e.key === "Escape") setOpen(false);
               if ((e.metaKey || e.ctrlKey) && /^[0-9]$/.test(e.key)) {
                 e.preventDefault();
-                choose(e.key === "0" ? null : (colors[Number(e.key) - 1]?.id ?? null));
+                choose(
+                  e.key === "0"
+                    ? null
+                    : (colors[Number(e.key) - 1]?.id ?? null),
+                );
               }
             }}
             placeholder="What's on your mind?"
