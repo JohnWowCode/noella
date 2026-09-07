@@ -1,0 +1,116 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { HOLD_MS, SLOP, type Grab } from "@/lib/drag";
+
+/**
+ * One thing being carried, and where the pointer is.
+ *
+ * The whole gesture lives here so every list in the app picks things up the
+ * same way: a press that holds still is a drag, a press that lets go quickly
+ * is a tap, and a press that slides straight away is a scroll.
+ *
+ * The listeners are attached the moment you press, not from an effect keyed on
+ * state. That is not a style preference — the first version watched for
+ * movement only after something had been lifted, so the "you were scrolling"
+ * escape hatch could never fire, and dragging a finger up a list on a phone
+ * picked a row up every time.
+ */
+export function useDrag(onDrop: (id: string, overId: string | null) => void) {
+  const [grab, setGrab] = useState<Grab | null>(null);
+  const [over, setOver] = useState<string | null>(null);
+
+  const timer = useRef(0);
+  const start = useRef<{ x: number; y: number; id: string } | null>(null);
+  const held = useRef(false);
+  const overRef = useRef<string | null>(null);
+  const endedAt = useRef(0);
+  // Kept in a ref so the listeners never close over a stale handler. Written
+  // in an effect rather than during render, which React forbids.
+  const drop = useRef(onDrop);
+  useEffect(() => {
+    drop.current = onDrop;
+  }, [onDrop]);
+
+  const teardown = useRef<(() => void) | null>(null);
+
+  const cancel = useCallback(() => {
+    window.clearTimeout(timer.current);
+    start.current = null;
+    held.current = false;
+    overRef.current = null;
+    setGrab(null);
+    setOver(null);
+    teardown.current?.();
+    teardown.current = null;
+  }, []);
+
+  const press = useCallback(
+    (id: string, e: React.PointerEvent) => {
+      if (e.button !== 0) return;
+      teardown.current?.();
+      start.current = { x: e.clientX, y: e.clientY, id };
+      held.current = false;
+
+      const move = (ev: PointerEvent) => {
+        const from = start.current;
+        if (!from) return;
+        if (!held.current) {
+          // Moved before the hold finished: a scroll, not a drag.
+          if (Math.hypot(ev.clientX - from.x, ev.clientY - from.y) > SLOP) {
+            window.clearTimeout(timer.current);
+            start.current = null;
+          }
+          return;
+        }
+        ev.preventDefault();
+        setGrab({ id: from.id, x: ev.clientX, y: ev.clientY });
+        const el = document
+          .elementFromPoint(ev.clientX, ev.clientY)
+          ?.closest("[data-drop-id]");
+        const next = el?.getAttribute("data-drop-id") ?? null;
+        overRef.current = next;
+        setOver(next);
+      };
+
+      const up = () => {
+        const from = start.current;
+        if (held.current && from) {
+          drop.current(from.id, overRef.current);
+          endedAt.current = Date.now();
+        }
+        cancel();
+      };
+
+      // Not passive: preventDefault is the only thing stopping the page
+      // scrolling underneath a drag on a touch screen.
+      document.addEventListener("pointermove", move, { passive: false });
+      document.addEventListener("pointerup", up);
+      document.addEventListener("pointercancel", cancel);
+      teardown.current = () => {
+        document.removeEventListener("pointermove", move);
+        document.removeEventListener("pointerup", up);
+        document.removeEventListener("pointercancel", cancel);
+      };
+
+      window.clearTimeout(timer.current);
+      timer.current = window.setTimeout(() => {
+        if (!start.current) return;
+        held.current = true;
+        setGrab({ id, x: start.current.x, y: start.current.y });
+        // A short buzz where the hardware has one, so a long press on a phone
+        // announces itself rather than just happening.
+        navigator.vibrate?.(8);
+      }, HOLD_MS);
+    },
+    [cancel],
+  );
+
+  // Nothing should survive the component going away mid-gesture.
+  useEffect(() => cancel, [cancel]);
+
+  /** True for a moment after a drag, so the click it caused can be ignored. */
+  const wasDrag = useCallback(() => Date.now() - endedAt.current < 250, []);
+
+  return { grab, over, press, cancel, wasDrag, dragging: grab !== null };
+}

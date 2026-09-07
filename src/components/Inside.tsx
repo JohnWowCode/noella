@@ -8,6 +8,8 @@ import {
   type Cadence,
 } from "@/lib/recurrence";
 import { reorder } from "@/lib/order";
+import { descendantsOf } from "@/lib/tree";
+import { useDrag } from "./useDrag";
 import { contentsOf, titleOf } from "@/lib/rooms";
 import { marksOf } from "@/lib/stickers";
 import { useNoella } from "@/lib/store/provider";
@@ -54,6 +56,27 @@ export function Inside({
   const [draft, setDraft] = useState("");
   const [open, setOpen] = useState<Set<string>>(() => new Set());
   const [settings, setSettings] = useState(false);
+  const [renaming, setRenaming] = useState<string | null>(null);
+
+  /*
+   * Picking a row up and putting it somewhere else.
+   *
+   * Dropping onto a row puts the thing inside it; dropping onto the panel's
+   * own edge takes it back out to the top of this room. Anything that would
+   * put a folder inside itself is refused rather than silently ignored —
+   * that is the one move that can lose your work.
+   */
+  const { grab, over, press, wasDrag, dragging } = useDrag((id, overId) => {
+    if (!overId || overId === id) return;
+    const moved = notes.find((n) => n.id === id);
+    if (!moved) return;
+    const banned = new Set([id, ...descendantsOf(notes, id).map((n) => n.id)]);
+    if (banned.has(overId)) return;
+    const parentId = overId === `root:${note.id}` ? note.id : overId;
+    if (parentId === moved.parentId) return;
+    patchNote(id, { parentId, order: 0 });
+    setOpen((prev) => new Set(prev).add(parentId));
+  });
 
   const line = onColor ? "border-current/30" : "border-rule-soft";
   const tickable = contents.filter((c) => c.isTask);
@@ -79,7 +102,12 @@ export function Inside({
   return (
     <div className={`mt-4 border-t ${line} pt-3`}>
       {contents.length > 0 && (
-        <ul className={`border ${line}`}>
+        <ul
+          data-drop-id={`root:${note.id}`}
+          className={`border ${line} ${
+            over === `root:${note.id}` ? "border-current" : ""
+          }`}
+        >
           {contents.map((item, i) => (
             <Branch
               key={item.id}
@@ -95,6 +123,13 @@ export function Inside({
               onOpen={onOpen}
               notes={notes}
               patchNote={patchNote}
+              press={press}
+              grabbed={grab?.id ?? null}
+              over={over}
+              dragging={dragging}
+              renaming={renaming}
+              onRename={setRenaming}
+              wasDrag={wasDrag}
             />
           ))}
         </ul>
@@ -173,6 +208,16 @@ export function Inside({
         </div>
       )}
 
+      {grab && (
+        <span
+          aria-hidden
+          style={{ left: grab.x + 14, top: grab.y - 10 }}
+          className="pointer-events-none fixed z-50 max-w-56 truncate border-2 border-ink bg-paper px-2 py-1 text-[calc(14px*var(--type))] text-ink shadow-lg"
+        >
+          {titleOf(notes.find((n) => n.id === grab.id) ?? note)}
+        </span>
+      )}
+
       {settings && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           {CADENCES.map((c) => (
@@ -219,6 +264,13 @@ function Branch({
   onOpen,
   notes,
   patchNote,
+  press,
+  grabbed,
+  over,
+  dragging,
+  renaming,
+  onRename,
+  wasDrag,
 }: {
   item: Note;
   siblings: Note[];
@@ -232,6 +284,13 @@ function Branch({
   onOpen?: (id: string) => void;
   notes: Note[];
   patchNote: (id: string, patch: Partial<Note>) => void;
+  press: (id: string, e: React.PointerEvent) => void;
+  grabbed: string | null;
+  over: string | null;
+  dragging: boolean;
+  renaming: string | null;
+  onRename: (id: string | null) => void;
+  wasDrag: () => boolean;
 }) {
   const children = contentsOf(notes, item.id);
   const room = children.length > 0;
@@ -242,7 +301,25 @@ function Branch({
   return (
     <>
       <li
-        className={`group/row flex items-start gap-2 border-b ${line} py-2.5 pr-3 last:border-b-0`}
+        data-drop-id={item.id}
+        onPointerDown={(e) => {
+          /*
+           * Anywhere on the row lifts it, including the name — the name is
+           * most of the row, and a list you can only pick up by a two-pixel
+           * margin is a list you cannot pick up. The small controls opt out
+           * by name, because pressing the chevron should unfold rather than
+           * lift, and the same for the tick and the arrows.
+           */
+          if ((e.target as HTMLElement).closest("[data-nodrag]")) return;
+          press(item.id, e);
+        }}
+        className={`group/row flex items-start gap-2 border-b ${line} py-2.5 pr-3 last:border-b-0 ${
+          grabbed === item.id ? "opacity-35" : ""
+        } ${
+          dragging && over === item.id && grabbed !== item.id
+            ? "bg-current/15 outline-2 -outline-offset-2 outline-current"
+            : ""
+        } ${dragging ? "" : "touch-pan-y"}`}
         style={{ paddingLeft: `${12 + Math.min(depth, MAX_DEPTH) * 18}px` }}
       >
         {/*
@@ -255,6 +332,7 @@ function Branch({
             type="button"
             onClick={() => onToggle(item.id)}
             aria-expanded={unfolded}
+            data-nodrag
             aria-label={
               unfolded ? `Fold ${titleOf(item)}` : `Unfold ${titleOf(item)}`
             }
@@ -273,6 +351,7 @@ function Branch({
               })
             }
             aria-label={settled ? "Not done after all" : "Done"}
+            data-nodrag
             className="tap mt-0.5 grid h-4 w-4 shrink-0 place-items-center border border-current text-[10px] leading-none"
           >
             {settled ? "×" : ""}
@@ -294,16 +373,47 @@ function Branch({
           </span>
         )}
 
-        {/* The name is the way in. This was a span. */}
-        <button
-          type="button"
-          onClick={() => onOpen?.(item.id)}
-          className={`min-w-0 flex-1 text-left text-[calc(15px*var(--type))] leading-snug underline decoration-transparent underline-offset-2 hover:decoration-current ${
-            settled ? "line-through opacity-50" : ""
-          }`}
-        >
-          {titleOf(item)}
-        </button>
+        {/* The name is the way in, and a double-click renames it in place. */}
+        {renaming === item.id ? (
+          <input
+            autoFocus
+            defaultValue={titleOf(item)}
+            aria-label={`Rename ${titleOf(item)}`}
+            data-nodrag
+            onBlur={(e) => {
+              const next = e.target.value.trim();
+              if (next && next !== titleOf(item)) {
+                const rest = item.body.slice(item.body.indexOf("\n") + 1);
+                patchNote(item.id, {
+                  body: item.body.includes("\n") ? `${next}\n${rest}` : next,
+                });
+              }
+              onRename(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+              if (e.key === "Escape") onRename(null);
+            }}
+            className="min-w-0 flex-1 border border-current bg-transparent px-1.5 py-0.5 text-[calc(15px*var(--type))] outline-none"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              if (wasDrag()) return;
+              onOpen?.(item.id);
+            }}
+            onDoubleClick={(e) => {
+              e.preventDefault();
+              onRename(item.id);
+            }}
+            className={`min-w-0 flex-1 text-left text-[calc(15px*var(--type))] leading-snug underline decoration-transparent underline-offset-2 hover:decoration-current ${
+              settled ? "line-through opacity-50" : ""
+            }`}
+          >
+            {titleOf(item)}
+          </button>
+        )}
 
         {room && (
           <button
@@ -332,6 +442,7 @@ function Branch({
             }}
             disabled={index === 0}
             aria-label="Move up"
+            data-nodrag
             className="tap label px-1 disabled:opacity-30"
           >
             ↑
@@ -345,9 +456,19 @@ function Branch({
             }}
             disabled={index === siblings.length - 1}
             aria-label="Move down"
+            data-nodrag
             className="tap label px-1 disabled:opacity-30"
           >
             ↓
+          </button>
+          <button
+            type="button"
+            onClick={() => onRename(item.id)}
+            aria-label={`Rename ${titleOf(item)}`}
+            data-nodrag
+            className="tap label px-1"
+          >
+            <Icon name="write" size={12} />
           </button>
         </span>
       </li>
@@ -368,6 +489,13 @@ function Branch({
             onOpen={onOpen}
             notes={notes}
             patchNote={patchNote}
+            press={press}
+            grabbed={grabbed}
+            over={over}
+            dragging={dragging}
+            renaming={renaming}
+            onRename={onRename}
+            wasDrag={wasDrag}
           />
         ))}
     </>

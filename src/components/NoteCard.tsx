@@ -898,6 +898,16 @@ export function NoteCard({
  * and each row carries its path because "bugs" means nothing on its own when
  * three folders have one.
  */
+/**
+ * Somewhere to put this, chosen by walking your own shelves.
+ *
+ * It used to be a search box over a flat list of every note you own, each with
+ * its path printed after it — which is a database query, not a place. You do
+ * not remember what a folder is called nearly as reliably as you remember
+ * where it sits, and now that contents are a tree everywhere else, this is the
+ * same tree: top level, unfold, choose. The search is still here because at
+ * four hundred notes it is faster, but it is no longer the only way through.
+ */
 function Mover({
   note,
   targets,
@@ -910,22 +920,69 @@ function Mover({
   onPick: (parentId: string | null) => void;
 }) {
   const [q, setQ] = useState("");
+  const [open, setOpen] = useState<Set<string>>(() => new Set());
   const needle = q.trim().toLowerCase();
+  const allowed = new Set(targets.map((t) => t.id));
 
-  const rows = targets
-    .map((t) => ({ note: t, path: pathTo(notes, t.id) }))
-    .filter(({ note: t, path }) =>
-      needle
-        ? [t, ...path].some((n) => titleOf(n).toLowerCase().includes(needle))
-        : true,
-    )
-    .slice(0, 40);
+  const kids = (parentId: string | null) =>
+    notes
+      .filter(
+        (n) =>
+          n.parentId === parentId && n.archivedAt === null && allowed.has(n.id),
+      )
+      .sort(
+        (a, b) => a.order - b.order || titleOf(a).localeCompare(titleOf(b)),
+      );
+
+  const found = needle
+    ? targets
+        .filter((t) => titleOf(t).toLowerCase().includes(needle))
+        .slice(0, 30)
+    : [];
+
+  const Row = ({ item, depth }: { item: Note; depth: number }) => {
+    const children = kids(item.id);
+    const unfolded = open.has(item.id);
+    return (
+      <>
+        <li className="flex items-center">
+          <button
+            type="button"
+            onClick={() =>
+              setOpen((prev) => {
+                const next = new Set(prev);
+                if (next.has(item.id)) next.delete(item.id);
+                else next.add(item.id);
+                return next;
+              })
+            }
+            disabled={children.length === 0}
+            aria-label={unfolded ? "Fold" : "Unfold"}
+            style={{ marginLeft: `${depth * 16}px` }}
+            className="tap grid h-7 w-6 shrink-0 place-items-center opacity-60 disabled:opacity-0"
+          >
+            <span className={unfolded ? "rotate-90" : ""}>
+              <Icon name="chevron" size={11} />
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onPick(item.id)}
+            className="min-w-0 flex-1 truncate px-1.5 py-2 text-left text-[calc(15px*var(--type))] hover:bg-current/10"
+          >
+            {titleOf(item)}
+          </button>
+        </li>
+        {unfolded &&
+          children.map((c) => <Row key={c.id} item={c} depth={depth + 1} />)}
+      </>
+    );
+  };
 
   return (
     <div className="mt-3 border border-current/25 p-2">
       <div className="flex items-center gap-2">
         <input
-          autoFocus
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Put it in…"
@@ -944,35 +1001,44 @@ function Mover({
         )}
       </div>
 
-      {rows.length === 0 ? (
-        <p className="label mt-2 px-1 py-2 opacity-60">Nowhere by that name.</p>
-      ) : (
-        <ul className="mt-2 max-h-56 overflow-y-auto">
-          {rows.map(({ note: t, path }) => (
-            <li key={t.id}>
-              <button
-                type="button"
-                onClick={() => onPick(t.id)}
-                className="flex w-full items-baseline gap-2 px-1.5 py-1.5 text-left hover:bg-current/10"
-              >
-                <span className="prose-note min-w-0 flex-1 truncate text-[calc(15px*var(--type))]">
-                  {titleOf(t)}
-                </span>
-                {path.length > 0 && (
-                  <span className="label shrink-0 max-w-40 truncate opacity-55">
-                    in {titleOf(path[path.length - 1])}
-                  </span>
-                )}
-              </button>
+      <ul className="mt-2 max-h-64 overflow-y-auto">
+        {needle ? (
+          found.length === 0 ? (
+            <li className="label px-1 py-2 opacity-60">
+              Nowhere by that name.
             </li>
-          ))}
-        </ul>
-      )}
+          ) : (
+            found.map((t) => (
+              <li key={t.id} className="flex items-baseline gap-2">
+                <button
+                  type="button"
+                  onClick={() => onPick(t.id)}
+                  className="flex min-w-0 flex-1 items-baseline gap-2 px-1.5 py-2 text-left hover:bg-current/10"
+                >
+                  <span className="min-w-0 flex-1 truncate text-[calc(15px*var(--type))]">
+                    {titleOf(t)}
+                  </span>
+                  <span className="label shrink-0 truncate opacity-50">
+                    {pathTo(notes, t.id)
+                      .map((n) => titleOf(n))
+                      .join(" › ")}
+                  </span>
+                </button>
+              </li>
+            ))
+          )
+        ) : kids(null).length === 0 ? (
+          <li className="label px-1 py-2 opacity-60">
+            Nothing else at the top level yet.
+          </li>
+        ) : (
+          kids(null).map((t) => <Row key={t.id} item={t} depth={0} />)
+        )}
+      </ul>
     </div>
   );
 }
 
-/** A row of related actions under a quiet word saying what they are for. */
 function Group({
   name,
   children,
