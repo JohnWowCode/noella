@@ -24,6 +24,7 @@ import type { Color, Note } from "@/lib/types";
 import { Footer, Header } from "./Chrome";
 import { Compose } from "./Compose";
 import { Journal } from "./Journal";
+import { ClaudeImport } from "./ClaudeImport";
 import { DataMenu } from "./DataMenu";
 import { FolderLink } from "./FolderLink";
 import { Work } from "./Work";
@@ -943,7 +944,8 @@ export function Home() {
         {ready && notes.length > 0 && (
           <div className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-3">
             <FolderLink />
-            <span className="ml-auto">
+            <span className="ml-auto flex items-center gap-2">
+              <ClaudeImport onOpen={open} />
               <DataMenu />
             </span>
           </div>

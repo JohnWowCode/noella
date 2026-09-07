@@ -197,11 +197,19 @@ export class LocalStore implements Store {
     return this.clone();
   }
 
-  async createNote(input: NewNote): Promise<Note> {
+  /** The whole of making a note, without writing it. Shared with createNotes. */
+  private async build(input: NewNote, ahead = 0): Promise<Note> {
     const { body, isTask, done } = detectTask(input.body);
     const now = new Date().toISOString();
+    /*
+     * `ahead` counts the notes built in this batch but not yet in the
+     * snapshot. Without it a bulk import hands every note the same reference
+     * number, because each one reads a wall none of the others is in yet.
+     */
     const seq =
-      this.snapshot.notes.reduce((max, n) => Math.max(max, n.seq), 0) + 1;
+      this.snapshot.notes.reduce((max, n) => Math.max(max, n.seq), 0) +
+      1 +
+      ahead;
 
     const note: Note = {
       id: uid(),
@@ -243,9 +251,25 @@ export class LocalStore implements Store {
       archivedAt: null,
     };
 
+    return note;
+  }
+
+  async createNote(input: NewNote): Promise<Note> {
+    const note = await this.build(input);
     this.snapshot.notes = [note, ...this.snapshot.notes];
     write(this.snapshot);
     return { ...note };
+  }
+
+  /** Several at once, one write. See the Store interface for why. */
+  async createNotes(inputs: NewNote[]): Promise<Note[]> {
+    const made: Note[] = [];
+    for (const input of inputs) {
+      made.push(await this.build(input, made.length));
+    }
+    this.snapshot.notes = [...made, ...this.snapshot.notes];
+    write(this.snapshot);
+    return made.map((n) => ({ ...n }));
   }
 
   async updateNote(id: string, patch: Partial<Note>): Promise<Note> {

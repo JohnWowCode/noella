@@ -30,6 +30,7 @@ interface Noella {
   settings: Settings;
   colorOf: (note: Note) => Color | null;
   addNote: (input: NewNote) => Promise<Note>;
+  addNotes: (inputs: NewNote[]) => Promise<Note[]>;
   patchNote: (id: string, patch: Partial<Note>) => void;
   removeNote: (id: string) => void;
   patchColor: (id: string, patch: Partial<Color>) => void;
@@ -83,6 +84,16 @@ export function NoellaProvider({ children }: { children: React.ReactNode }) {
       const note = await store.createNote(input);
       setNotes((prev) => [note, ...prev.filter((n) => n.id !== note.id)]);
       return note;
+    },
+    [store],
+  );
+
+  const addNotes = useCallback(
+    async (inputs: NewNote[]) => {
+      const made = await store.createNotes(inputs);
+      const ids = new Set(made.map((n) => n.id));
+      setNotes((prev) => [...made, ...prev.filter((n) => !ids.has(n.id))]);
+      return made;
     },
     [store],
   );
@@ -200,6 +211,7 @@ export function NoellaProvider({ children }: { children: React.ReactNode }) {
       colorOf: (note) =>
         note.colorId ? (byId.get(note.colorId) ?? null) : null,
       addNote,
+      addNotes,
       patchNote,
       removeNote,
       patchColor,
@@ -218,6 +230,7 @@ export function NoellaProvider({ children }: { children: React.ReactNode }) {
     colors,
     settings,
     addNote,
+    addNotes,
     patchNote,
     removeNote,
     patchColor,

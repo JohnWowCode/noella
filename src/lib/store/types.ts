@@ -28,6 +28,15 @@ export interface Store {
   readonly label: string;
   load(): Promise<Snapshot>;
   createNote(input: NewNote): Promise<Note>;
+  /**
+   * Several at once, written once.
+   *
+   * Every write here rewrites the whole wall, which is fine for the one note
+   * you just typed and not fine for the four hundred that come in from a
+   * Claude export — that would be four hundred full serialisations of a wall
+   * that is getting bigger with each one.
+   */
+  createNotes(inputs: NewNote[]): Promise<Note[]>;
   updateNote(id: string, patch: Partial<Note>): Promise<Note>;
   deleteNote(id: string): Promise<void>;
   /** Puts deleted notes back exactly as they were. What undo is built on. */

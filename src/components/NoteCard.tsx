@@ -510,150 +510,180 @@ export function NoteCard({
         File Task Archive Del. That is not a card with actions, it is a toolbar
         with a note attached — and picking one meant reading all nine first.
       */}
+      {/*
+        Thirteen identical grey words in a row.
+
+        That is what this had become — Open Edit Colour Marks Today HPrio MPrio
+        LPrio Move Checkbox Send Archive Delete — and picking one meant reading
+        all thirteen first, which is exactly the complaint this menu was built
+        to answer two rewrites ago. It grew back one action at a time.
+
+        Four groups with a word over each, and colour where colour means
+        something: the ranks wear their own hue like the chips do, Today wears
+        the ink because it is a commitment rather than a label, and Delete is
+        the only red thing in the app that is not a priority.
+      */}
       {menu && (
-        <div className="mt-3 flex flex-wrap items-center gap-1.5 border border-current/25 px-2 py-2">
-          {onPick && picked === null && (
-            <Action onClick={() => onPick(note.id, true)}>Pick</Action>
-          )}
-          {!heading && onOpen && (
-            <Action onClick={() => onOpen(note.id)}>
-              {inside > 0 ? `Open · ${inside}` : "Open"}
-            </Action>
-          )}
-          <Action
-            onClick={() => {
-              setEditing(true);
-              setMenu(false);
-            }}
-          >
-            Edit
-          </Action>
-          <Action
-            onClick={() => {
-              setRecolouring((v) => !v);
-              setMoving(false);
-              setMarking(false);
-            }}
-            pressed={recolouring}
-          >
-            Colour
-          </Action>
-          <Action
-            onClick={() => {
-              setMarking((v) => !v);
-              setRecolouring(false);
-              setMoving(false);
-            }}
-            pressed={marking}
-          >
-            Marks
-          </Action>
-          {/*
-            Today first, because it is the one you reach for daily and it is
-            no longer the same question as importance. Now/Next/Later meant
-            both at once, so "the most important thing I have, not today" had
-            nowhere to go.
-          */}
-          <Action
-            onClick={() =>
-              patchNote(note.id, {
-                todayOn: note.todayOn ? null : todayKey(),
-              })
-            }
-            pressed={note.todayOn !== null}
-          >
-            {note.todayOn ? "Off today" : "Today"}
-          </Action>
-          {PRIORITIES.map((level) => (
+        <div className="mt-3 flex flex-col gap-2.5 border border-current/25 px-3 py-2.5">
+          <Group name="Where it goes">
+            {!heading && onOpen && (
+              <Action onClick={() => onOpen(note.id)}>
+                {inside > 0 ? `Open · ${inside}` : "Open"}
+              </Action>
+            )}
+            {targets.length > 0 && (
+              <Action
+                onClick={() => {
+                  setMoving((v) => !v);
+                  setRecolouring(false);
+                }}
+                pressed={moving}
+              >
+                Move into…
+              </Action>
+            )}
             <Action
-              key={level}
+              onClick={() => {
+                setRecolouring((v) => !v);
+                setMoving(false);
+                setMarking(false);
+              }}
+              pressed={recolouring}
+              swatch={color?.hex}
+            >
+              {color ? (color.name ?? "Folder") : "Folder"}
+            </Action>
+            {onPick && picked === null && (
+              <Action onClick={() => onPick(note.id, true)}>Pick more</Action>
+            )}
+          </Group>
+
+          <Group name="What it is">
+            <Action
+              onClick={() => {
+                setMarking((v) => !v);
+                setRecolouring(false);
+                setMoving(false);
+              }}
+              pressed={marking}
+            >
+              {marks.length > 0 ? `Marks · ${marks.length}` : "Marks"}
+            </Action>
+            <Action
+              onClick={() =>
+                patchNote(note.id, { isTask: !note.isTask, doneAt: null })
+              }
+              pressed={note.isTask}
+            >
+              {note.isTask ? "Has a checkbox" : "Give it a checkbox"}
+            </Action>
+            <Action
+              onClick={() => {
+                setEditing(true);
+                setMenu(false);
+              }}
+            >
+              Edit the words
+            </Action>
+          </Group>
+
+          <Group name="When you will do it">
+            <Action
               onClick={() =>
                 patchNote(note.id, {
-                  priority: note.priority === level ? null : level,
+                  todayOn: note.todayOn ? null : todayKey(),
                 })
               }
-              pressed={note.priority === level}
+              pressed={note.todayOn !== null}
+              solid
             >
-              {PRIORITY[level].label}
+              {/*
+                The word does not change with the state. Every other toggle in
+                this drawer keeps its name and lets being filled say it is on;
+                a button that reads "On today" and takes it off when you press
+                it is the one that has to be thought about.
+              */}
+              Today
             </Action>
-          ))}
-          {targets.length > 0 && (
+            {PRIORITIES.map((level) => (
+              <Action
+                key={level}
+                onClick={() =>
+                  patchNote(note.id, {
+                    priority: note.priority === level ? null : level,
+                  })
+                }
+                pressed={note.priority === level}
+                swatch={PRIORITY[level].hex}
+                title={PRIORITY[level].hint}
+              >
+                {PRIORITY[level].label}
+              </Action>
+            ))}
+          </Group>
+
+          <Group name="Out of the way">
+            {destination && (
+              <Action
+                onClick={() => {
+                  setSent("…");
+                  void send(destination, {
+                    id: note.id,
+                    ref: seqLabel(note.seq),
+                    title: note.body.split("\n", 1)[0],
+                    body: note.body,
+                    marks,
+                    tags: note.tags,
+                    priority: note.priority,
+                    done,
+                    createdAt: note.createdAt,
+                    url: `${window.location.origin}${window.location.pathname}#note-${note.id}`,
+                  }).then((r) => {
+                    setSent(
+                      r.ok
+                        ? r.how === "opened"
+                          ? "Opened"
+                          : "Sent"
+                        : r.how === "copied"
+                          ? `Copied instead — ${r.why}`
+                          : r.why,
+                    );
+                    window.setTimeout(() => setSent(null), 5000);
+                  });
+                }}
+              >
+                {sent ?? `Send to ${destination.name}`}
+              </Action>
+            )}
             <Action
-              onClick={() => {
-                setMoving((v) => !v);
-                setRecolouring(false);
-              }}
-              pressed={moving}
-            >
-              Move
-            </Action>
-          )}
-          <Action
-            onClick={() =>
-              patchNote(note.id, { isTask: !note.isTask, doneAt: null })
-            }
-          >
-            {note.isTask ? "No checkbox" : "Checkbox"}
-          </Action>
-          {destination && (
-            <Action
-              onClick={() => {
-                setSent("…");
-                void send(destination, {
-                  id: note.id,
-                  ref: seqLabel(note.seq),
-                  title: note.body.split("\n", 1)[0],
-                  body: note.body,
-                  marks,
-                  tags: note.tags,
-                  priority: note.priority,
-                  done: done,
-                  createdAt: note.createdAt,
-                  url: `${window.location.origin}${window.location.pathname}#note-${note.id}`,
-                }).then((r) => {
-                  setSent(
-                    r.ok
-                      ? r.how === "opened"
-                        ? "Opened"
-                        : "Sent"
-                      : r.how === "copied"
-                        ? `Copied instead — ${r.why}`
-                        : r.why,
-                  );
-                  window.setTimeout(() => setSent(null), 5000);
-                });
-              }}
-            >
-              {sent ?? `Send to ${destination.name}`}
-            </Action>
-          )}
-          <Action
-            onClick={() =>
-              patchNote(note.id, {
-                archivedAt: archived ? null : new Date().toISOString(),
-              })
-            }
-          >
-            {archived ? "Restore" : "Archive"}
-          </Action>
-          <Action
-            onClick={() => {
-              // Steps go with the project, so say so before it happens.
-              if (
-                contents.length > 0 &&
-                !window.confirm(
-                  `Delete this and the ${contents.length} ${
-                    contents.length === 1 ? "thing" : "things"
-                  } inside it?`,
-                )
-              ) {
-                return;
+              onClick={() =>
+                patchNote(note.id, {
+                  archivedAt: archived ? null : new Date().toISOString(),
+                })
               }
-              removeNote(note.id);
-            }}
-          >
-            Delete
-          </Action>
+            >
+              {archived ? "Restore" : "Archive"}
+            </Action>
+            <Action
+              onClick={() => {
+                // Steps go with the project, so say so before it happens.
+                if (
+                  contents.length > 0 &&
+                  !window.confirm(
+                    `Delete this and the ${contents.length} ${
+                      contents.length === 1 ? "thing" : "things"
+                    } inside it?`,
+                  )
+                ) {
+                  return;
+                }
+                removeNote(note.id);
+              }}
+              danger
+            >
+              Delete
+            </Action>
+          </Group>
         </div>
       )}
 
@@ -926,16 +956,42 @@ function Mover({
   );
 }
 
+/** A row of related actions under a quiet word saying what they are for. */
+function Group({
+  name,
+  children,
+}: {
+  name: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+      <span className="label mr-1 w-full opacity-45 sm:w-auto">{name}</span>
+      {children}
+    </div>
+  );
+}
+
 function Action({
   onClick,
   children,
   pressed,
   label,
+  title,
+  swatch,
+  solid = false,
+  danger = false,
 }: {
   onClick: () => void;
   children: React.ReactNode;
   pressed?: boolean;
   label?: string;
+  title?: string;
+  /** A block of the colour this action is about, drawn before the word. */
+  swatch?: string;
+  /** Fills with the card's ink when set. For commitments, not labels. */
+  solid?: boolean;
+  danger?: boolean;
 }) {
   return (
     <button
@@ -943,12 +999,24 @@ function Action({
       onClick={onClick}
       aria-pressed={pressed}
       aria-label={label}
-      className={`label px-2 py-1.5 ${
-        pressed
-          ? "bg-current/15"
-          : "opacity-70 hover:bg-current/10 hover:opacity-100"
+      title={title}
+      className={`label flex items-center gap-1.5 px-2 py-1.5 [@media(hover:none)]:min-h-10 ${
+        pressed && solid
+          ? "bg-[var(--on,var(--ink))] text-[var(--on-inv,var(--paper))]"
+          : pressed
+            ? "bg-current/20"
+            : danger
+              ? "text-[#C4443F] opacity-90 hover:bg-[#C4443F] hover:text-paper hover:opacity-100"
+              : "opacity-70 hover:bg-current/10 hover:opacity-100"
       }`}
     >
+      {swatch && (
+        <span
+          aria-hidden
+          className="h-2.5 w-2.5 shrink-0 border border-current/25"
+          style={{ backgroundColor: swatch }}
+        />
+      )}
       {children}
     </button>
   );
