@@ -44,6 +44,8 @@ interface Props {
   /** Non-null once the wall is in picking mode. */
   picked?: boolean | null;
   onPick?: (id: string, on: boolean) => void;
+  /** Clear the screen and work on this one thing. */
+  onStart?: (id: string) => void;
 }
 
 export function NoteCard({
@@ -55,6 +57,7 @@ export function NoteCard({
   heading = false,
   picked = null,
   onPick,
+  onStart,
 }: Props) {
   const { notes, colors, colorOf, patchNote, removeNote, attachImage } =
     useNoella();
@@ -588,6 +591,9 @@ export function NoteCard({
           </Group>
 
           <Group name="When you will do it">
+            {onStart && !done && (
+              <Action onClick={() => onStart(note.id)}>Do it now</Action>
+            )}
             <Action
               onClick={() =>
                 patchNote(note.id, {

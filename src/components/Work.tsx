@@ -30,10 +30,10 @@ const ROWS = 12;
  */
 export function Work({
   todayKey,
-  onOpen,
+  onStart,
 }: {
   todayKey: string;
-  onOpen?: (id: string) => void;
+  onStart?: (id: string) => void;
 }) {
   const { notes, patchNote } = useNoella();
   const [drawn, setDrawn] = useState<Candidate | null>(null);
@@ -121,7 +121,7 @@ export function Work({
 
   return (
     <>
-      <Today todayKey={todayKey} onOpen={onOpen} />
+      <Today todayKey={todayKey} onStart={onStart} />
 
       {showing && (
         <section className="mt-4 border-2 border-ink bg-field">
@@ -228,7 +228,7 @@ export function Work({
                   onTick={() =>
                     patchNote(n.id, { doneAt: new Date().toISOString() })
                   }
-                  onOpen={onOpen}
+                  onStart={onStart}
                 />
               ))}
             </ul>
@@ -260,12 +260,12 @@ function Row({
   note,
   onToday,
   onTick,
-  onOpen,
+  onStart,
 }: {
   note: Note;
   onToday: () => void;
   onTick: () => void;
-  onOpen?: (id: string) => void;
+  onStart?: (id: string) => void;
 }) {
   const marks = marksOf(note);
   return (
@@ -293,7 +293,7 @@ function Row({
       </span>
       <button
         type="button"
-        onClick={() => onOpen?.(note.id)}
+        onClick={() => onStart?.(note.id)}
         className="prose-note min-w-0 flex-1 text-left text-[calc(17px*var(--type))] leading-snug"
       >
         {note.body.split("\n", 1)[0]}

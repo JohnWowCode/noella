@@ -24,10 +24,16 @@ import { Icon } from "./Icon";
  */
 export function Today({
   todayKey,
-  onOpen,
+  onStart,
 }: {
   todayKey: string;
-  onOpen?: (id: string) => void;
+  /**
+   * Tapping a row starts it rather than navigating to it.
+   *
+   * Today is the doing list, so the obvious gesture should be the doing one.
+   * Opening it on the wall is still one tap away, from inside.
+   */
+  onStart?: (id: string) => void;
 }) {
   const { notes, patchNote } = useNoella();
   const { open, done, carried, finished } = todayOf(notes, todayKey);
@@ -113,7 +119,7 @@ export function Today({
             days={ageOf(n, todayKey)}
             onTick={() => patchNote(n.id, { doneAt: new Date().toISOString() })}
             onDrop={() => patchNote(n.id, { todayOn: null })}
-            onOpen={onOpen}
+            onStart={onStart}
           />
         ))}
         {open.map((n) => (
@@ -123,7 +129,7 @@ export function Today({
             days={0}
             onTick={() => patchNote(n.id, { doneAt: new Date().toISOString() })}
             onDrop={() => patchNote(n.id, { todayOn: null })}
-            onOpen={onOpen}
+            onStart={onStart}
           />
         ))}
         {done.map((n) => (
@@ -134,7 +140,7 @@ export function Today({
             finished
             onTick={() => patchNote(n.id, { doneAt: null })}
             onDrop={() => patchNote(n.id, { todayOn: null })}
-            onOpen={onOpen}
+            onStart={onStart}
           />
         ))}
       </ul>
@@ -155,14 +161,14 @@ function Row({
   finished = false,
   onTick,
   onDrop,
-  onOpen,
+  onStart,
 }: {
   note: Note;
   days: number;
   finished?: boolean;
   onTick: () => void;
   onDrop: () => void;
-  onOpen?: (id: string) => void;
+  onStart?: (id: string) => void;
 }) {
   const marks = marksOf(note);
   return (
@@ -186,7 +192,7 @@ function Row({
 
       <button
         type="button"
-        onClick={() => onOpen?.(note.id)}
+        onClick={() => onStart?.(note.id)}
         className={`prose-note min-w-0 flex-1 text-left text-[calc(17px*var(--type))] leading-snug ${
           finished ? "text-mute line-through" : ""
         }`}

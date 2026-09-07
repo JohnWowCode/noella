@@ -27,6 +27,7 @@ import { Journal } from "./Journal";
 import { ClaudeImport } from "./ClaudeImport";
 import { DataMenu } from "./DataMenu";
 import { FolderLink } from "./FolderLink";
+import { Focus } from "./Focus";
 import { Work } from "./Work";
 import { NoteCard } from "./NoteCard";
 import { SelectionBar } from "./Selection";
@@ -131,6 +132,8 @@ export function Home() {
    * first pick and both leave with the last.
    */
   const [picked, setPicked] = useState<Set<string>>(() => new Set());
+  /** The one thing you are doing right now, over everything else. */
+  const [focus, setFocus] = useState<string | null>(null);
 
   const composeRef = useRef<HTMLTextAreaElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -628,7 +631,7 @@ export function Home() {
 
         {showing === "work" && todayKey && (
           <>
-            <Work todayKey={todayKey} onOpen={open} />
+            <Work todayKey={todayKey} onStart={setFocus} />
 
             {/* Projects that have gone quiet. A doing question, so it lives
                 with the doing rather than under four hundred notes. */}
@@ -917,6 +920,7 @@ export function Home() {
                       onOpen={open}
                       picked={picked.size > 0 ? picked.has(n.id) : null}
                       onPick={pick}
+                      onStart={setFocus}
                       // While searching you are looking at the whole tree, so a
                       // result has to say where it came from or it is just a
                       // sentence with no address.
@@ -951,6 +955,10 @@ export function Home() {
           </div>
         )}
       </main>
+
+      {focus && (
+        <Focus id={focus} onClose={() => setFocus(null)} onOpen={open} />
+      )}
 
       {/* Sits over everything, at the bottom, where a thumb already is. */}
       <SelectionBar
