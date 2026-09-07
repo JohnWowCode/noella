@@ -8,24 +8,27 @@ import {
   type Cadence,
 } from "@/lib/recurrence";
 import { reorder } from "@/lib/order";
-import { titleOf } from "@/lib/rooms";
+import { contentsOf, titleOf } from "@/lib/rooms";
+import { marksOf } from "@/lib/stickers";
 import { useNoella } from "@/lib/store/provider";
-import { countChildren } from "@/lib/tree";
 import type { Note } from "@/lib/types";
 import { Icon } from "./Icon";
 
 /**
- * What is inside a note.
+ * What is inside, as something you can walk.
  *
- * One panel where there were two — a project panel with a status row and a
- * list panel with a cadence row — because a project and a list were never two
- * things. Anything can hold anything, so anything gets this: a line to add to
- * it, what is in it, and how far through it you are.
+ * This was a list you could not use. A row showed a name that was not a
+ * button and three things you could do: move it up, move it down, delete it.
+ * So the only easy action on a folder full of folders was destroying one, and
+ * getting *into* one meant going somewhere else and finding its card. Making
+ * folders inside folders — the thing this app is for — was the one thing it
+ * was worst at.
  *
- * It sits under the words rather than over them. The old list card opened with
- * three cadence buttons and a "resets in 7d" counter above a single item,
- * which put the machinery of the thing in front of the thing. What you wrote
- * comes first, always; the plumbing is underneath and quiet.
+ * It is a tree now. The name opens it. A chevron unfolds it in place, as deep
+ * as you have nested, so you can see and reach the whole shape from wherever
+ * you are standing. Delete is gone from here entirely: it lives on the card,
+ * behind a menu, like every other destructive thing, instead of being the
+ * most prominent control on a list of your work.
  */
 export function Inside({
   note,
@@ -33,6 +36,7 @@ export function Inside({
   onColor,
   showContents = true,
   today,
+  onOpen,
 }: {
   note: Note;
   contents: Note[];
@@ -40,14 +44,15 @@ export function Inside({
   onColor: boolean;
   /**
    * False when you are standing inside this note, where its contents are
-   * already the cards below. Listing them twice — once as rows, once as cards
-   * — was the single most confusing thing on the screen.
+   * already the cards below.
    */
   showContents?: boolean;
   today: Date;
+  onOpen?: (id: string) => void;
 }) {
-  const { notes, addNote, patchNote, removeNote } = useNoella();
+  const { notes, addNote, patchNote } = useNoella();
   const [draft, setDraft] = useState("");
+  const [open, setOpen] = useState<Set<string>>(() => new Set());
   const [settings, setSettings] = useState(false);
 
   const line = onColor ? "border-current/30" : "border-rule-soft";
@@ -57,15 +62,17 @@ export function Inside({
   function add() {
     const body = draft.trim();
     if (!body) return;
-    /*
-     * Whatever you put in inherits the room's colour and lands at the bottom.
-     * It is not forced into a checkbox: a room holds sub-rooms, screenshots
-     * and paragraphs as readily as it holds jobs, and deciding which at the
-     * moment of typing is the friction this app keeps removing.
-     */
     addNote({ body, colorId: note.colorId, parentId: note.id });
     setDraft("");
   }
+
+  const toggle = (id: string) =>
+    setOpen((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   if (!showContents) return null;
 
@@ -74,25 +81,20 @@ export function Inside({
       {contents.length > 0 && (
         <ul className={`border ${line}`}>
           {contents.map((item, i) => (
-            <Row
+            <Branch
               key={item.id}
               item={item}
+              siblings={contents}
               index={i}
-              count={contents.length}
+              depth={0}
               line={line}
-              settled={isSettled(item, note.repeats, today)}
-              inside={countChildren(notes, item.id)}
-              onTick={() =>
-                patchNote(item.id, {
-                  doneAt: item.doneAt ? null : new Date().toISOString(),
-                })
-              }
-              onMove={(by: 1 | -1) => {
-                for (const patch of reorder(contents, item.id, by)) {
-                  patchNote(patch.id, { order: patch.order });
-                }
-              }}
-              onRemove={() => removeNote(item.id)}
+              repeats={note.repeats}
+              today={today}
+              open={open}
+              onToggle={toggle}
+              onOpen={onOpen}
+              notes={notes}
+              patchNote={patchNote}
             />
           ))}
         </ul>
@@ -129,12 +131,9 @@ export function Inside({
       </div>
 
       {/*
-        The machinery, underneath and small.
-
-        Progress and repeating were the loudest things on a list card — three
-        cadence buttons and a countdown above one item. They matter, but they
-        are about the container rather than about anything in it, so they read
-        last and only once there is something to say.
+        The machinery, underneath and small. It is about the container rather
+        than about anything in it, so it reads last and only when there is
+        something to say.
       */}
       {(tickable.length > 0 || note.repeats) && (
         <div className="label mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 opacity-60">
@@ -204,97 +203,174 @@ export function Inside({
   );
 }
 
-function Row({
+/** How far in a row is allowed to indent before it stops being readable. */
+const MAX_DEPTH = 4;
+
+function Branch({
   item,
+  siblings,
   index,
-  count,
+  depth,
   line,
-  settled,
-  inside,
-  onTick,
-  onMove,
-  onRemove,
+  repeats,
+  today,
+  open,
+  onToggle,
+  onOpen,
+  notes,
+  patchNote,
 }: {
   item: Note;
+  siblings: Note[];
   index: number;
-  count: number;
+  depth: number;
   line: string;
-  settled: boolean;
-  inside: number;
-  onTick: () => void;
-  onMove: (by: 1 | -1) => void;
-  onRemove: () => void;
+  repeats: Cadence | null;
+  today: Date;
+  open: Set<string>;
+  onToggle: (id: string) => void;
+  onOpen?: (id: string) => void;
+  notes: Note[];
+  patchNote: (id: string, patch: Partial<Note>) => void;
 }) {
+  const children = contentsOf(notes, item.id);
+  const room = children.length > 0;
+  const unfolded = room && open.has(item.id);
+  const settled = isSettled(item, repeats, today);
+  const marks = marksOf(item);
+
   return (
-    <li
-      className={`group/row flex items-start gap-3 border-b ${line} px-3 py-2.5 last:border-b-0`}
-    >
-      {/*
-        A tick box only on things that can be ticked. A room gets a chevron:
-        drawing an empty checkbox beside "Cave Sniper" said it was a job you
-        had not done, when it is a place you have not opened.
-      */}
-      {item.isTask ? (
-        <button
-          type="button"
-          onClick={onTick}
-          aria-label={settled ? "Not done after all" : "Done"}
-          className="tap mt-0.5 grid h-4 w-4 shrink-0 place-items-center border border-current text-[10px] leading-none"
-        >
-          {settled ? "×" : ""}
-        </button>
-      ) : (
-        <span
-          aria-hidden
-          className="mt-1 grid h-4 w-4 shrink-0 place-items-center opacity-45"
-        >
-          <Icon
-            name={inside > 0 ? "chevron" : "ring"}
-            size={inside > 0 ? 11 : 6}
-          />
-        </span>
-      )}
-      <span
-        className={`min-w-0 flex-1 text-[calc(15px*var(--type))] leading-snug ${
-          settled ? "line-through opacity-50" : ""
-        }`}
+    <>
+      <li
+        className={`group/row flex items-start gap-2 border-b ${line} py-2.5 pr-3 last:border-b-0`}
+        style={{ paddingLeft: `${12 + Math.min(depth, MAX_DEPTH) * 18}px` }}
       >
-        {titleOf(item)}
-      </span>
-      {inside > 0 && (
-        <span className="label mt-0.5 shrink-0 tabular-nums opacity-50">
-          {inside}
+        {/*
+          The chevron unfolds; the name goes in. Two different verbs, so two
+          different targets — collapsing a folder to look at the one below it
+          should not move you into it.
+        */}
+        {room ? (
+          <button
+            type="button"
+            onClick={() => onToggle(item.id)}
+            aria-expanded={unfolded}
+            aria-label={
+              unfolded ? `Fold ${titleOf(item)}` : `Unfold ${titleOf(item)}`
+            }
+            className="tap mt-0.5 grid h-4 w-4 shrink-0 place-items-center opacity-60 hover:opacity-100"
+          >
+            <span className={unfolded ? "rotate-90" : ""}>
+              <Icon name="chevron" size={11} />
+            </span>
+          </button>
+        ) : item.isTask ? (
+          <button
+            type="button"
+            onClick={() =>
+              patchNote(item.id, {
+                doneAt: item.doneAt ? null : new Date().toISOString(),
+              })
+            }
+            aria-label={settled ? "Not done after all" : "Done"}
+            className="tap mt-0.5 grid h-4 w-4 shrink-0 place-items-center border border-current text-[10px] leading-none"
+          >
+            {settled ? "×" : ""}
+          </button>
+        ) : (
+          <span
+            aria-hidden
+            className="mt-1 grid h-4 w-4 shrink-0 place-items-center opacity-35"
+          >
+            <Icon name="ring" size={6} />
+          </span>
+        )}
+
+        {marks.length > 0 && (
+          <span className="mt-0.5 flex shrink-0 items-center gap-1 opacity-70">
+            {marks.slice(0, 2).map((m) => (
+              <Icon key={m} name={m} size={13} />
+            ))}
+          </span>
+        )}
+
+        {/* The name is the way in. This was a span. */}
+        <button
+          type="button"
+          onClick={() => onOpen?.(item.id)}
+          className={`min-w-0 flex-1 text-left text-[calc(15px*var(--type))] leading-snug underline decoration-transparent underline-offset-2 hover:decoration-current ${
+            settled ? "line-through opacity-50" : ""
+          }`}
+        >
+          {titleOf(item)}
+        </button>
+
+        {room && (
+          <button
+            type="button"
+            onClick={() => onToggle(item.id)}
+            aria-hidden
+            tabIndex={-1}
+            className="label mt-0.5 shrink-0 tabular-nums opacity-45 hover:opacity-100"
+          >
+            {children.length}
+          </button>
+        )}
+
+        {/*
+          Reordering, and nothing else. Delete used to be here, on every row,
+          as the loudest thing on offer — it is on the card now, behind the
+          menu, with the other things you cannot undo.
+        */}
+        <span className="flex shrink-0 items-center gap-1 opacity-0 group-hover/row:opacity-60 focus-within:opacity-100 [@media(hover:none)]:opacity-40">
+          <button
+            type="button"
+            onClick={() => {
+              for (const patch of reorder(siblings, item.id, -1)) {
+                patchNote(patch.id, { order: patch.order });
+              }
+            }}
+            disabled={index === 0}
+            aria-label="Move up"
+            className="tap label px-1 disabled:opacity-30"
+          >
+            ↑
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              for (const patch of reorder(siblings, item.id, 1)) {
+                patchNote(patch.id, { order: patch.order });
+              }
+            }}
+            disabled={index === siblings.length - 1}
+            aria-label="Move down"
+            className="tap label px-1 disabled:opacity-30"
+          >
+            ↓
+          </button>
         </span>
-      )}
-      <span className="flex shrink-0 items-center gap-2 opacity-0 group-hover/row:opacity-70 focus-within:opacity-100 [@media(hover:none)]:opacity-50">
-        <button
-          type="button"
-          onClick={() => onMove(-1)}
-          disabled={index === 0}
-          aria-label="Move up"
-          className="tap label px-1 disabled:opacity-30"
-        >
-          ↑
-        </button>
-        <button
-          type="button"
-          onClick={() => onMove(1)}
-          disabled={index === count - 1}
-          aria-label="Move down"
-          className="tap label px-1 disabled:opacity-30"
-        >
-          ↓
-        </button>
-        <button
-          type="button"
-          onClick={onRemove}
-          aria-label="Delete"
-          className="tap label px-1 underline decoration-1 underline-offset-2"
-        >
-          Del
-        </button>
-      </span>
-    </li>
+      </li>
+
+      {unfolded &&
+        children.map((child, i) => (
+          <Branch
+            key={child.id}
+            item={child}
+            siblings={children}
+            index={i}
+            depth={depth + 1}
+            line={line}
+            repeats={item.repeats}
+            today={today}
+            open={open}
+            onToggle={onToggle}
+            onOpen={onOpen}
+            notes={notes}
+            patchNote={patchNote}
+          />
+        ))}
+    </>
   );
 }
 

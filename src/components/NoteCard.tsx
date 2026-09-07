@@ -391,20 +391,25 @@ export function NoteCard({
         ) : note.body.length > 0 ? (
           <p
             /*
-             * Two ways in, one gesture each.
+             * A room's name goes in; a note's words open the editor.
              *
-             * Double-click where the hand already is, for anything with a
-             * pointer. On a touch screen double-tap means zoom, so a single
-             * tap on the words opens the editor instead — which is a target
-             * the width of the card rather than a fourth 23px glyph crowding
-             * the star and the menu. Decided at the tap, not at render, so
-             * there is no hydration mismatch and it follows a keyboard being
-             * plugged in.
+             * That is the rule everywhere else: clicking a folder's name
+             * opens the folder. Rooms are places and notes are content, and
+             * you rename a place far less often than you enter it — renaming
+             * is still in the menu. For a plain note, double-click edits
+             * where the hand already is, and on a touch screen, where
+             * double-tap means zoom, a single tap does it instead.
              */
             onClick={() => {
-              if (window.matchMedia("(hover: none)").matches) setEditing(true);
+              if (room && !heading) {
+                onOpen?.(note.id);
+              } else if (window.matchMedia("(hover: none)").matches) {
+                setEditing(true);
+              }
             }}
-            onDoubleClick={() => setEditing(true)}
+            onDoubleClick={() => {
+              if (!room || heading) setEditing(true);
+            }}
             className={`prose-note order-3 w-full min-w-0 [overflow-wrap:anywhere] whitespace-pre-wrap ${
               long ? "" : "sm:order-2 sm:w-auto sm:flex-1"
             } ${
@@ -797,6 +802,7 @@ export function NoteCard({
           onColor={onColor}
           showContents={!heading}
           today={new Date()}
+          onOpen={onOpen}
         />
       )}
 
@@ -827,8 +833,12 @@ export function NoteCard({
               : "border-rule hover:bg-ink hover:text-paper"
           }`}
         >
-          <span>Open</span>
-          <span className="tabular-nums opacity-70">{inside} inside</span>
+          {/*
+            No count here any more. The tree above already lists what is in
+            it, and this said "1 inside" beside a row saying "2" — the same
+            word for two different things one line apart.
+          */}
+          <span>Open {titleOf(note)}</span>
           <Icon name="chevron" size={13} className="ml-auto" />
         </button>
       )}
