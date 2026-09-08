@@ -10,6 +10,7 @@ import {
   quietDays,
   streak,
 } from "@/lib/momentum";
+import { minutesOn, spellMinutes } from "@/lib/minutes";
 import { matches } from "@/lib/notes";
 import { contentsOf, titleOf } from "@/lib/rooms";
 import { PRIORITIES, PRIORITY, rankOf, type Priority } from "@/lib/priority";
@@ -725,6 +726,7 @@ export function Home() {
                 onOpen={open}
                 heading
               />
+              <RoomState room={here} todayKey={todayKey} />
             </div>
           )}
 
@@ -1163,6 +1165,62 @@ function Trail({
  * A separate component only so it can see the drag — Home provides the
  * context, so Home itself cannot read it.
  */
+/**
+ * How a room is doing, under its own name.
+ *
+ * Standing inside a room, the first thing on screen was a bordered box
+ * containing the room's name — directly under a breadcrumb containing the
+ * room's name. Two hundred pixels to say a thing you had just read, which is
+ * the forehead space this app is not allowed to have. The box stays, because
+ * a room is a note and hiding its words would make it feel like something the
+ * app invented; it just has to earn the space now.
+ *
+ * Counts everything underneath at any depth, because "12 inside" meaning
+ * "12 in the first drawer" is a lie the moment there is a second drawer.
+ */
+function RoomState({ room, todayKey }: { room: Note; todayKey: string }) {
+  const { notes } = useNoella();
+  const inside = useMemo(
+    () => descendantsOf(notes, room.id).filter((n) => n.archivedAt === null),
+    [notes, room.id],
+  );
+  if (inside.length === 0) return null;
+
+  const jobs = inside.filter((n) => n.isTask);
+  const done = jobs.filter((n) => n.doneAt !== null).length;
+  const today = inside.filter(
+    (n) => n.todayOn === todayKey && n.doneAt === null,
+  ).length;
+  const spent = minutesOn(inside);
+
+  return (
+    <div className="border border-t-0 border-rule bg-field">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2">
+        <span className="label text-mute">
+          {inside.length} inside
+          {jobs.length > 0 && ` · ${done} of ${jobs.length} done`}
+          {spent > 0 && ` · ${spellMinutes(spent)} on it`}
+        </span>
+        {today > 0 && (
+          <span className="label border border-ink bg-ink px-1.5 py-0.5 text-paper">
+            {today} on today
+          </span>
+        )}
+      </div>
+      {/* A rule that fills as the room empties — the same one Today uses, so
+        the two places you watch something finish look like each other. */}
+      {jobs.length > 0 && (
+        <span aria-hidden className="block h-[3px] w-full bg-rule-soft">
+          <span
+            className="block h-full bg-ink"
+            style={{ width: `${(done / jobs.length) * 100}%` }}
+          />
+        </span>
+      )}
+    </div>
+  );
+}
+
 function AreaTabs({
   area,
   go,

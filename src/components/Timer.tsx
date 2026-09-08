@@ -157,7 +157,14 @@ export function Timer({ step, onColor }: { step: Note; onColor: boolean }) {
         >
           <span className="flex items-center gap-2">
             <Icon name="play" size={12} />
-            Just start · 5 minutes
+            {/*
+              Five minutes is the trick — nobody refuses five minutes — but it
+              is only the trick while it is the truth. Once you have said how
+              long you think this takes, the bar behind the clock is already
+              measuring against that number, and a button still promising five
+              is the app arguing with itself.
+            */}
+            Just start · {step.estimateMinutes ?? 5} minutes
           </span>
         </button>
       )}

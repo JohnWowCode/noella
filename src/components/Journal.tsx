@@ -3,11 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { fromKey } from "@/lib/clock";
 import { isVideo, mediaFilesFrom } from "@/lib/images";
+import { minutesOn, spellMinutes } from "@/lib/minutes";
 import { marksOf } from "@/lib/stickers";
 import { useNoella } from "@/lib/store/provider";
 import type { Note, NoteImage } from "@/lib/types";
 import { Icon } from "./Icon";
 import { Lightbox } from "./NoteImages";
+import { Where } from "./Where";
 
 /**
  * The journal.
@@ -137,6 +139,16 @@ export function Journal({
                       `${day.shots.length} ${day.shots.length === 1 ? "shot" : "shots"}`,
                     day.finished.length > 0 &&
                       `${day.finished.length} finished`,
+                    /*
+                      What the day cost, where the day is written down.
+
+                      Every one of these was timed by the clock in Focus and
+                      the number went straight into the note and stayed there,
+                      unread. Four ticks is a list; two and a half hours is a
+                      day you can defend to yourself on a Friday.
+                    */
+                    minutesOn(day.finished) > 0 &&
+                      spellMinutes(minutesOn(day.finished)),
                   ]
                     .filter(Boolean)
                     .join(" · ")}
@@ -177,13 +189,28 @@ export function Journal({
                             <Icon name={m} size={14} />
                           </span>
                         ))}
-                      <button
-                        type="button"
-                        onClick={() => onOpen?.(n.id)}
-                        className="prose-note min-w-0 flex-1 text-left text-[calc(16px*var(--type))] leading-snug"
-                      >
-                        {n.body.split("\n", 1)[0] || "a picture"}
-                      </button>
+                      <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
+                        <button
+                          type="button"
+                          onClick={() => onOpen?.(n.id)}
+                          className="prose-note w-full text-left text-[calc(16px*var(--type))] leading-snug"
+                        >
+                          {n.body.split("\n", 1)[0] || "a picture"}
+                        </button>
+                        <Where id={n.id} onOpen={onOpen} />
+                      </span>
+                      {n.actualMinutes !== null && n.actualMinutes > 0 && (
+                        <span
+                          className="label mt-[5px] shrink-0 text-mute tabular-nums"
+                          title={
+                            n.estimateMinutes !== null
+                              ? `you guessed ${n.estimateMinutes}m`
+                              : undefined
+                          }
+                        >
+                          {spellMinutes(n.actualMinutes)}
+                        </span>
+                      )}
                     </li>
                   ))}
                 </ul>
