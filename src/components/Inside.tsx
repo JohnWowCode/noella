@@ -204,16 +204,6 @@ export function Inside({
         </div>
       )}
 
-      {grab && (
-        <span
-          aria-hidden
-          style={{ left: grab.x + 14, top: grab.y - 10 }}
-          className="pointer-events-none fixed z-50 max-w-56 truncate border-2 border-ink bg-paper px-2 py-1 text-[calc(14px*var(--type))] text-ink shadow-lg"
-        >
-          {titleOf(notes.find((n) => n.id === grab.id) ?? note)}
-        </span>
-      )}
-
       {settings && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           {CADENCES.map((c) => (

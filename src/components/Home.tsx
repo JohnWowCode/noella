@@ -13,10 +13,16 @@ import {
 import { matches } from "@/lib/notes";
 import { contentsOf, titleOf } from "@/lib/rooms";
 import { PRIORITIES, PRIORITY, rankOf, type Priority } from "@/lib/priority";
-import { ALL_MARKS, markLabel, markOf, marksOf } from "@/lib/stickers";
+import {
+  ALL_MARKS,
+  markLabel,
+  markOf,
+  marksOf,
+  toggleMark,
+} from "@/lib/stickers";
 import type { Drop } from "@/lib/drag";
 import { descendantsOf, pathTo } from "@/lib/tree";
-import { Icon, type IconName } from "./Icon";
+import { Icon, isIconName, type IconName } from "./Icon";
 import { Popover } from "./Popover";
 import { swatchName } from "@/lib/store/defaults";
 import { useNoella } from "@/lib/store/provider";
@@ -27,8 +33,9 @@ import { Compose } from "./Compose";
 import { Journal } from "./Journal";
 import { ClaudeImport } from "./ClaudeImport";
 import { DataMenu } from "./DataMenu";
-import { DragProvider } from "./DragProvider";
+import { DragProvider, useCarry } from "./DragProvider";
 import { FolderLink } from "./FolderLink";
+import { Ghost } from "./Ghost";
 import { Focus } from "./Focus";
 import { Work } from "./Work";
 import { NoteCard } from "./NoteCard";
@@ -151,18 +158,91 @@ export function Home() {
   const drop = useCallback(
     (id: string, overId: string | null, where: Drop) => {
       if (!overId || overId === id) return;
-      const moved = notes.find((n) => n.id === id);
+      if (!notes.some((n) => n.id === id)) return;
+
+      /*
+       * Carrying one of a pile carries the pile.
+       *
+       * You could already tick five notes and then use the bar at the bottom
+       * on all five at once — but dragging still only ever moved the one under
+       * your finger, which made the pile feel like a menu rather than a
+       * handful. Picking things up is the most direct thing in the app; it
+       * should obey the same selection everything else does. Wall order is
+       * kept, so five notes land in the order you were already looking at.
+       */
+      const crew =
+        picked.has(id) && picked.size > 1
+          ? notes.filter((n) => picked.has(n.id)).map((n) => n.id)
+          : [id];
+      /** Top of wherever they land, in the order they were in. */
+      const rung = (i: number) => i - crew.length;
+
+      /*
+       * The chrome is a destination too.
+       *
+       * Everything along the top already means something — this tab is what
+       * you are doing, that swatch is a folder, that chip is a mark — so
+       * carrying a note onto one should mean the obvious thing rather than
+       * nothing. It costs no new interface at all: the targets were already
+       * drawn, they were just inert.
+       */
+      if (overId === "drop:today") {
+        crew.forEach((m) => patchNote(m, { todayOn: todayKey }));
+        return;
+      }
+      if (overId === "drop:pick") {
+        setPicked((prev) => new Set(prev).add(id));
+        return;
+      }
+      if (overId === "drop:top") {
+        crew.forEach((m, i) => {
+          const n = notes.find((x) => x.id === m);
+          if (n && n.parentId === null) return;
+          patchNote(m, { parentId: null, order: rung(i) });
+        });
+        return;
+      }
+      if (overId.startsWith("drop:color:")) {
+        const colorId = overId.slice("drop:color:".length);
+        crew.forEach((m) =>
+          patchNote(m, { colorId: colorId === "none" ? null : colorId }),
+        );
+        return;
+      }
+      if (overId.startsWith("drop:mark:")) {
+        const m = overId.slice("drop:mark:".length);
+        if (!isIconName(m)) return;
+        /*
+         * Dropping on a mark a second time takes it off again — which for a
+         * pile only reads as one gesture if the pile answers as one. So it is
+         * on unless every last one of them already wears it.
+         */
+        const all = crew.every((c) =>
+          (notes.find((n) => n.id === c)?.icons ?? []).includes(m),
+        );
+        crew.forEach((c) => {
+          const n = notes.find((x) => x.id === c);
+          if (!n) return;
+          const has = n.icons.includes(m);
+          if (all === has) patchNote(c, { icons: toggleMark(n.icons, m) });
+        });
+        return;
+      }
+
       const target = notes.find((n) => n.id === overId);
-      if (!moved || !target) return;
-      const banned = new Set([
-        id,
-        ...descendantsOf(notes, id).map((n) => n.id),
-      ]);
+      if (!target) return;
+      /* Nothing may land inside itself or inside anything it contains. */
+      const banned = new Set(
+        crew.flatMap((m) => [m, ...descendantsOf(notes, m).map((n) => n.id)]),
+      );
       if (banned.has(overId)) return;
 
       if (where === "into") {
-        if (target.id === moved.parentId) return;
-        patchNote(id, { parentId: target.id, order: -1 });
+        crew.forEach((m, i) => {
+          const n = notes.find((x) => x.id === m);
+          if (n && n.parentId === target.id) return;
+          patchNote(m, { parentId: target.id, order: rung(i) });
+        });
         return;
       }
 
@@ -170,29 +250,34 @@ export function Home() {
        * Between. The siblings are renumbered from the top so the new position
        * holds — nudging one order value only works until two of them collide.
        */
+      const held = new Set(crew);
       const siblings = notes
         .filter(
           (n) =>
             n.parentId === target.parentId &&
             n.archivedAt === null &&
-            n.id !== id,
+            !held.has(n.id),
         )
         .sort(
           (a, b) => a.order - b.order || b.createdAt.localeCompare(a.createdAt),
         );
       const at = siblings.findIndex((n) => n.id === target.id);
       const index = where === "above" ? at : at + 1;
+      const group = crew
+        .map((m) => notes.find((n) => n.id === m))
+        .filter((n): n is Note => n !== undefined);
       const next = [
         ...siblings.slice(0, index),
-        moved,
+        ...group,
         ...siblings.slice(index),
       ];
       next.forEach((n, i) => {
-        if (n.id === id) patchNote(id, { parentId: target.parentId, order: i });
+        if (held.has(n.id))
+          patchNote(n.id, { parentId: target.parentId, order: i });
         else if (n.order !== i) patchNote(n.id, { order: i });
       });
     },
-    [notes, patchNote],
+    [notes, patchNote, picked, todayKey],
   );
 
   const pick = useCallback((id: string, on: boolean) => {
@@ -654,35 +739,9 @@ export function Home() {
           {!inside && (
             <nav
               aria-label="Areas"
-              className="mt-5 flex items-center gap-1 border-b border-rule-soft"
+              className="relative mt-5 flex items-center gap-1 border-b border-rule-soft"
             >
-              {(Object.keys(AREAS) as Area[]).map((id) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => go(id)}
-                  aria-current={area === id ? "page" : undefined}
-                  className={`label flex items-center gap-1.5 px-3 py-2.5 ${
-                    area === id
-                      ? "-mb-px border-b-2 border-ink text-ink"
-                      : "text-mute hover:text-ink"
-                  }`}
-                >
-                  {AREAS[id]}
-                  {/*
-                  What is waiting behind the tab you are not looking at.
-                  Only ever drawn when there is something, so a quiet app has
-                  three plain words across the top and a busy one tells you
-                  where to go without you having to go and look.
-                */}
-                  {id === "work" && owed > 0 && (
-                    <span className="tabular-nums opacity-60">{owed}</span>
-                  )}
-                  {id === "journal" && madeToday > 0 && (
-                    <span className="tabular-nums opacity-60">{madeToday}</span>
-                  )}
-                </button>
-              ))}
+              <AreaTabs area={area} go={go} owed={owed} madeToday={madeToday} />
             </nav>
           )}
 
@@ -1019,6 +1078,8 @@ export function Home() {
           <Focus id={focus} onClose={() => setFocus(null)} onOpen={open} />
         )}
 
+        <Ghost notes={notes} picked={picked} />
+
         {/* Sits over everything, at the bottom, where a thumb already is. */}
         <SelectionBar
           selected={picked}
@@ -1085,6 +1146,88 @@ function Trail({
         {titleOf(here)}
       </span>
     </nav>
+  );
+}
+
+/**
+ * The three areas, and two of them are places to put things.
+ *
+ * A separate component only so it can see the drag — Home provides the
+ * context, so Home itself cannot read it.
+ */
+function AreaTabs({
+  area,
+  go,
+  owed,
+  madeToday,
+}: {
+  area: Area;
+  go: (next: Area) => void;
+  owed: number;
+  madeToday: number;
+}) {
+  const carry = useCarry();
+  /*
+   * Work means today and Wall means the top level, so carrying something onto
+   * either says the thing the word already says. Journal is deliberately not a
+   * target: "drop it here to mark it finished" is a fine idea and a bad
+   * accident.
+   */
+  const target: Partial<Record<Area, string>> = {
+    work: "drop:today",
+    wall: "drop:top",
+  };
+
+  return (
+    <>
+      {(Object.keys(AREAS) as Area[]).map((id) => {
+        const lit = carry.dragging && target[id] && carry.over === target[id];
+        return (
+          <button
+            key={id}
+            type="button"
+            onClick={() => go(id)}
+            aria-current={area === id ? "page" : undefined}
+            data-drop-id={target[id]}
+            className={`label flex items-center gap-1.5 px-3 py-2.5 ${
+              area === id
+                ? "-mb-px border-b-2 border-ink text-ink"
+                : "text-mute hover:text-ink"
+            } ${lit ? "bg-ink text-paper" : ""}`}
+          >
+            {AREAS[id]}
+            {/*
+              What is waiting behind the tab you are not looking at. Only ever
+              drawn when there is something, so a quiet app has three plain
+              words across the top and a busy one tells you where to go without
+              you having to go and look.
+            */}
+            {id === "work" && owed > 0 && (
+              <span className="tabular-nums opacity-60">{owed}</span>
+            )}
+            {id === "journal" && madeToday > 0 && (
+              <span className="tabular-nums opacity-60">{madeToday}</span>
+            )}
+          </button>
+        );
+      })}
+
+      {/*
+        What a drop would do, said once, under the row.
+
+        The first version wrote it into the tabs themselves — WORK became
+        "Onto today" — which read beautifully and was unusable: the words are
+        longer, so the tabs grew and slid out from under the thing you were
+        already carrying towards them. A target that moves as you approach it
+        is worse than one that says nothing. So the promise is made here, out
+        of the flow, and the tabs hold still.
+      */}
+      {carry.dragging && (
+        <span className="label pointer-events-none absolute top-full left-0 z-10 mt-1.5 border border-rule bg-paper px-2 py-1 whitespace-nowrap text-mute">
+          Work = onto today · Wall = out to the top
+        </span>
+      )}
+    </>
   );
 }
 
@@ -1167,6 +1310,7 @@ function Marks({
   onPick: (mark: IconName) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const carry = useCarry();
   const used = ALL_MARKS.filter((m) => (counts.get(m) ?? 0) > 0);
   if (used.length === 0) return null;
 
@@ -1207,11 +1351,12 @@ function Marks({
             type="button"
             onClick={() => onPick(m)}
             aria-pressed={on}
+            data-drop-id={`drop:mark:${m}`}
             className={`flex items-center gap-1.5 border px-2 py-1.5 ${
               on
                 ? "border-ink bg-ink text-paper"
                 : "border-rule hover:border-ink"
-            }`}
+            } ${carry.dragging && carry.over === `drop:mark:${m}` ? "outline-2 -outline-offset-2 outline-ink" : ""}`}
           >
             <Icon name={m} size={15} />
             <span className="label">{markLabel(m)}</span>
@@ -1260,6 +1405,7 @@ function Worlds({
   onPick: (id: string) => void;
 }) {
   const { colors } = useNoella();
+  const carry = useCarry();
   const used = colors.filter((c) => (counts.get(c.id) ?? 0) > 0);
   if (used.length === 0) return null;
 
@@ -1277,11 +1423,12 @@ function Worlds({
             type="button"
             onClick={() => onPick(c.id)}
             aria-pressed={c.id === active}
+            data-drop-id={`drop:color:${c.id}`}
             className={`flex items-center gap-2 border px-2 py-1.5 ${
               c.id === active
                 ? "border-ink bg-ink text-paper"
                 : "border-rule hover:border-ink"
-            }`}
+            } ${carry.dragging && carry.over === `drop:color:${c.id}` ? "outline-2 -outline-offset-2 outline-ink" : ""}`}
           >
             <span
               aria-hidden

@@ -9,6 +9,7 @@ import { swatchName } from "@/lib/store/defaults";
 import { useNoella } from "@/lib/store/provider";
 import { descendantsOf } from "@/lib/tree";
 import type { Note } from "@/lib/types";
+import { useCarry } from "./DragProvider";
 import { Icon } from "./Icon";
 
 /**
@@ -38,6 +39,7 @@ export function SelectionBar({
   onOpen: (id: string) => void;
 }) {
   const { colors, addNote, patchNote, removeNote } = useNoella();
+  const carry = useCarry();
   const [panel, setPanel] = useState<"none" | "room" | "colour" | "mark">(
     "none",
   );
@@ -81,7 +83,17 @@ export function SelectionBar({
       role="region"
       aria-label="Selected notes"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-      className="fixed inset-x-0 bottom-0 z-40 border-t-2 border-ink bg-paper"
+      /*
+       * A pile you can throw things onto. Ticking each note was the only way
+       * in, which meant the bar could only ever act on what you had already
+       * decided about — now you can gather while you browse.
+       */
+      data-drop-id="drop:pick"
+      className={`fixed inset-x-0 bottom-0 z-40 border-t-2 border-ink bg-paper ${
+        carry.dragging && carry.over === "drop:pick"
+          ? "outline-2 -outline-offset-2 outline-ink"
+          : ""
+      }`}
     >
       <div className="mx-auto w-full max-w-3xl px-4 py-3 sm:px-6">
         {panel === "room" && (

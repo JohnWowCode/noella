@@ -38,6 +38,7 @@ export function useDrag(
 
   const cancel = useCallback(() => {
     window.clearTimeout(timer.current);
+    document.body.style.removeProperty("user-select");
     start.current = null;
     held.current = false;
     overRef.current = null;
@@ -86,21 +87,35 @@ export function useDrag(
         cancel();
       };
 
+      // Dragging a note's words leaves those words selected. Press them again
+      // and the browser starts its own drag of the selection, which fires
+      // pointercancel and swallows the drop — so the second drag in a row did
+      // nothing at all. The browser's drag is never wanted here.
+      const noNative = (ev: Event) => ev.preventDefault();
+
       // Not passive: preventDefault is the only thing stopping the page
       // scrolling underneath a drag on a touch screen.
       document.addEventListener("pointermove", move, { passive: false });
       document.addEventListener("pointerup", up);
       document.addEventListener("pointercancel", cancel);
+      document.addEventListener("dragstart", noNative);
       teardown.current = () => {
         document.removeEventListener("pointermove", move);
         document.removeEventListener("pointerup", up);
         document.removeEventListener("pointercancel", cancel);
+        document.removeEventListener("dragstart", noNative);
       };
 
       window.clearTimeout(timer.current);
       timer.current = window.setTimeout(() => {
         if (!start.current) return;
         held.current = true;
+        // Let go of any words the press highlighted, and stop the browser
+        // highlighting more as you go. Without this, carrying a note dragged a
+        // selection across everything the pointer crossed, so half the screen
+        // came up black behind the thing you were trying to place.
+        window.getSelection()?.removeAllRanges();
+        document.body.style.userSelect = "none";
         setGrab({ id, x: start.current.x, y: start.current.y });
         // A short buzz where the hardware has one, so a long press on a phone
         // announces itself rather than just happening.
