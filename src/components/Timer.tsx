@@ -1,29 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  clearRunning,
+  minutesSince,
+  readRunning,
+  writeRunning,
+  type Running,
+} from "@/lib/running";
 import { useNoella } from "@/lib/store/provider";
 import type { Note } from "@/lib/types";
 import { Icon } from "./Icon";
 
-const KEY = "noella.timer";
-
 /** The sizes a next step should ever be. Anything bigger is not a next step. */
 export const ESTIMATES = [5, 15, 30, 60] as const;
-
-interface Running {
-  stepId: string;
-  startedAt: number;
-}
-
-function read(): Running | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as Running) : null;
-  } catch {
-    return null;
-  }
-}
 
 /**
  * A clock for one step.
@@ -45,7 +35,7 @@ export function Timer({ step, onColor }: { step: Note; onColor: boolean }) {
   // Read after mount so the server and first client render agree.
   useEffect(() => {
     let live = true;
-    const stored = read();
+    const stored = readRunning();
     Promise.resolve().then(() => {
       if (live) setRunning(stored);
     });
@@ -65,25 +55,15 @@ export function Timer({ step, onColor }: { step: Note; onColor: boolean }) {
   }, [active]);
 
   function start() {
-    const next = { stepId: step.id, startedAt: Date.now() };
+    const next: Running = { stepId: step.id, startedAt: Date.now() };
     setRunning(next);
-    try {
-      localStorage.setItem(KEY, JSON.stringify(next));
-    } catch {
-      // The clock still runs for this session.
-    }
+    writeRunning(next);
   }
 
   function stop(): number {
-    const minutes = active
-      ? Math.max(1, Math.round((Date.now() - active.startedAt) / 60000))
-      : 0;
+    const minutes = active ? minutesSince(active.startedAt, Date.now()) : 0;
     setRunning(null);
-    try {
-      localStorage.removeItem(KEY);
-    } catch {
-      // Nothing to clean up.
-    }
+    clearRunning();
     return minutes;
   }
 

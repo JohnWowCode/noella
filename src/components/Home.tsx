@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { inDays, useTodayKey } from "@/lib/clock";
+import { writeLast } from "@/lib/lastseen";
 import {
   bestRun,
   drifting,
@@ -42,6 +43,7 @@ import { Work } from "./Work";
 import { NoteCard } from "./NoteCard";
 import { SelectionBar } from "./Selection";
 import { TagIndex } from "./TagIndex";
+import { Ticking } from "./Ticking";
 import { Reading } from "./Reading";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -144,6 +146,15 @@ export function Home() {
   const [picked, setPicked] = useState<Set<string>>(() => new Set());
   /** The one thing you are doing right now, over everything else. */
   const [focus, setFocus] = useState<string | null>(null);
+  /*
+   * Opening the one-thing view is the app's only unambiguous "I am working on
+   * this", so it is the only thing that moves the marker. Ticking a box or
+   * dragging a card is bookkeeping; this is hands on it.
+   */
+  const start = useCallback((id: string) => {
+    writeLast(id);
+    setFocus(id);
+  }, []);
 
   const composeRef = useRef<HTMLTextAreaElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -757,7 +768,7 @@ export function Home() {
 
           {showing === "work" && todayKey && (
             <>
-              <Work todayKey={todayKey} onStart={setFocus} onOpen={open} />
+              <Work todayKey={todayKey} onStart={start} onOpen={open} />
 
               {/* Projects that have gone quiet. A doing question, so it lives
                 with the doing rather than under four hundred notes. */}
@@ -1048,7 +1059,7 @@ export function Home() {
                         onOpen={open}
                         picked={picked.size > 0 ? picked.has(n.id) : null}
                         onPick={pick}
-                        onStart={setFocus}
+                        onStart={start}
                         // While searching you are looking at the whole tree, so a
                         // result has to say where it came from or it is just a
                         // sentence with no address.
@@ -1089,6 +1100,11 @@ export function Home() {
         )}
 
         <Ghost notes={notes} picked={picked} />
+
+        {/* Follows you off the one-thing view, because a clock you cannot see
+          is a clock that runs all afternoon. Stands down while something is
+          picked — that bar owns the bottom of the screen. */}
+        <Ticking hidden={focus !== null || picked.size > 0} onOpen={start} />
 
         {/* Sits over everything, at the bottom, where a thumb already is. */}
         <SelectionBar

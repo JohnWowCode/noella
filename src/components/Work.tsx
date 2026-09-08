@@ -10,6 +10,7 @@ import { useNoella } from "@/lib/store/provider";
 import type { Note } from "@/lib/types";
 import { Icon } from "./Icon";
 import { Timer } from "./Timer";
+import { LeftOff } from "./LeftOff";
 import { Today } from "./Today";
 import { Where } from "./Where";
 
@@ -142,6 +143,10 @@ export function Work({
 
   return (
     <>
+      {/* Above Today, because it is the question you have before you can read
+        a list: not "what did I promise" but "what was I doing". */}
+      {onStart && <LeftOff onStart={onStart} />}
+
       <Today todayKey={todayKey} onStart={onStart} onOpen={onOpen} />
 
       {showing && (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { estimateFactor } from "@/lib/momentum";
 import { markLabel, marksOf } from "@/lib/stickers";
 import { titleOf } from "@/lib/rooms";
@@ -32,7 +32,9 @@ export function Focus({
   onClose: () => void;
   onOpen: (id: string) => void;
 }) {
-  const { notes, patchNote } = useNoella();
+  const { notes, patchNote, addNote } = useNoella();
+  const [parked, setParked] = useState("");
+  const [count, setCount] = useState(0);
   const note = notes.find((n) => n.id === id) ?? null;
 
   // Escape is the way out of every other overlay here, so it is the way out
@@ -130,7 +132,52 @@ export function Focus({
           </p>
         )}
 
-        <div className="mt-8 flex flex-wrap items-center gap-2 border-t border-rule-soft pt-6">
+        {/*
+          Somewhere to put the thing that just barged in.
+          
+          This is the screen built for holding one thought, and it was the only
+          screen with nowhere to put a second one. So the moment "I have to
+          renew the domain" arrives you either lose the thought or lose the
+          thread, and losing the thread costs the whole session. It goes on the
+          wall, unsorted, and you stay exactly where you are.
+        */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const body = parked.trim();
+            if (!body) return;
+            void addNote({ body, colorId: null });
+            setParked("");
+            setCount((n) => n + 1);
+          }}
+          className="mt-8 flex flex-wrap items-center gap-2 border-t border-rule-soft pt-6"
+        >
+          <label htmlFor="park" className="label shrink-0 text-mute">
+            Something else on your mind?
+          </label>
+          <input
+            id="park"
+            value={parked}
+            onChange={(e) => setParked(e.target.value)}
+            placeholder="Park it and carry on"
+            className="prose-note min-w-40 flex-1 border border-rule bg-field px-3 py-2 text-[calc(16px*var(--type))] outline-none focus:border-ink"
+          />
+          <button
+            type="submit"
+            disabled={parked.trim().length === 0}
+            className="label border border-rule px-3 py-2.5 enabled:hover:bg-ink enabled:hover:text-paper disabled:opacity-40"
+          >
+            Park it
+          </button>
+          {count > 0 && (
+            <span className="label w-full text-mute">
+              {count === 1 ? "Parked. It is on the wall." : `${count} parked.`}{" "}
+              Nothing has moved here.
+            </span>
+          )}
+        </form>
+
+        <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-rule-soft pt-6">
           <button
             type="button"
             onClick={() => {

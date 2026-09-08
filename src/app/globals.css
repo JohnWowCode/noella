@@ -249,7 +249,16 @@ html[data-size="huge"] {
   line-height: var(--read-leading);
   letter-spacing: var(--read-tracking);
   word-spacing: var(--read-word);
-  text-wrap: pretty;
+  /*
+   * `text-wrap-style`, not `text-wrap`.
+   *
+   * The shorthand also sets `text-wrap-mode: wrap`, and because these
+   * utilities are defined after Tailwind's, that quietly beat every
+   * `truncate` it was put next to — `white-space: nowrap` resolves to the
+   * same property. A one-line title in the running-clock strip came out five
+   * lines tall on a phone and nothing in the markup said why.
+   */
+  text-wrap-style: pretty;
 }
 
 /*
