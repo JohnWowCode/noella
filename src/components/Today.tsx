@@ -7,6 +7,7 @@ import { useNoella } from "@/lib/store/provider";
 import type { Note } from "@/lib/types";
 import { useMemo } from "react";
 import { Icon } from "./Icon";
+import { Where } from "./Where";
 
 /**
  * The only list in Noella you can reach the bottom of.
@@ -25,6 +26,7 @@ import { Icon } from "./Icon";
 export function Today({
   todayKey,
   onStart,
+  onOpen,
 }: {
   todayKey: string;
   /**
@@ -34,6 +36,8 @@ export function Today({
    * Opening it on the wall is still one tap away, from inside.
    */
   onStart?: (id: string) => void;
+  /** Opening the room a promise came out of, not the promise itself. */
+  onOpen?: (id: string) => void;
 }) {
   const { notes, patchNote } = useNoella();
   const { open, done, carried, finished } = todayOf(notes, todayKey);
@@ -120,6 +124,7 @@ export function Today({
             onTick={() => patchNote(n.id, { doneAt: new Date().toISOString() })}
             onDrop={() => patchNote(n.id, { todayOn: null })}
             onStart={onStart}
+            onOpen={onOpen}
           />
         ))}
         {open.map((n) => (
@@ -130,6 +135,7 @@ export function Today({
             onTick={() => patchNote(n.id, { doneAt: new Date().toISOString() })}
             onDrop={() => patchNote(n.id, { todayOn: null })}
             onStart={onStart}
+            onOpen={onOpen}
           />
         ))}
         {done.map((n) => (
@@ -141,6 +147,7 @@ export function Today({
             onTick={() => patchNote(n.id, { doneAt: null })}
             onDrop={() => patchNote(n.id, { todayOn: null })}
             onStart={onStart}
+            onOpen={onOpen}
           />
         ))}
       </ul>
@@ -162,6 +169,7 @@ function Row({
   onTick,
   onDrop,
   onStart,
+  onOpen,
 }: {
   note: Note;
   days: number;
@@ -169,6 +177,7 @@ function Row({
   onTick: () => void;
   onDrop: () => void;
   onStart?: (id: string) => void;
+  onOpen?: (id: string) => void;
 }) {
   const marks = marksOf(note);
   return (
@@ -190,15 +199,18 @@ function Row({
         ))}
       </span>
 
-      <button
-        type="button"
-        onClick={() => onStart?.(note.id)}
-        className={`prose-note min-w-0 flex-1 text-left text-[calc(17px*var(--type))] leading-snug ${
-          finished ? "text-mute line-through" : ""
-        }`}
-      >
-        {note.body.split("\n", 1)[0]}
-      </button>
+      <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
+        <button
+          type="button"
+          onClick={() => onStart?.(note.id)}
+          className={`prose-note w-full text-left text-[calc(17px*var(--type))] leading-snug ${
+            finished ? "text-mute line-through" : ""
+          }`}
+        >
+          {note.body.split("\n", 1)[0]}
+        </button>
+        <Where id={note.id} onOpen={onOpen} />
+      </span>
 
       {/*
         How long it has been sitting there, and one tap to stop pretending.

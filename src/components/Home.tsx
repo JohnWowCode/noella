@@ -441,10 +441,18 @@ export function Home() {
         (mark === null || marksOf(n).includes(mark)) &&
         matches(n, query),
     );
-    // Favourites float, then newest first. Nothing else reorders the list.
+    /*
+     * Favourites float, then wherever you put them, then newest first.
+     *
+     * Dragging a card to a new place on the wall wrote the new position and
+     * the wall then drew itself by date anyway, so the card sprang back and
+     * the whole gesture was a lie. Every note that has never been dragged
+     * still has position zero, so an untouched wall is exactly the date order
+     * it always was — the hand-set part only shows up once there is one.
+     */
     return rows.sort((a, b) => {
       if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-      return b.createdAt.localeCompare(a.createdAt);
+      return a.order - b.order || b.createdAt.localeCompare(a.createdAt);
     });
   }, [top, live, world, tag, view, query, level, mark, notes]);
 
@@ -747,7 +755,7 @@ export function Home() {
 
           {showing === "work" && todayKey && (
             <>
-              <Work todayKey={todayKey} onStart={setFocus} />
+              <Work todayKey={todayKey} onStart={setFocus} onOpen={open} />
 
               {/* Projects that have gone quiet. A doing question, so it lives
                 with the doing rather than under four hundred notes. */}

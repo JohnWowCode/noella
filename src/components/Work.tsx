@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { fromKey } from "@/lib/clock";
 import { candidates, pick, type Candidate } from "@/lib/pick";
-import { PRIORITY, rankOf } from "@/lib/priority";
+import { PRIORITIES, PRIORITY, rankOf } from "@/lib/priority";
 import { contentsOf } from "@/lib/rooms";
 import { markLabel, marksOf } from "@/lib/stickers";
 import { useNoella } from "@/lib/store/provider";
@@ -11,6 +11,7 @@ import type { Note } from "@/lib/types";
 import { Icon } from "./Icon";
 import { Timer } from "./Timer";
 import { Today } from "./Today";
+import { Where } from "./Where";
 
 /** Rows before the queue folds. Long enough to be a plan, short enough to read. */
 const ROWS = 12;
@@ -31,9 +32,12 @@ const ROWS = 12;
 export function Work({
   todayKey,
   onStart,
+  onOpen,
 }: {
   todayKey: string;
   onStart?: (id: string) => void;
+  /** Opening the room a job came out of. */
+  onOpen?: (id: string) => void;
 }) {
   const { notes, patchNote } = useNoella();
   const [drawn, setDrawn] = useState<Candidate | null>(null);
@@ -63,8 +67,25 @@ export function Work({
     });
   }, [notes]);
 
+  /*
+   * The list you decided about, and the pile you never did.
+   *
+   * These were one list of twelve, and the three you had actually ranked sat
+   * in the same grey rows as the nine you had never looked at twice — so the
+   * ranking bought you nothing, and the list read as a demand rather than a
+   * plan. Up next is now only what you said mattered. Everything else waits
+   * below under its own honest heading, where saying which it is takes one
+   * tap and no menu.
+   */
+  const ranked = useMemo(() => queue.filter((n) => n.priority !== null), [queue]);
+  const unsorted = useMemo(
+    () => queue.filter((n) => n.priority === null),
+    [queue],
+  );
+
   const [all, setAll] = useState(false);
-  const shown = all ? queue : queue.slice(0, ROWS);
+  const shown = all ? ranked : ranked.slice(0, ROWS);
+  const [sorting, setSorting] = useState(false);
 
   /*
    * What the hat can contain.
@@ -121,17 +142,13 @@ export function Work({
 
   return (
     <>
-      <Today todayKey={todayKey} onStart={onStart} />
+      <Today todayKey={todayKey} onStart={onStart} onOpen={onOpen} />
 
       {showing && (
         <section className="mt-4 border-2 border-ink bg-field">
           <div className="flex flex-wrap items-baseline gap-x-3 px-4 pt-3.5">
             <p className="label text-mute">{line}</p>
-            {showing.from && (
-              <p className="label normal-case tracking-normal text-mute">
-                {showing.from}
-              </p>
-            )}
+            <Where id={showing.note.id} onOpen={onOpen} />
             <button
               type="button"
               onClick={() => setDrawn(null)}
@@ -200,7 +217,7 @@ export function Work({
         >
           <header className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-rule-soft px-4 py-3">
             <h2 className="title">Up next</h2>
-            <span className="label text-mute">{queue.length}</span>
+            <span className="label text-mute">{ranked.length}</span>
             {pool.length > 0 && (
               <button
                 type="button"
@@ -213,10 +230,10 @@ export function Work({
             )}
           </header>
 
-          {queue.length === 0 ? (
+          {ranked.length === 0 ? (
             <p className="prose-note px-4 py-5 text-[calc(15px*var(--type))] text-mute">
-              Nothing ranked. Anything you mark Next or Later lands here, in
-              order.
+              Nothing ranked yet. Anything you mark HPrio, MPrio or LPrio lands
+              here, in that order.
             </p>
           ) : (
             <ul className="flex flex-col">
@@ -229,19 +246,88 @@ export function Work({
                     patchNote(n.id, { doneAt: new Date().toISOString() })
                   }
                   onStart={onStart}
+                  onOpen={onOpen}
                 />
               ))}
             </ul>
           )}
 
-          {queue.length > ROWS && (
+          {ranked.length > ROWS && (
             <button
               type="button"
               onClick={() => setAll((v) => !v)}
               className="label w-full border-t border-rule-soft px-4 py-2.5 text-mute hover:bg-ink hover:text-paper"
             >
-              {all ? "Fewer" : `${queue.length - ROWS} more`}
+              {all ? "Fewer" : `${ranked.length - ROWS} more`}
             </button>
+          )}
+        </section>
+      )}
+
+      {unsorted.length > 0 && (
+        <section
+          aria-label="Not sorted yet"
+          className="mt-4 border border-rule-soft bg-field"
+        >
+          <button
+            type="button"
+            onClick={() => setSorting((v) => !v)}
+            aria-expanded={sorting}
+            className="flex w-full flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-3 text-left hover:bg-ink hover:text-paper"
+          >
+            <h2 className="title">Not sorted yet</h2>
+            <span className="label opacity-60">{unsorted.length}</span>
+            <span className="label ml-auto opacity-60">
+              {sorting ? "Hide" : "Sort them"}
+            </span>
+          </button>
+
+          {sorting && (
+            <ul className="flex flex-col border-t border-rule-soft">
+              {unsorted.map((n) => (
+                <li
+                  key={n.id}
+                  className="flex flex-col gap-1.5 border-b border-rule-soft px-4 py-2.5 last:border-b-0"
+                >
+                  <button
+                    type="button"
+                    onClick={() => onStart?.(n.id)}
+                    className="prose-note w-full text-left text-[calc(17px*var(--type))] leading-snug"
+                  >
+                    {n.body.split("\n", 1)[0]}
+                  </button>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Where id={n.id} onOpen={onOpen} />
+                    <span className="ml-auto flex items-center gap-1.5">
+                      {PRIORITIES.map((level) => (
+                        <button
+                          key={level}
+                          type="button"
+                          onClick={() => patchNote(n.id, { priority: level })}
+                          className="label flex items-center gap-1.5 border border-rule px-2 py-1 hover:bg-ink hover:text-paper [@media(hover:none)]:min-h-9"
+                        >
+                          <span
+                            aria-hidden
+                            className="h-2.5 w-2.5"
+                            style={{ backgroundColor: PRIORITY[level].hex }}
+                          />
+                          {PRIORITY[level].label}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          patchNote(n.id, { archivedAt: new Date().toISOString() })
+                        }
+                        className="label border border-rule px-2 py-1 whitespace-nowrap text-mute hover:bg-ink hover:text-paper [@media(hover:none)]:min-h-9"
+                      >
+                        Not really
+                      </button>
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
           )}
         </section>
       )}
@@ -261,11 +347,13 @@ function Row({
   onToday,
   onTick,
   onStart,
+  onOpen,
 }: {
   note: Note;
   onToday: () => void;
   onTick: () => void;
   onStart?: (id: string) => void;
+  onOpen?: (id: string) => void;
 }) {
   const marks = marksOf(note);
   return (
@@ -291,13 +379,16 @@ function Row({
           </span>
         ))}
       </span>
-      <button
-        type="button"
-        onClick={() => onStart?.(note.id)}
-        className="prose-note min-w-0 flex-1 text-left text-[calc(17px*var(--type))] leading-snug"
-      >
-        {note.body.split("\n", 1)[0]}
-      </button>
+      <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
+        <button
+          type="button"
+          onClick={() => onStart?.(note.id)}
+          className="prose-note w-full text-left text-[calc(17px*var(--type))] leading-snug"
+        >
+          {note.body.split("\n", 1)[0]}
+        </button>
+        <Where id={note.id} onOpen={onOpen} />
+      </span>
       <button
         type="button"
         onClick={onToday}
