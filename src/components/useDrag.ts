@@ -16,7 +16,9 @@ import { HOLD_MS, SLOP, type Grab } from "@/lib/drag";
  * escape hatch could never fire, and dragging a finger up a list on a phone
  * picked a row up every time.
  */
-export function useDrag(onDrop: (id: string, overId: string | null) => void) {
+export function useDrag(
+  onDrop: (id: string, overId: string | null, y: number) => void,
+) {
   const [grab, setGrab] = useState<Grab | null>(null);
   const [over, setOver] = useState<string | null>(null);
 
@@ -73,10 +75,12 @@ export function useDrag(onDrop: (id: string, overId: string | null) => void) {
         setOver(next);
       };
 
-      const up = () => {
+      const up = (ev: PointerEvent) => {
         const from = start.current;
         if (held.current && from) {
-          drop.current(from.id, overRef.current);
+          // The drop carries the point it happened at, so nothing downstream
+          // has to read a position back out of render state.
+          drop.current(from.id, overRef.current, ev.clientY);
           endedAt.current = Date.now();
         }
         cancel();

@@ -8,8 +8,8 @@ import {
   type Cadence,
 } from "@/lib/recurrence";
 import { reorder } from "@/lib/order";
-import { descendantsOf } from "@/lib/tree";
-import { useDrag } from "./useDrag";
+import { useCarry } from "./DragProvider";
+import type { Drop } from "@/lib/drag";
 import { contentsOf, titleOf } from "@/lib/rooms";
 import { marksOf } from "@/lib/stickers";
 import { useNoella } from "@/lib/store/provider";
@@ -58,25 +58,20 @@ export function Inside({
   const [settings, setSettings] = useState(false);
   const [renaming, setRenaming] = useState<string | null>(null);
 
+  /* The one gesture, shared with the cards this panel sits inside. */
+  const { grab, over, where, press, wasDrag, dragging, landedIn, landedAt } =
+    useCarry();
+
   /*
-   * Picking a row up and putting it somewhere else.
-   *
-   * Dropping onto a row puts the thing inside it; dropping onto the panel's
-   * own edge takes it back out to the top of this room. Anything that would
-   * put a folder inside itself is refused rather than silently ignored —
-   * that is the one move that can lose your work.
+   * Something just landed in one of these rows, so show it. Adjusted during
+   * render rather than from an effect: the fold has to be open on the first
+   * paint after the drop, not one frame later.
    */
-  const { grab, over, press, wasDrag, dragging } = useDrag((id, overId) => {
-    if (!overId || overId === id) return;
-    const moved = notes.find((n) => n.id === id);
-    if (!moved) return;
-    const banned = new Set([id, ...descendantsOf(notes, id).map((n) => n.id)]);
-    if (banned.has(overId)) return;
-    const parentId = overId === `root:${note.id}` ? note.id : overId;
-    if (parentId === moved.parentId) return;
-    patchNote(id, { parentId, order: 0 });
-    setOpen((prev) => new Set(prev).add(parentId));
-  });
+  const [sawLanding, setSawLanding] = useState(0);
+  if (landedAt !== sawLanding) {
+    setSawLanding(landedAt);
+    if (landedIn) setOpen((prev) => new Set(prev).add(landedIn));
+  }
 
   const line = onColor ? "border-current/30" : "border-rule-soft";
   const tickable = contents.filter((c) => c.isTask);
@@ -130,6 +125,7 @@ export function Inside({
               renaming={renaming}
               onRename={setRenaming}
               wasDrag={wasDrag}
+              where={where}
             />
           ))}
         </ul>
@@ -271,6 +267,7 @@ function Branch({
   renaming,
   onRename,
   wasDrag,
+  where,
 }: {
   item: Note;
   siblings: Note[];
@@ -291,6 +288,7 @@ function Branch({
   renaming: string | null;
   onRename: (id: string | null) => void;
   wasDrag: () => boolean;
+  where: Drop;
 }) {
   const children = contentsOf(notes, item.id);
   const room = children.length > 0;
@@ -302,6 +300,7 @@ function Branch({
     <>
       <li
         data-drop-id={item.id}
+        data-parent={item.parentId ?? ""}
         onPointerDown={(e) => {
           /*
            * Anywhere on the row lifts it, including the name — the name is
@@ -317,7 +316,11 @@ function Branch({
           grabbed === item.id ? "opacity-35" : ""
         } ${
           dragging && over === item.id && grabbed !== item.id
-            ? "bg-current/15 outline-2 -outline-offset-2 outline-current"
+            ? where === "into"
+              ? "bg-current/15 outline-2 -outline-offset-2 outline-current"
+              : where === "above"
+                ? "border-t-2 border-t-current"
+                : "border-b-2 border-b-current"
             : ""
         } ${dragging ? "" : "touch-pan-y"}`}
         style={{ paddingLeft: `${12 + Math.min(depth, MAX_DEPTH) * 18}px` }}
@@ -496,6 +499,7 @@ function Branch({
             renaming={renaming}
             onRename={onRename}
             wasDrag={wasDrag}
+            where={where}
           />
         ))}
     </>

@@ -14,7 +14,8 @@ import { matches } from "@/lib/notes";
 import { contentsOf, titleOf } from "@/lib/rooms";
 import { PRIORITIES, PRIORITY, rankOf, type Priority } from "@/lib/priority";
 import { ALL_MARKS, markLabel, markOf, marksOf } from "@/lib/stickers";
-import { pathTo } from "@/lib/tree";
+import type { Drop } from "@/lib/drag";
+import { descendantsOf, pathTo } from "@/lib/tree";
 import { Icon, type IconName } from "./Icon";
 import { Popover } from "./Popover";
 import { swatchName } from "@/lib/store/defaults";
@@ -26,6 +27,7 @@ import { Compose } from "./Compose";
 import { Journal } from "./Journal";
 import { ClaudeImport } from "./ClaudeImport";
 import { DataMenu } from "./DataMenu";
+import { DragProvider } from "./DragProvider";
 import { FolderLink } from "./FolderLink";
 import { Focus } from "./Focus";
 import { Work } from "./Work";
@@ -102,7 +104,7 @@ type View = "all" | "todo" | "done" | "starred" | "rooms" | "archive";
  * filter one list of everything by folder, by kind, or by what is still open.
  */
 export function Home() {
-  const { ready, notes, colors, patchColor } = useNoella();
+  const { ready, notes, colors, patchColor, patchNote } = useNoella();
   const todayKey = useTodayKey();
 
   const [query, setQuery] = useState("");
@@ -138,6 +140,60 @@ export function Home() {
   const composeRef = useRef<HTMLTextAreaElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const moreRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * What carrying something and letting go means.
+   *
+   * Onto a note: it goes inside it. Between two notes: it lands beside them,
+   * in that order, under whatever they are under. Onto itself or into its own
+   * contents: nothing, because that is the one move that can lose a branch.
+   */
+  const drop = useCallback(
+    (id: string, overId: string | null, where: Drop) => {
+      if (!overId || overId === id) return;
+      const moved = notes.find((n) => n.id === id);
+      const target = notes.find((n) => n.id === overId);
+      if (!moved || !target) return;
+      const banned = new Set([
+        id,
+        ...descendantsOf(notes, id).map((n) => n.id),
+      ]);
+      if (banned.has(overId)) return;
+
+      if (where === "into") {
+        if (target.id === moved.parentId) return;
+        patchNote(id, { parentId: target.id, order: -1 });
+        return;
+      }
+
+      /*
+       * Between. The siblings are renumbered from the top so the new position
+       * holds — nudging one order value only works until two of them collide.
+       */
+      const siblings = notes
+        .filter(
+          (n) =>
+            n.parentId === target.parentId &&
+            n.archivedAt === null &&
+            n.id !== id,
+        )
+        .sort(
+          (a, b) => a.order - b.order || b.createdAt.localeCompare(a.createdAt),
+        );
+      const at = siblings.findIndex((n) => n.id === target.id);
+      const index = where === "above" ? at : at + 1;
+      const next = [
+        ...siblings.slice(0, index),
+        moved,
+        ...siblings.slice(index),
+      ];
+      next.forEach((n, i) => {
+        if (n.id === id) patchNote(id, { parentId: target.parentId, order: i });
+        else if (n.order !== i) patchNote(n.id, { order: i });
+      });
+    },
+    [notes, patchNote],
+  );
 
   const pick = useCallback((id: string, on: boolean) => {
     setPicked((prev) => {
@@ -519,158 +575,159 @@ export function Home() {
   }, [ready]);
 
   return (
-    <div className="flex min-h-full flex-col">
-      <Header
-        right={
-          <>
-            <input
-              ref={searchRef}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") {
-                  setQuery("");
-                  e.currentTarget.blur();
-                }
-              }}
-              placeholder="Search  /"
-              aria-label="Search everything"
-              className="label w-28 border border-rule bg-field px-3 py-2
+    <DragProvider onDrop={drop}>
+      <div className="flex min-h-full flex-col">
+        <Header
+          right={
+            <>
+              <input
+                ref={searchRef}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setQuery("");
+                    e.currentTarget.blur();
+                  }
+                }}
+                placeholder="Search  /"
+                aria-label="Search everything"
+                className="label w-28 border border-rule bg-field px-3 py-2
                          outline-none placeholder:text-mute focus:w-44"
+              />
+              <Reading />
+              <ThemeToggle />
+            </>
+          }
+        />
+
+        <main
+          /*
+           * Room to scroll past the picking bar, which is fixed over the bottom
+           * of the screen. Without it the last card is permanently underneath
+           * the thing you are using to act on it.
+           */
+          className={`mx-auto w-full max-w-3xl flex-1 px-4 pt-6 sm:px-6 sm:pt-8 ${
+            picked.size > 0 ? "pb-72" : "pb-28"
+          }`}
+        >
+          {here && (
+            <Trail
+              trail={trail}
+              here={here}
+              onGo={(id) => (id === null ? setInside(null) : open(id))}
             />
-            <Reading />
-            <ThemeToggle />
-          </>
-        }
-      />
+          )}
 
-      <main
-        /*
-         * Room to scroll past the picking bar, which is fixed over the bottom
-         * of the screen. Without it the last card is permanently underneath
-         * the thing you are using to act on it.
-         */
-        className={`mx-auto w-full max-w-3xl flex-1 px-4 pt-6 sm:px-6 sm:pt-8 ${
-          picked.size > 0 ? "pb-72" : "pb-28"
-        }`}
-      >
-        {here && (
-          <Trail
-            trail={trail}
-            here={here}
-            onGo={(id) => (id === null ? setInside(null) : open(id))}
-          />
-        )}
-
-        {/* Inside a folder, the folder itself is the first thing on screen:
+          {/* Inside a folder, the folder itself is the first thing on screen:
             its own words, its pictures, its status. It is a note like any
             other and hiding it would make it feel like a container the app
             invented rather than something you wrote. */}
-        {here && (
-          <div className="mb-4">
-            <NoteCard
-              note={here}
-              query={query}
-              onTag={setTag}
-              onOpen={open}
-              heading
-            />
-          </div>
-        )}
+          {here && (
+            <div className="mb-4">
+              <NoteCard
+                note={here}
+                query={query}
+                onTag={setTag}
+                onOpen={open}
+                heading
+              />
+            </div>
+          )}
 
-        <Compose
-          key={inside ?? "root"}
-          colorId={composeColor}
-          onColorId={setComposeColor}
-          inputRef={composeRef}
-          parentId={inside}
-          parentName={here ? titleOf(here) : null}
-        />
+          <Compose
+            key={inside ?? "root"}
+            colorId={composeColor}
+            onColorId={setComposeColor}
+            inputRef={composeRef}
+            parentId={inside}
+            parentName={here ? titleOf(here) : null}
+          />
 
-        {/*
+          {/*
           The one bit of navigation in the app.
 
           Three words, underlined where you are. Not tabs, not a sidebar, not
           a hamburger: the whole app is still one page and the box you write
           in is still above this, so nothing about capture got slower.
         */}
-        {!inside && (
-          <nav
-            aria-label="Areas"
-            className="mt-5 flex items-center gap-1 border-b border-rule-soft"
-          >
-            {(Object.keys(AREAS) as Area[]).map((id) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => go(id)}
-                aria-current={area === id ? "page" : undefined}
-                className={`label flex items-center gap-1.5 px-3 py-2.5 ${
-                  area === id
-                    ? "-mb-px border-b-2 border-ink text-ink"
-                    : "text-mute hover:text-ink"
-                }`}
-              >
-                {AREAS[id]}
-                {/*
+          {!inside && (
+            <nav
+              aria-label="Areas"
+              className="mt-5 flex items-center gap-1 border-b border-rule-soft"
+            >
+              {(Object.keys(AREAS) as Area[]).map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => go(id)}
+                  aria-current={area === id ? "page" : undefined}
+                  className={`label flex items-center gap-1.5 px-3 py-2.5 ${
+                    area === id
+                      ? "-mb-px border-b-2 border-ink text-ink"
+                      : "text-mute hover:text-ink"
+                  }`}
+                >
+                  {AREAS[id]}
+                  {/*
                   What is waiting behind the tab you are not looking at.
                   Only ever drawn when there is something, so a quiet app has
                   three plain words across the top and a busy one tells you
                   where to go without you having to go and look.
                 */}
-                {id === "work" && owed > 0 && (
-                  <span className="tabular-nums opacity-60">{owed}</span>
-                )}
-                {id === "journal" && madeToday > 0 && (
-                  <span className="tabular-nums opacity-60">{madeToday}</span>
-                )}
-              </button>
-            ))}
-          </nav>
-        )}
+                  {id === "work" && owed > 0 && (
+                    <span className="tabular-nums opacity-60">{owed}</span>
+                  )}
+                  {id === "journal" && madeToday > 0 && (
+                    <span className="tabular-nums opacity-60">{madeToday}</span>
+                  )}
+                </button>
+              ))}
+            </nav>
+          )}
 
-        {showing === "work" && todayKey && (
-          <>
-            <Work todayKey={todayKey} onStart={setFocus} />
+          {showing === "work" && todayKey && (
+            <>
+              <Work todayKey={todayKey} onStart={setFocus} />
 
-            {/* Projects that have gone quiet. A doing question, so it lives
+              {/* Projects that have gone quiet. A doing question, so it lives
                 with the doing rather than under four hundred notes. */}
-            {quiet && drift.length > 0 && (
-              <section className="mt-12">
-                <h2 className="title mb-3 flex flex-wrap items-baseline gap-x-2.5">
-                  Still want these?
-                  <span className="label font-normal text-mute">
-                    no wrong answer
-                  </span>
-                </h2>
-                <div className="flex flex-col gap-2">
-                  {drift.map((p) => (
-                    <Drifting
-                      key={p.id}
-                      project={p}
-                      quiet={quietDays(notes, p, todayKey ?? "")}
-                    />
-                  ))}
-                </div>
-              </section>
-            )}
-          </>
-        )}
+              {quiet && drift.length > 0 && (
+                <section className="mt-12">
+                  <h2 className="title mb-3 flex flex-wrap items-baseline gap-x-2.5">
+                    Still want these?
+                    <span className="label font-normal text-mute">
+                      no wrong answer
+                    </span>
+                  </h2>
+                  <div className="flex flex-col gap-2">
+                    {drift.map((p) => (
+                      <Drifting
+                        key={p.id}
+                        project={p}
+                        quiet={quietDays(notes, p, todayKey ?? "")}
+                      />
+                    ))}
+                  </div>
+                </section>
+              )}
+            </>
+          )}
 
-        {showing === "journal" && (
-          <>
-            <Journal todayKey={todayKey} onOpen={open} />
+          {showing === "journal" && (
+            <>
+              <Journal todayKey={todayKey} onOpen={open} />
 
-            {/* The same record as the days above, zoomed out to eight weeks. */}
-            {quiet && cells.some((c) => c.moves > 0) && (
-              <Ledger cells={cells} week={week} />
-            )}
-          </>
-        )}
+              {/* The same record as the days above, zoomed out to eight weeks. */}
+              {quiet && cells.some((c) => c.moves > 0) && (
+                <Ledger cells={cells} week={week} />
+              )}
+            </>
+          )}
 
-        {showing === "wall" && live.length > 0 && !inside && (
-          <>
-            {/*
+          {showing === "wall" && live.length > 0 && !inside && (
+            <>
+              {/*
               Nothing on this row exists until it means something.
 
               It used to be seven view chips, three ranks and four grouping
@@ -679,297 +736,300 @@ export function Home() {
               so a new wall shows none of them and a busy one shows the ones
               you have earned.
             */}
-            {(counts.todo > 0 ||
-              counts.done > 0 ||
-              counts.starred > 0 ||
-              counts.rooms > 0 ||
-              counts.archive > 0 ||
-              counts.byLevel.size > 0 ||
-              counts.byMark.size > 0 ||
-              live.length >= GROUPABLE ||
-              filtered) && (
-              <div
-                /*
-                 * One swipeable line on a phone, wrapped rows on a desktop.
-                 *
-                 * Measured on a 375px screen this band was four rows and about
-                 * 250px — you scrolled past a wall of filters to reach the
-                 * wall. Sideways is the cheap direction on a phone and the
-                 * gesture everybody already has.
-                 */
-                className="mt-7 flex items-center gap-1.5 overflow-x-auto pb-1
+              {(counts.todo > 0 ||
+                counts.done > 0 ||
+                counts.starred > 0 ||
+                counts.rooms > 0 ||
+                counts.archive > 0 ||
+                counts.byLevel.size > 0 ||
+                counts.byMark.size > 0 ||
+                live.length >= GROUPABLE ||
+                filtered) && (
+                <div
+                  /*
+                   * One swipeable line on a phone, wrapped rows on a desktop.
+                   *
+                   * Measured on a 375px screen this band was four rows and about
+                   * 250px — you scrolled past a wall of filters to reach the
+                   * wall. Sideways is the cheap direction on a phone and the
+                   * gesture everybody already has.
+                   */
+                  className="mt-7 flex items-center gap-1.5 overflow-x-auto pb-1
                            [-ms-overflow-style:none] [scrollbar-width:none]
                            [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:overflow-visible sm:pb-0"
-              >
-                {counts.todo > 0 && (
-                  <Chip
-                    on={view === "todo"}
-                    onClick={() => setView(view === "todo" ? "all" : "todo")}
-                    count={counts.todo}
-                    hex={CHIP.todo}
-                  >
-                    To do
-                  </Chip>
-                )}
-                {counts.done > 0 && (
-                  <Chip
-                    on={view === "done"}
-                    onClick={() => setView(view === "done" ? "all" : "done")}
-                    count={counts.done}
-                    hex={CHIP.done}
-                  >
-                    Done
-                  </Chip>
-                )}
-                {counts.starred > 0 && (
-                  <Chip
-                    on={view === "starred"}
-                    onClick={() =>
-                      setView(view === "starred" ? "all" : "starred")
-                    }
-                    count={counts.starred}
-                    hex={CHIP.starred}
-                  >
-                    <Icon name="starFilled" size={12} />
-                  </Chip>
-                )}
-                {counts.rooms > 0 && (
-                  <Chip
-                    on={view === "rooms"}
-                    onClick={() => setView(view === "rooms" ? "all" : "rooms")}
-                    count={counts.rooms}
-                    hex={CHIP.room}
-                  >
-                    Rooms
-                  </Chip>
-                )}
-                {counts.archive > 0 && (
-                  <Chip
-                    on={view === "archive"}
-                    onClick={() =>
-                      setView(view === "archive" ? "all" : "archive")
-                    }
-                    count={counts.archive}
-                    hex={CHIP.archive}
-                  >
-                    Archive
-                  </Chip>
-                )}
-
-                {PRIORITIES.filter((p) => counts.byLevel.get(p)).map((p) => {
-                  const on = level === p;
-                  return (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => setLevel(on ? null : p)}
-                      aria-pressed={on}
-                      title={PRIORITY[p].hint}
-                      className="label flex items-center gap-1.5 border px-2.5 py-1.5"
-                      style={
-                        on
-                          ? {
-                              backgroundColor: PRIORITY[p].hex,
-                              borderColor: PRIORITY[p].hex,
-                              color: "#111111",
-                            }
-                          : { borderColor: "var(--rule)" }
-                      }
+                >
+                  {counts.todo > 0 && (
+                    <Chip
+                      on={view === "todo"}
+                      onClick={() => setView(view === "todo" ? "all" : "todo")}
+                      count={counts.todo}
+                      hex={CHIP.todo}
                     >
-                      <span
-                        aria-hidden
-                        className="h-2.5 w-2.5"
-                        style={{ backgroundColor: PRIORITY[p].hex }}
-                      />
-                      {PRIORITY[p].label}
-                      <span className="tabular-nums opacity-65">
-                        {counts.byLevel.get(p)}
-                      </span>
-                    </button>
-                  );
-                })}
+                      To do
+                    </Chip>
+                  )}
+                  {counts.done > 0 && (
+                    <Chip
+                      on={view === "done"}
+                      onClick={() => setView(view === "done" ? "all" : "done")}
+                      count={counts.done}
+                      hex={CHIP.done}
+                    >
+                      Done
+                    </Chip>
+                  )}
+                  {counts.starred > 0 && (
+                    <Chip
+                      on={view === "starred"}
+                      onClick={() =>
+                        setView(view === "starred" ? "all" : "starred")
+                      }
+                      count={counts.starred}
+                      hex={CHIP.starred}
+                    >
+                      <Icon name="starFilled" size={12} />
+                    </Chip>
+                  )}
+                  {counts.rooms > 0 && (
+                    <Chip
+                      on={view === "rooms"}
+                      onClick={() =>
+                        setView(view === "rooms" ? "all" : "rooms")
+                      }
+                      count={counts.rooms}
+                      hex={CHIP.room}
+                    >
+                      Rooms
+                    </Chip>
+                  )}
+                  {counts.archive > 0 && (
+                    <Chip
+                      on={view === "archive"}
+                      onClick={() =>
+                        setView(view === "archive" ? "all" : "archive")
+                      }
+                      count={counts.archive}
+                      hex={CHIP.archive}
+                    >
+                      Archive
+                    </Chip>
+                  )}
 
-                {/* Grouping earns its place once there is enough to group. */}
-                {live.length >= GROUPABLE && (
-                  <Popover
-                    label="Group the list"
-                    set={group !== "none"}
-                    align="right"
-                    current={
-                      <span className="label">
-                        {group === "none" ? "Group" : GROUPINGS[group]}
-                      </span>
-                    }
-                  >
-                    {(close) => (
-                      <span className="flex flex-col gap-1">
-                        {(
-                          Object.keys(GROUPINGS) as (keyof typeof GROUPINGS)[]
-                        ).map((id) => (
-                          <button
-                            key={id}
-                            type="button"
-                            onClick={() => {
-                              setGroup(id);
-                              close();
-                            }}
-                            className={`label px-2 py-2 text-left ${
-                              group === id
-                                ? "bg-ink text-paper"
-                                : "hover:bg-ink/10"
-                            }`}
-                          >
-                            {GROUPINGS[id]}
-                          </button>
-                        ))}
-                      </span>
-                    )}
-                  </Popover>
-                )}
-
-                {filtered && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setView("all");
-                      setWorld(null);
-                      setTag(null);
-                      setLevel(null);
-                      setMark(null);
-                      setQuery("");
-                    }}
-                    className="label ml-auto border border-rule px-2.5 py-1.5 text-mute hover:bg-ink hover:text-paper"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-            )}
-
-            <Marks
-              active={mark}
-              counts={counts.byMark}
-              onPick={(m) => setMark(m === mark ? null : m)}
-            />
-
-            <Worlds
-              active={world}
-              counts={counts.byWorld}
-              onPick={(id) => setWorld(id === world ? null : id)}
-            />
-
-            <TagIndex notes={notes} active={tag} onPick={setTag} />
-          </>
-        )}
-
-        {showing === "wall" && activeWorld && (
-          <WorldBand
-            color={activeWorld}
-            index={colors.indexOf(activeWorld)}
-            count={counts.byWorld.get(activeWorld.id) ?? 0}
-            onRename={(name) =>
-              patchColor(activeWorld.id, { name: name || null })
-            }
-            onExit={() => setWorld(null)}
-          />
-        )}
-
-        {showing === "wall" && (
-          <section className="mt-5 flex flex-col gap-3">
-            {!ready ? (
-              <Empty>Reading what you have…</Empty>
-            ) : notes.length === 0 ? (
-              <FirstRun />
-            ) : visible.length === 0 ? (
-              <Empty>
-                {view === "archive"
-                  ? "Nothing archived."
-                  : inside
-                    ? `Nothing in ${titleOf(here!)} yet. Put something in it up there.`
-                    : "Nothing here. Try another folder, or clear the filters."}
-              </Empty>
-            ) : (
-              groups.map((band) => (
-                <section key={band.key} className="flex flex-col gap-3">
-                  {band.name !== null && (
-                    <h3 className="title mt-3 flex items-baseline gap-2.5 first:mt-0">
-                      {band.swatch && (
+                  {PRIORITIES.filter((p) => counts.byLevel.get(p)).map((p) => {
+                    const on = level === p;
+                    return (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setLevel(on ? null : p)}
+                        aria-pressed={on}
+                        title={PRIORITY[p].hint}
+                        className="label flex items-center gap-1.5 border px-2.5 py-1.5"
+                        style={
+                          on
+                            ? {
+                                backgroundColor: PRIORITY[p].hex,
+                                borderColor: PRIORITY[p].hex,
+                                color: "#111111",
+                              }
+                            : { borderColor: "var(--rule)" }
+                        }
+                      >
                         <span
                           aria-hidden
-                          className="h-3.5 w-3.5 self-center border border-rule"
-                          style={{ backgroundColor: band.swatch }}
+                          className="h-2.5 w-2.5"
+                          style={{ backgroundColor: PRIORITY[p].hex }}
                         />
-                      )}
-                      {band.icon && (
-                        <span className="self-center">
-                          <Icon name={band.icon} size={17} />
+                        {PRIORITY[p].label}
+                        <span className="tabular-nums opacity-65">
+                          {counts.byLevel.get(p)}
+                        </span>
+                      </button>
+                    );
+                  })}
+
+                  {/* Grouping earns its place once there is enough to group. */}
+                  {live.length >= GROUPABLE && (
+                    <Popover
+                      label="Group the list"
+                      set={group !== "none"}
+                      align="right"
+                      current={
+                        <span className="label">
+                          {group === "none" ? "Group" : GROUPINGS[group]}
+                        </span>
+                      }
+                    >
+                      {(close) => (
+                        <span className="flex flex-col gap-1">
+                          {(
+                            Object.keys(GROUPINGS) as (keyof typeof GROUPINGS)[]
+                          ).map((id) => (
+                            <button
+                              key={id}
+                              type="button"
+                              onClick={() => {
+                                setGroup(id);
+                                close();
+                              }}
+                              className={`label px-2 py-2 text-left ${
+                                group === id
+                                  ? "bg-ink text-paper"
+                                  : "hover:bg-ink/10"
+                              }`}
+                            >
+                              {GROUPINGS[id]}
+                            </button>
+                          ))}
                         </span>
                       )}
-                      {band.name}
-                      <span className="label font-normal text-mute tabular-nums">
-                        {band.rows.length}
-                      </span>
-                    </h3>
+                    </Popover>
                   )}
-                  {band.rows.map((n) => (
-                    <NoteCard
-                      key={n.id}
-                      note={n}
-                      query={query}
-                      onTag={setTag}
-                      onOpen={open}
-                      picked={picked.size > 0 ? picked.has(n.id) : null}
-                      onPick={pick}
-                      onStart={setFocus}
-                      // While searching you are looking at the whole tree, so a
-                      // result has to say where it came from or it is just a
-                      // sentence with no address.
-                      path={searching ? pathTo(notes, n.id) : undefined}
-                    />
-                  ))}
-                </section>
-              ))
-            )}
-          </section>
+
+                  {filtered && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setView("all");
+                        setWorld(null);
+                        setTag(null);
+                        setLevel(null);
+                        setMark(null);
+                        setQuery("");
+                      }}
+                      className="label ml-auto border border-rule px-2.5 py-1.5 text-mute hover:bg-ink hover:text-paper"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              )}
+
+              <Marks
+                active={mark}
+                counts={counts.byMark}
+                onPick={(m) => setMark(m === mark ? null : m)}
+              />
+
+              <Worlds
+                active={world}
+                counts={counts.byWorld}
+                onPick={(id) => setWorld(id === world ? null : id)}
+              />
+
+              <TagIndex notes={notes} active={tag} onPick={setTag} />
+            </>
+          )}
+
+          {showing === "wall" && activeWorld && (
+            <WorldBand
+              color={activeWorld}
+              index={colors.indexOf(activeWorld)}
+              count={counts.byWorld.get(activeWorld.id) ?? 0}
+              onRename={(name) =>
+                patchColor(activeWorld.id, { name: name || null })
+              }
+              onExit={() => setWorld(null)}
+            />
+          )}
+
+          {showing === "wall" && (
+            <section className="mt-5 flex flex-col gap-3">
+              {!ready ? (
+                <Empty>Reading what you have…</Empty>
+              ) : notes.length === 0 ? (
+                <FirstRun />
+              ) : visible.length === 0 ? (
+                <Empty>
+                  {view === "archive"
+                    ? "Nothing archived."
+                    : inside
+                      ? `Nothing in ${titleOf(here!)} yet. Put something in it up there.`
+                      : "Nothing here. Try another folder, or clear the filters."}
+                </Empty>
+              ) : (
+                groups.map((band) => (
+                  <section key={band.key} className="flex flex-col gap-3">
+                    {band.name !== null && (
+                      <h3 className="title mt-3 flex items-baseline gap-2.5 first:mt-0">
+                        {band.swatch && (
+                          <span
+                            aria-hidden
+                            className="h-3.5 w-3.5 self-center border border-rule"
+                            style={{ backgroundColor: band.swatch }}
+                          />
+                        )}
+                        {band.icon && (
+                          <span className="self-center">
+                            <Icon name={band.icon} size={17} />
+                          </span>
+                        )}
+                        {band.name}
+                        <span className="label font-normal text-mute tabular-nums">
+                          {band.rows.length}
+                        </span>
+                      </h3>
+                    )}
+                    {band.rows.map((n) => (
+                      <NoteCard
+                        key={n.id}
+                        note={n}
+                        query={query}
+                        onTag={setTag}
+                        onOpen={open}
+                        picked={picked.size > 0 ? picked.has(n.id) : null}
+                        onPick={pick}
+                        onStart={setFocus}
+                        // While searching you are looking at the whole tree, so a
+                        // result has to say where it came from or it is just a
+                        // sentence with no address.
+                        path={searching ? pathTo(notes, n.id) : undefined}
+                      />
+                    ))}
+                  </section>
+                ))
+              )}
+            </section>
+          )}
+
+          {showing === "wall" && more > 0 && (
+            <div ref={moreRef} className="mt-3">
+              <button
+                type="button"
+                onClick={loadMore}
+                className="label w-full border border-rule bg-field px-4 py-4 text-mute hover:bg-ink hover:text-paper"
+              >
+                {more} more
+              </button>
+            </div>
+          )}
+
+          {ready && notes.length > 0 && (
+            <div className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-3">
+              <FolderLink />
+              <span className="ml-auto flex items-center gap-2">
+                <ClaudeImport onOpen={open} />
+                <DataMenu />
+              </span>
+            </div>
+          )}
+        </main>
+
+        {focus && (
+          <Focus id={focus} onClose={() => setFocus(null)} onOpen={open} />
         )}
 
-        {showing === "wall" && more > 0 && (
-          <div ref={moreRef} className="mt-3">
-            <button
-              type="button"
-              onClick={loadMore}
-              className="label w-full border border-rule bg-field px-4 py-4 text-mute hover:bg-ink hover:text-paper"
-            >
-              {more} more
-            </button>
-          </div>
-        )}
+        {/* Sits over everything, at the bottom, where a thumb already is. */}
+        <SelectionBar
+          selected={picked}
+          notes={notes}
+          onClear={() => setPicked(new Set())}
+          onOpen={open}
+        />
 
-        {ready && notes.length > 0 && (
-          <div className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-3">
-            <FolderLink />
-            <span className="ml-auto flex items-center gap-2">
-              <ClaudeImport onOpen={open} />
-              <DataMenu />
-            </span>
-          </div>
-        )}
-      </main>
-
-      {focus && (
-        <Focus id={focus} onClose={() => setFocus(null)} onOpen={open} />
-      )}
-
-      {/* Sits over everything, at the bottom, where a thumb already is. */}
-      <SelectionBar
-        selected={picked}
-        notes={notes}
-        onClear={() => setPicked(new Set())}
-        onOpen={open}
-      />
-
-      <Footer />
-    </div>
+        <Footer />
+      </div>
+    </DragProvider>
   );
 }
 

@@ -32,14 +32,18 @@ export type Drop = "into" | "above" | "below";
 /**
  * Which of the three a pointer at `y` means over a row.
  *
- * The middle of a row means "inside this"; the top and bottom eighths mean
- * "between these two". Only containers get the middle band — dropping into a
- * plain note would silently turn it into a folder, which is a surprising thing
- * to do to somebody by accident.
+ * The middle band means "inside this"; the top and bottom edges mean "between
+ * these two".
+ *
+ * Everything can hold something — that is the whole model, a note with a note
+ * in it is a room — so the middle band is offered on every target. The first
+ * version reserved it for things that already had contents, which meant the
+ * one case you most want to drag into, an empty folder you just made, was the
+ * one case that refused you.
  */
-export function dropAt(rect: DOMRect, y: number, canHold: boolean): Drop {
+export function dropAt(rect: DOMRect, y: number): Drop {
   const edge = Math.max(6, rect.height * 0.28);
   if (y < rect.top + edge) return "above";
   if (y > rect.bottom - edge) return "below";
-  return canHold ? "into" : y < rect.top + rect.height / 2 ? "above" : "below";
+  return "into";
 }

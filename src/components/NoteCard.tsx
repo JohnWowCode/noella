@@ -21,6 +21,7 @@ import { ON_COLOR_BUTTON, surfaceStyle } from "@/lib/surface";
 import type { Note } from "@/lib/types";
 import { Icon } from "./Icon";
 import { Lightbox, NoteImages } from "./NoteImages";
+import { useCarry } from "./DragProvider";
 import { Inside } from "./Inside";
 
 /**
@@ -70,6 +71,7 @@ export function NoteCard({
   const [marking, setMarking] = useState(false);
   /** Long bodies open on demand. See LONG below. */
   const [unfolded, setUnfolded] = useState(false);
+  const carry = useCarry();
   /*
    * Read on mount rather than in render: it is a device setting in
    * localStorage, and reading storage during render is both impure and a
@@ -162,6 +164,13 @@ export function NoteCard({
     <article
       id={`note-${note.id}`}
       /*
+       * A card is a place as well as a thing: carry something onto it and it
+       * goes inside. The tree within a card marks its own rows, and the
+       * innermost target under the pointer wins, so dropping on a row puts it
+       * in that row rather than in the card around it.
+       */
+      data-drop-id={heading ? undefined : note.id}
+      /*
        * The reference and the time, on the card rather than in it.
        *
        * Both were on the face: NOTE 0041 went first, and the clock followed
@@ -177,7 +186,13 @@ export function NoteCard({
       }}
       className={`group scroll-mt-4 border px-4 py-3 sm:px-5 ${
         onColor ? "" : "border-rule bg-field"
-      } ${archived ? "opacity-60" : ""}`}
+      } ${archived ? "opacity-60" : ""} ${
+        carry.grab?.id === note.id ? "opacity-35" : ""
+      } ${
+        carry.dragging && carry.over === note.id && carry.grab?.id !== note.id
+          ? "outline-2 -outline-offset-2 outline-ink"
+          : ""
+      }`}
       style={{
         ...surface,
         // A ranked card carries its colour on the edge as well as in the
@@ -400,7 +415,13 @@ export function NoteCard({
              * where the hand already is, and on a touch screen, where
              * double-tap means zoom, a single tap does it instead.
              */
+            onPointerDown={(e) => {
+              if (heading) return;
+              if ((e.target as HTMLElement).closest("[data-nodrag]")) return;
+              carry.press(note.id, e);
+            }}
             onClick={() => {
+              if (carry.wasDrag()) return;
               if (room && !heading) {
                 onOpen?.(note.id);
               } else if (window.matchMedia("(hover: none)").matches) {
