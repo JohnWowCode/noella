@@ -49,6 +49,11 @@ export interface Store {
   /** Stores prepared bytes. Called before the note that references them. */
   saveImage(id: string, blob: Blob): Promise<void>;
 
+  /** What is in memory now, without a round trip. What sync merges against. */
+  here(): Snapshot;
+  /** Takes a merged wall as the truth. Image bytes on the device are kept. */
+  adopt(next: Snapshot): Promise<Snapshot>;
+
   export(): Promise<Backup>;
   /** Replaces everything. Returns the restored snapshot. */
   import(backup: Backup): Promise<Snapshot>;

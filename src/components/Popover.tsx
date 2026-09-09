@@ -33,9 +33,25 @@ function keepInView(el: HTMLElement | null) {
    * against the larger one is how a panel gets declared "on screen" while
    * sixty pixels of it sit past the right edge with nothing to scroll to.
    */
-  const over = rect.right - (document.documentElement.clientWidth - margin);
-  if (over <= 0) return;
-  el.style.transform = `translateX(${-Math.min(over, Math.max(0, rect.left - margin))}px)`;
+  const wide = document.documentElement.clientWidth;
+  /*
+   * Both edges, not just the right one.
+   *
+   * This only ever pulled panels back from the right, which was fine while
+   * every trigger sat on the left. A right-aligned one near the right edge
+   * opens leftward — and a 288px panel anchored there starts at -214 on a
+   * 390px phone, entirely off the side of the screen with nothing to scroll
+   * to. Measured the same way, corrected the other way.
+   */
+  const overRight = rect.right - (wide - margin);
+  if (overRight > 0) {
+    el.style.transform = `translateX(${-Math.min(overRight, Math.max(0, rect.left - margin))}px)`;
+    return;
+  }
+  const overLeft = margin - rect.left;
+  if (overLeft > 0) {
+    el.style.transform = `translateX(${Math.min(overLeft, Math.max(0, wide - margin - rect.right))}px)`;
+  }
 }
 
 export function Popover({

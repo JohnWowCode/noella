@@ -12,6 +12,7 @@ import {
 } from "../types";
 import { todayKey } from "../clock";
 import { descendantsOf } from "../tree";
+import { bury, unbury } from "../sync/local";
 import { DEFAULT_SWATCHES } from "./defaults";
 import type { Backup, Snapshot, Store } from "./types";
 
@@ -327,6 +328,9 @@ export class LocalStore implements Store {
     }
     const ids = new Set(doomed.map((n) => n.id));
     this.snapshot.notes = this.snapshot.notes.filter((n) => !ids.has(n.id));
+    // Recorded so the copy in the cloud, and every other device reading it,
+    // hears that this was deleted rather than just missing from here.
+    bury([...ids]);
     write(this.snapshot);
   }
 
@@ -336,7 +340,29 @@ export class LocalStore implements Store {
       ...notes.filter((n) => !known.has(n.id)),
       ...this.snapshot.notes,
     ];
+    // A note that is back was never deleted, whatever the record says — leave
+    // the grave standing and the next sync would take it away again.
+    unbury(notes.map((n) => n.id));
     write(this.snapshot);
+  }
+
+  /** What is in memory now. The sync layer merges against this. */
+  here(): Snapshot {
+    return this.clone();
+  }
+
+  /**
+   * Takes a merged wall as the truth, keeping the image bytes this device
+   * already holds — those live in IndexedDB and never travel in the file.
+   */
+  async adopt(next: Snapshot): Promise<Snapshot> {
+    this.snapshot = migrate({
+      notes: next.notes,
+      colors: next.colors,
+      settings: next.settings,
+    });
+    write(this.snapshot);
+    return this.clone();
   }
 
   async updateColor(id: string, patch: Partial<Color>): Promise<Color> {

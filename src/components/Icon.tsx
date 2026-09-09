@@ -102,6 +102,7 @@ const MARKS: Record<string, Mark> = {
   swatches: { d: "M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM17.5 14v7M14 17.5h7" },
   /* A tab and a body: what a folder looks like when it is drawn, not photographed. */
   folder: { d: "M3 6h6l2 3h10v11H3z" },
+  cloud: { d: "M7 19a4.5 4.5 0 01-.6-8.96A6 6 0 0118.5 11 4 4 0 0118 19z" },
   folderPlus: { d: "M3 6h6l2 3h10v11H3zM12 12v6M9 15h6" },
 };
 

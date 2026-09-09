@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { seqLabel } from "../format";
@@ -20,7 +21,24 @@ import {
 } from "../types";
 import { descendantsOf } from "../tree";
 import { LocalStore } from "./local";
+import { readConnection } from "../sync/local";
+import { syncOnce } from "../sync/run";
 import type { Backup, Store } from "./types";
+
+/** What the cloud is doing, in the four states a person cares about. */
+export type CloudState = "off" | "working" | "ok" | "stuck";
+
+export interface Cloud {
+  state: CloudState;
+  /** When the last good round finished. Epoch ms, 0 for never. */
+  at: number;
+  /** Why it is stuck, in words. */
+  trouble: string | null;
+  /** Runs a round now. Safe to call while one is already going.*/
+  now: () => void;
+  /** Re-reads the stored connection after it has been changed. */
+  reconnect: () => void;
+}
 
 interface Noella {
   ready: boolean;
@@ -43,6 +61,7 @@ interface Noella {
   imageUrl: (id: string) => Promise<string | null>;
   exportBackup: () => Promise<Backup>;
   importBackup: (backup: Backup) => Promise<void>;
+  cloud: Cloud;
 }
 
 const Ctx = createContext<Noella | null>(null);
@@ -56,6 +75,20 @@ export function NoellaProvider({ children }: { children: React.ReactNode }) {
   const [colors, setColors] = useState<Color[]>([]);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [undo, setUndo] = useState<Noella["undo"]>(null);
+  const [cloudState, setCloudState] = useState<CloudState>("off");
+  const [cloudAt, setCloudAt] = useState(0);
+  const [trouble, setTrouble] = useState<string | null>(null);
+  /** Bumped when the connection is changed, so the effects below re-arm. */
+  const [wiring, setWiring] = useState(0);
+  const [connected, setConnected] = useState(false);
+  const running = useRef(false);
+  const again = useRef(false);
+  /*
+   * A round that finishes while another was asked for runs the next one
+   * itself. Reaching that through a ref rather than by name keeps the
+   * function from referring to itself, which the compiler cannot memoize.
+   */
+  const loop = useRef<() => void>(() => {});
 
   useEffect(() => {
     let live = true;
@@ -70,6 +103,97 @@ export function NoellaProvider({ children }: { children: React.ReactNode }) {
       live = false;
     };
   }, [store]);
+
+  /*
+   * A round of syncing, and only ever one at a time.
+   *
+   * Two rounds overlapping would each merge against a wall the other is about
+   * to change, and the loser would push a copy missing whatever the winner
+   * had just pulled. A round asked for while one is running is remembered and
+   * run once the current one is done.
+   */
+  const runSync = useCallback(async () => {
+    const connection = readConnection();
+    if (!connection) return;
+    if (running.current) {
+      again.current = true;
+      return;
+    }
+    running.current = true;
+    setCloudState("working");
+    try {
+      const result = await syncOnce(connection, store.here());
+      if (result.merged) {
+        const kept = await store.adopt(result.merged);
+        setNotes(kept.notes);
+        setColors(kept.colors);
+        setSettings(kept.settings);
+      }
+      setTrouble(null);
+      setCloudAt(result.at);
+      setCloudState("ok");
+    } catch (err) {
+      setTrouble(err instanceof Error ? err.message : "Something went wrong.");
+      setCloudState("stuck");
+    } finally {
+      running.current = false;
+      if (again.current) {
+        again.current = false;
+        loop.current();
+      }
+    }
+  }, [store]);
+
+  useEffect(() => {
+    loop.current = () => void runSync();
+  }, [runSync]);
+
+  // Read after mount, like everything else that touches storage, so the
+  // server render and the first client render agree about it.
+  useEffect(() => {
+    const has = readConnection() !== null;
+    Promise.resolve().then(() => setConnected(has));
+  }, [wiring]);
+
+  /*
+   * When it happens on its own: once the wall has loaded, whenever you come
+   * back to the tab, and a few seconds after you stop changing things. Not on
+   * every keystroke — every round is a commit, and a hundred commits for one
+   * paragraph is a history nobody can read.
+   */
+  useEffect(() => {
+    if (!ready || !readConnection()) return;
+    // Off the render pass. A round starts by saying it is working, and saying
+    // so synchronously inside an effect is a cascading render.
+    const first = window.setTimeout(() => void runSync(), 0);
+    const onShow = () => {
+      if (document.visibilityState === "visible") void runSync();
+    };
+    document.addEventListener("visibilitychange", onShow);
+    window.addEventListener("online", onShow);
+    return () => {
+      window.clearTimeout(first);
+      document.removeEventListener("visibilitychange", onShow);
+      window.removeEventListener("online", onShow);
+    };
+  }, [ready, runSync, wiring]);
+
+  useEffect(() => {
+    if (!ready || !readConnection()) return;
+    const id = window.setTimeout(() => void runSync(), 6000);
+    return () => window.clearTimeout(id);
+  }, [ready, runSync, wiring, notes, colors, settings]);
+
+  const cloud = useMemo<Cloud>(
+    () => ({
+      state: connected ? cloudState : "off",
+      at: cloudAt,
+      trouble,
+      now: () => void runSync(),
+      reconnect: () => setWiring((n) => n + 1),
+    }),
+    [connected, cloudState, cloudAt, trouble, runSync],
+  );
 
   // Every mutation writes to state first and reconciles after. The card shows
   // up the instant you hit save, before the store has answered.
@@ -222,6 +346,7 @@ export function NoellaProvider({ children }: { children: React.ReactNode }) {
       imageUrl,
       exportBackup,
       importBackup,
+      cloud,
     };
   }, [
     store,
@@ -241,6 +366,7 @@ export function NoellaProvider({ children }: { children: React.ReactNode }) {
     imageUrl,
     exportBackup,
     importBackup,
+    cloud,
   ]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

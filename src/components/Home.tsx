@@ -34,6 +34,7 @@ import { Footer, Header } from "./Chrome";
 import { Compose } from "./Compose";
 import { Journal } from "./Journal";
 import { ClaudeImport } from "./ClaudeImport";
+import { Cloud } from "./Cloud";
 import { DataMenu } from "./DataMenu";
 import { DragProvider, useCarry } from "./DragProvider";
 import { FolderLink } from "./FolderLink";
@@ -1223,6 +1224,7 @@ export function Home() {
             <div className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-3">
               <FolderLink />
               <span className="ml-auto flex items-center gap-2">
+                <Cloud />
                 <ClaudeImport onOpen={open} />
                 <DataMenu />
               </span>
