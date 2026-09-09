@@ -43,6 +43,7 @@ export function Popover({
   current,
   set,
   align = "left",
+  trigger,
   children,
 }: {
   /** For screen readers and the tooltip. The trigger itself shows `current`. */
@@ -52,6 +53,12 @@ export function Popover({
   /** Whether something is chosen, which is all the trigger needs to say. */
   set: boolean;
   align?: "left" | "right";
+  /**
+   * Replaces the trigger's own sizing. The compose row wants a comfortable
+   * square; a note card's gutter is one line of body text tall and a nine-rem
+   * button in it would be taller than the note.
+   */
+  trigger?: string;
   children: (close: () => void) => React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -91,9 +98,12 @@ export function Popover({
          * button is being hit with a finger and there is more room going
          * spare than there is patience.
          */
-        className={`grid h-9 min-w-9 place-items-center border px-2 text-[16px] leading-none [@media(hover:none)]:h-11 [@media(hover:none)]:min-w-11 ${
-          set || open ? "border-ink" : "border-rule text-mute hover:border-ink"
-        }`}
+        className={
+          trigger ??
+          `grid h-9 min-w-9 place-items-center border px-2 text-[16px] leading-none [@media(hover:none)]:h-11 [@media(hover:none)]:min-w-11 ${
+            set || open ? "border-ink" : "border-rule text-mute hover:border-ink"
+          }`
+        }
       >
         {current}
       </button>

@@ -15,7 +15,7 @@ import { contentsOf, titleOf } from "@/lib/rooms";
 import { PRIORITIES, PRIORITY } from "@/lib/priority";
 import { swatchName } from "@/lib/store/defaults";
 import { MARK_GROUPS, markLabel, marksOf, toggleMark } from "@/lib/stickers";
-import { countChildren, pathTo, placesFor } from "@/lib/tree";
+import { countChildren, placesFor } from "@/lib/tree";
 import { useNoella } from "@/lib/store/provider";
 import { ON_COLOR_BUTTON, surfaceStyle } from "@/lib/surface";
 import type { Note } from "@/lib/types";
@@ -23,6 +23,8 @@ import { Icon } from "./Icon";
 import { Lightbox, NoteImages } from "./NoteImages";
 import { useCarry } from "./DragProvider";
 import { Inside } from "./Inside";
+import { Mover } from "./Mover";
+import { Popover } from "./Popover";
 
 /**
  * Characters past which a body folds on the wall. Roughly four lines at the
@@ -307,7 +309,7 @@ export function NoteCard({
               )}
             </button>
           )}
-          {note.isTask && (
+          {note.isTask ? (
             <button
               type="button"
               onClick={() =>
@@ -320,6 +322,36 @@ export function NoteCard({
             >
               {done ? "×" : ""}
             </button>
+          ) : (
+            /*
+              A note becomes a job here, not four taps into a menu.
+
+              Deciding a thought is actually a job is the commonest thing you
+              do to a note and it was the same distance away as "archive it".
+              It waits at a whisper until the pointer is on the card, and sits
+              at a whisper permanently where there is no pointer to wait for.
+            */
+            !heading && (
+              <button
+                type="button"
+                onClick={() => patchNote(note.id, { isTask: true })}
+                aria-label="Make it a job"
+                title="Make it a job"
+                /*
+                  Only where there is a pointer.
+
+                  On a touch screen these have no hover to wait for, so they
+                  stand there permanently — and three sixteen-pixel controls
+                  eight pixels apart, each with a forty-four pixel thumb area,
+                  overlap so badly that tapping the tickbox rank the note. The
+                  ⋯ drawer already offers both as full-width rows, which is
+                  the right shape for a thumb anyway.
+                */
+                className="tap hidden h-4 w-4 shrink-0 place-items-center border border-dashed border-current
+                           opacity-0 group-hover:opacity-70 focus-visible:opacity-100
+                           [@media(hover:hover)]:grid"
+              />
+            )
           )}
 
           {/*
@@ -350,29 +382,109 @@ export function NoteCard({
               Today
             </span>
           )}
-          {note.priority && (
-            <span
-              className={`flex shrink-0 items-center gap-1.5 px-1.5 py-0.5 ${
-                onColor ? "bg-[var(--on)] text-[var(--on-inv)]" : ""
-              }`}
-              style={
-                onColor
-                  ? undefined
-                  : {
-                      backgroundColor: PRIORITY[note.priority].hex,
-                      color: "#111111",
+          {/*
+            The rank chip is the way to change the rank.
+
+            It was a label, and setting one meant the ⋯ menu — so the chip
+            told you the answer and refused to take a new one, which is the
+            most annoying thing a control can do. Same chip, same place; it
+            just opens now. Unranked notes get a flag at a whisper, the same
+            as the tickbox above.
+          */}
+          {!heading && (
+            <Popover
+              label={
+                note.priority
+                  ? `${PRIORITY[note.priority].label} — change it`
+                  : "Give it a rank"
+              }
+              set={note.priority !== null}
+              trigger={
+                note.priority
+                  ? // `label` explicitly: text-transform is inherited, but a
+                    // button is a form control and does not take the gutter's
+                    // uppercase with it — the chip came out reading "HPrio"
+                    // in a row of small caps.
+                    `label flex shrink-0 items-center gap-1.5 px-1.5 py-0.5 ${
+                      onColor ? "bg-[var(--on)] text-[var(--on-inv)]" : ""
+                    }`
+                  : `tap hidden h-4 w-4 shrink-0 place-items-center
+                     opacity-0 group-hover:opacity-70 focus-visible:opacity-100
+                     [@media(hover:hover)]:grid`
+              }
+              current={
+                note.priority ? (
+                  <span
+                    className="flex items-center gap-1.5"
+                    style={
+                      onColor
+                        ? undefined
+                        : {
+                            backgroundColor: PRIORITY[note.priority].hex,
+                            color: "#111111",
+                          }
                     }
+                  >
+                    {onColor && (
+                      <span
+                        aria-hidden
+                        className="h-2 w-2 shrink-0"
+                        style={{
+                          backgroundColor: PRIORITY[note.priority].hex,
+                        }}
+                      />
+                    )}
+                    {PRIORITY[note.priority].label}
+                  </span>
+                ) : (
+                  <Icon name="flag" size={13} />
+                )
               }
             >
-              {onColor && (
-                <span
-                  aria-hidden
-                  className="h-2 w-2 shrink-0"
-                  style={{ backgroundColor: PRIORITY[note.priority].hex }}
-                />
+              {(close) => (
+                <span className="flex flex-col gap-1">
+                  {PRIORITIES.map((level) => (
+                    <button
+                      key={level}
+                      type="button"
+                      onClick={() => {
+                        patchNote(note.id, {
+                          priority: note.priority === level ? null : level,
+                        });
+                        close();
+                      }}
+                      className={`label flex items-center gap-2 px-2 py-2 text-left ${
+                        note.priority === level
+                          ? "bg-ink text-paper"
+                          : "hover:bg-ink/10"
+                      }`}
+                    >
+                      <span
+                        aria-hidden
+                        className="h-3 w-3 shrink-0"
+                        style={{ backgroundColor: PRIORITY[level].hex }}
+                      />
+                      {PRIORITY[level].label}
+                      <span className="ml-auto normal-case tracking-normal opacity-55">
+                        {PRIORITY[level].hint}
+                      </span>
+                    </button>
+                  ))}
+                  {note.priority && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        patchNote(note.id, { priority: null });
+                        close();
+                      }}
+                      className="label px-2 py-2 text-left hover:bg-ink/10"
+                    >
+                      No rank
+                    </button>
+                  )}
+                </span>
               )}
-              {PRIORITY[note.priority].label}
-            </span>
+            </Popover>
           )}
 
           {marks.map((m) => (
@@ -801,8 +913,8 @@ export function NoteCard({
 
       {moving && (
         <Mover
-          note={note}
           targets={targets}
+          canClear={note.parentId !== null}
           notes={notes}
           onPick={(parentId) => {
             // Deliberately not touching isTask. Filing something used to make
@@ -929,137 +1041,6 @@ export function NoteCard({
  * same tree: top level, unfold, choose. The search is still here because at
  * four hundred notes it is faster, but it is no longer the only way through.
  */
-function Mover({
-  note,
-  targets,
-  notes,
-  onPick,
-}: {
-  note: Note;
-  targets: Note[];
-  notes: Note[];
-  onPick: (parentId: string | null) => void;
-}) {
-  const [q, setQ] = useState("");
-  const [open, setOpen] = useState<Set<string>>(() => new Set());
-  const needle = q.trim().toLowerCase();
-  const allowed = new Set(targets.map((t) => t.id));
-
-  const kids = (parentId: string | null) =>
-    notes
-      .filter(
-        (n) =>
-          n.parentId === parentId && n.archivedAt === null && allowed.has(n.id),
-      )
-      .sort(
-        (a, b) => a.order - b.order || titleOf(a).localeCompare(titleOf(b)),
-      );
-
-  const found = needle
-    ? targets
-        .filter((t) => titleOf(t).toLowerCase().includes(needle))
-        .slice(0, 30)
-    : [];
-
-  const Row = ({ item, depth }: { item: Note; depth: number }) => {
-    const children = kids(item.id);
-    const unfolded = open.has(item.id);
-    return (
-      <>
-        <li className="flex items-center">
-          <button
-            type="button"
-            onClick={() =>
-              setOpen((prev) => {
-                const next = new Set(prev);
-                if (next.has(item.id)) next.delete(item.id);
-                else next.add(item.id);
-                return next;
-              })
-            }
-            disabled={children.length === 0}
-            aria-label={unfolded ? "Fold" : "Unfold"}
-            style={{ marginLeft: `${depth * 16}px` }}
-            className="tap grid h-7 w-6 shrink-0 place-items-center opacity-60 disabled:opacity-0"
-          >
-            <span className={unfolded ? "rotate-90" : ""}>
-              <Icon name="chevron" size={11} />
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => onPick(item.id)}
-            className="min-w-0 flex-1 truncate px-1.5 py-2 text-left text-[calc(15px*var(--type))] hover:bg-current/10"
-          >
-            {titleOf(item)}
-          </button>
-        </li>
-        {unfolded &&
-          children.map((c) => <Row key={c.id} item={c} depth={depth + 1} />)}
-      </>
-    );
-  };
-
-  return (
-    <div className="mt-3 border border-current/25 p-2">
-      <div className="flex items-center gap-2">
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Put it in…"
-          aria-label="Search for somewhere to put this"
-          className="label min-w-0 flex-1 border border-current/40 bg-transparent px-2 py-1.5
-                     outline-none placeholder:opacity-50"
-        />
-        {note.parentId && (
-          <button
-            type="button"
-            onClick={() => onPick(null)}
-            className="label shrink-0 border border-current px-2 py-1.5 hover:bg-[var(--on)] hover:text-[var(--on-inv)]"
-          >
-            Take it out
-          </button>
-        )}
-      </div>
-
-      <ul className="mt-2 max-h-64 overflow-y-auto">
-        {needle ? (
-          found.length === 0 ? (
-            <li className="label px-1 py-2 opacity-60">
-              Nowhere by that name.
-            </li>
-          ) : (
-            found.map((t) => (
-              <li key={t.id} className="flex items-baseline gap-2">
-                <button
-                  type="button"
-                  onClick={() => onPick(t.id)}
-                  className="flex min-w-0 flex-1 items-baseline gap-2 px-1.5 py-2 text-left hover:bg-current/10"
-                >
-                  <span className="min-w-0 flex-1 truncate text-[calc(15px*var(--type))]">
-                    {titleOf(t)}
-                  </span>
-                  <span className="label shrink-0 truncate opacity-50">
-                    {pathTo(notes, t.id)
-                      .map((n) => titleOf(n))
-                      .join(" › ")}
-                  </span>
-                </button>
-              </li>
-            ))
-          )
-        ) : kids(null).length === 0 ? (
-          <li className="label px-1 py-2 opacity-60">
-            Nothing else at the top level yet.
-          </li>
-        ) : (
-          kids(null).map((t) => <Row key={t.id} item={t} depth={0} />)
-        )}
-      </ul>
-    </div>
-  );
-}
-
 function Group({
   name,
   children,

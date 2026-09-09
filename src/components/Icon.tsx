@@ -100,6 +100,9 @@ const MARKS: Record<string, Mark> = {
     d: "M20 11.5 12 19.5a5 5 0 01-7-7l8-8a3.5 3.5 0 015 5l-8 8a2 2 0 01-3-3l7.5-7.5",
   },
   swatches: { d: "M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM17.5 14v7M14 17.5h7" },
+  /* A tab and a body: what a folder looks like when it is drawn, not photographed. */
+  folder: { d: "M3 6h6l2 3h10v11H3z" },
+  folderPlus: { d: "M3 6h6l2 3h10v11H3zM12 12v6M9 15h6" },
 };
 
 export type IconName = keyof typeof MARKS;

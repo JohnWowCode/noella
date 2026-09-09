@@ -80,6 +80,35 @@ const GROUPINGS = {
 type Grouping = "none" | "folder" | "mark" | "kind" | "priority";
 
 /**
+ * How the wall is laid out.
+ *
+ * A wall has always had exactly one order — newest first, with whatever you
+ * had dragged into place on top — and one order is a decision made for you.
+ * Sometimes you want the alphabet, sometimes you want the colour it lives in,
+ * and sometimes the only useful order is one you did not pick, because
+ * anything you did pick you have already read past.
+ */
+const SORTS = {
+  hand: "Newest, and where you put them",
+  old: "Oldest first",
+  alpha: "A to Z",
+  folder: "By folder colour",
+  shuffle: "Shuffled",
+} as const;
+
+type Sorting = keyof typeof SORTS;
+const SORT_KEY = "noella.sort";
+
+/** What the trigger says. The full sentence belongs in the list, not the row. */
+const SHORT: Record<Sorting, string> = {
+  hand: "Order",
+  old: "Oldest",
+  alpha: "A–Z",
+  folder: "Folder",
+  shuffle: "Shuffled",
+};
+
+/**
  * Three areas, one page.
  *
  * Everything used to be one column: write, then a jester, then five filter
@@ -135,6 +164,31 @@ export function Home() {
    */
   const [area, setArea] = useState<Area>("work");
   const [group, setGroup] = useState<Grouping>("none");
+  const [sort, setSort] = useState<Sorting>("hand");
+  /*
+   * Shuffled has to hold still.
+   *
+   * Re-rolling on every render means the wall reorders itself under your
+   * finger while you read it, which is not a shuffle, it is a fairground ride.
+   * One seed per press of the button.
+   */
+  const [seed, setSeed] = useState(1);
+  useEffect(() => {
+    const stored = (() => {
+      try {
+        return localStorage.getItem(SORT_KEY);
+      } catch {
+        return null;
+      }
+    })();
+    Promise.resolve().then(() => {
+      // Never restore Shuffled. Coming back to yesterday's random order is
+      // the one thing a shuffle must not do.
+      if (stored && stored !== "shuffle" && stored in SORTS) {
+        setSort(stored as Sorting);
+      }
+    });
+  }, []);
   const [level, setLevel] = useState<Priority | null>(null);
   /** One mark, used as a filter. Marks are the tags now. */
   const [mark, setMark] = useState<IconName | null>(null);
@@ -462,15 +516,41 @@ export function Home() {
      * still has position zero, so an untouched wall is exactly the date order
      * it always was — the hand-set part only shows up once there is one.
      */
+    const hue = (n: Note) => {
+      if (!n.colorId) return colors.length;
+      const at = colors.findIndex((c) => c.id === n.colorId);
+      return at < 0 ? colors.length : at;
+    };
+    /* A stable scramble: the same seed gives the same wall twice. */
+    const scatter = (n: Note) => {
+      let h = seed;
+      for (let i = 0; i < n.id.length; i += 1) {
+        h = (h * 31 + n.id.charCodeAt(i)) >>> 0;
+      }
+      return h;
+    };
+
     return rows.sort((a, b) => {
+      // Favourites float in every order. That is what a favourite is for.
       if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+      if (sort === "old") return a.createdAt.localeCompare(b.createdAt);
+      if (sort === "alpha")
+        return titleOf(a).localeCompare(titleOf(b), undefined, {
+          sensitivity: "base",
+        });
+      if (sort === "folder") {
+        const h = hue(a) - hue(b);
+        if (h !== 0) return h;
+        return b.createdAt.localeCompare(a.createdAt);
+      }
+      if (sort === "shuffle") return scatter(a) - scatter(b);
       return a.order - b.order || b.createdAt.localeCompare(a.createdAt);
     });
-  }, [top, live, world, tag, view, query, level, mark, notes]);
+  }, [top, live, world, tag, view, query, level, mark, notes, colors, sort, seed]);
 
   // Any change to what is on screen restarts the list from the top. Adjusted
   // during render, so the first paint is already the short list.
-  const signature = [query, world, tag, view, level, mark].join(" ");
+  const signature = [query, world, tag, view, level, mark, sort].join(" ");
   const [lastSignature, setLastSignature] = useState(signature);
   if (signature !== lastSignature) {
     setLastSignature(signature);
@@ -748,6 +828,7 @@ export function Home() {
             inputRef={composeRef}
             parentId={inside}
             parentName={here ? titleOf(here) : null}
+            onOpen={open}
           />
 
           {/*
@@ -928,6 +1009,58 @@ export function Home() {
                     );
                   })}
 
+                  {/*
+                    The order, which used to be a decision made for you.
+
+                    Sits next to grouping because they are the same question
+                    asked twice — what shape is this wall in — and it earns
+                    its place on the same terms.
+                  */}
+                  {live.length >= GROUPABLE && (
+                    <Popover
+                      label="Put them in an order"
+                      set={sort !== "hand"}
+                      align="right"
+                      current={
+                        <span className="label">
+                          {sort === "hand" ? "Order" : SHORT[sort]}
+                        </span>
+                      }
+                    >
+                      {(close) => (
+                        <span className="flex flex-col gap-1">
+                          {(Object.keys(SORTS) as Sorting[]).map((id) => (
+                            <button
+                              key={id}
+                              type="button"
+                              onClick={() => {
+                                setSort(id);
+                                // Pressing Shuffled again reshuffles, which is
+                                // the only thing pressing it again could mean.
+                                if (id === "shuffle") {
+                                  setSeed(Math.floor(Math.random() * 1e9) + 1);
+                                }
+                                try {
+                                  localStorage.setItem(SORT_KEY, id);
+                                } catch {
+                                  // It just will not be remembered.
+                                }
+                                close();
+                              }}
+                              className={`label flex items-center gap-2 px-2 py-2 text-left ${
+                                sort === id
+                                  ? "bg-ink text-paper"
+                                  : "hover:bg-ink/10"
+                              }`}
+                            >
+                              {SORTS[id]}
+                            </button>
+                          ))}
+                        </span>
+                      )}
+                    </Popover>
+                  )}
+
                   {/* Grouping earns its place once there is enough to group. */}
                   {live.length >= GROUPABLE && (
                     <Popover
@@ -1006,6 +1139,8 @@ export function Home() {
               color={activeWorld}
               index={colors.indexOf(activeWorld)}
               count={counts.byWorld.get(activeWorld.id) ?? 0}
+              rows={visible}
+              todayKey={todayKey}
               onRename={(name) =>
                 patchColor(activeWorld.id, { name: name || null })
               }
@@ -1535,18 +1670,28 @@ function WorldBand({
   color,
   index,
   count,
+  rows,
+  todayKey,
   onRename,
   onExit,
 }: {
   color: Color;
   index: number;
   count: number;
+  /** What is actually on screen inside it, for the same tally a room gives. */
+  rows: Note[];
+  todayKey: string;
   onRename: (name: string) => void;
   onExit: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState("");
   const name = color.name ?? swatchName(index);
+  const jobs = rows.filter((n) => n.isTask);
+  const done = jobs.filter((n) => n.doneAt !== null).length;
+  const today = rows.filter(
+    (n) => n.todayOn === todayKey && n.doneAt === null,
+  ).length;
 
   return (
     <div
@@ -1589,7 +1734,23 @@ function WorldBand({
         </button>
       )}
       <FolderSticker color={color} />
-      <span className="label opacity-70">{count} in here</span>
+      {/*
+        A colour is a folder, so it answers what a folder answers.
+
+        It said "6 in here" and stopped, which is the count a filter gives.
+        A place tells you how much of it is finished and what it wants from
+        you today — the same tally a room gives under its own name, because
+        they are the same question about two kinds of shelf.
+      */}
+      <span className="label opacity-70">
+        {count} in here
+        {jobs.length > 0 && ` · ${done} of ${jobs.length} done`}
+      </span>
+      {today > 0 && (
+        <span className={`label border px-1.5 py-0.5 ${ON_COLOR_BUTTON}`}>
+          {today} on today
+        </span>
+      )}
       <button
         type="button"
         onClick={onExit}

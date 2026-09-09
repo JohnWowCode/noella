@@ -9,6 +9,7 @@ import {
 } from "@/lib/images";
 import { swatchName } from "@/lib/store/defaults";
 import { Icon, type IconName } from "./Icon";
+import { Mover } from "./Mover";
 import { Popover } from "./Popover";
 import { useNoella } from "@/lib/store/provider";
 import { PRIORITIES, PRIORITY, type Priority } from "@/lib/priority";
@@ -79,6 +80,12 @@ interface Props {
   parentId?: string | null;
   /** Its name, so the box can say where what you type is going. */
   parentName?: string | null;
+  /**
+   * Opens a note. Used by the folder switch, which makes a thing and then
+   * stands you inside it — the only sensible next move after saying "this is
+   * going to hold other things".
+   */
+  onOpen?: (id: string) => void;
 }
 
 /**
@@ -99,8 +106,9 @@ export function Compose({
   placeholder,
   parentId = null,
   parentName = null,
+  onOpen,
 }: Props) {
-  const { colors, addNote, attachImage } = useNoella();
+  const { colors, notes, addNote, attachImage } = useNoella();
   const [body, setBody] = useState("");
   const [task, setTask] = useState(false);
   const [restored, setRestored] = useState(false);
@@ -110,6 +118,27 @@ export function Compose({
   const [tooBig, setTooBig] = useState(false);
   const [icons, setIcons] = useState<IconName[]>([]);
   const [priority, setPriority] = useState<Priority | null>(null);
+  /*
+   * Where it is going, and whether it is going to hold things.
+   *
+   * Both start where you are standing: writing inside a room files into that
+   * room, and nothing is a folder until you say so. The destination is not
+   * sticky between notes the way the colour and the tick are — a run of
+   * thoughts belongs where you are, and silently filing the fourth one
+   * somewhere you chose for the first is how notes go missing.
+   */
+  // Seeded from where you are standing. The box is keyed on the room in the
+  // page above, so walking into another one remounts this and reseeds it —
+  // there is nothing here to keep in step.
+  const [into, setInto] = useState<string | null>(parentId);
+  const [holds, setHolds] = useState(false);
+  const places = useMemo(
+    () => notes.filter((n) => n.archivedAt === null),
+    [notes],
+  );
+  const intoName = into
+    ? (notes.find((n) => n.id === into)?.body.split("\n", 1)[0] ?? null)
+    : null;
   /** What you have fired off without leaving the box. */
   const [burst, setBurst] = useState<string[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -156,18 +185,32 @@ export function Compose({
     }
   }
 
-  function save() {
+  async function save() {
     if (!body.trim() && pending.length === 0) return;
     const input: NewNote = {
       body: body.trim(),
       colorId,
       images: pending,
-      parentId,
+      parentId: into,
       icons,
       priority,
     };
     if (task) input.isTask = true;
-    addNote(input);
+    const made = await addNote(input);
+
+    /*
+     * A folder is a note with things in it, so "make it a folder" cannot be a
+     * flag — it has to be an act. It puts you inside the thing you just named,
+     * with the box already pointed at it, which is what you were going to do
+     * next anyway.
+     */
+    if (holds) {
+      setHolds(false);
+      setBody("");
+      setPending([]);
+      onOpen?.(made.id);
+      return;
+    }
 
     /*
      * Everything that would slow the next one down is left alone.
@@ -188,7 +231,7 @@ export function Compose({
     const mod = e.metaKey || e.ctrlKey;
     if (mod && e.key === "Enter") {
       e.preventDefault();
-      save();
+      void save();
       return;
     }
     /*
@@ -201,7 +244,7 @@ export function Compose({
      */
     if (e.key === "Enter" && !e.shiftKey && !e.altKey && !body.includes("\n")) {
       e.preventDefault();
-      save();
+      void save();
       return;
     }
     if (mod && /^[0-9]$/.test(e.key)) {
@@ -494,6 +537,63 @@ export function Compose({
           )}
         </Popover>
 
+        {/*
+          Where it lands, before it lands.
+
+          Filing was a thing you did afterwards: write it, find it on the wall,
+          open its menu, walk the shelves. Which is two minutes of tidying per
+          thought, so nobody does it and the wall silts up. The box knows where
+          you are standing and offers to point somewhere else.
+        */}
+        <Popover
+          label={intoName ? `Going into ${intoName}` : "Put it somewhere"}
+          set={into !== null}
+          current={
+            <span className="flex items-center gap-1.5">
+              <Icon name="folder" size={16} />
+              {intoName && (
+                <span className="label max-w-24 truncate">{intoName}</span>
+              )}
+            </span>
+          }
+        >
+          {(close) => (
+            <Mover
+              targets={places}
+              notes={notes}
+              canClear={into !== null}
+              clearLabel="Top of the wall"
+              onPick={(id) => {
+                setInto(id);
+                close();
+              }}
+            />
+          )}
+        </Popover>
+
+        {/*
+          "This one is going to hold things."
+
+          Off by default, because almost nothing is a folder and a wall of
+          empty containers is worse than a wall of notes. On, it makes the
+          thing and stands you inside it with the box already pointed there.
+        */}
+        <button
+          type="button"
+          onMouseDown={hold}
+          onClick={() => setHolds((v) => !v)}
+          aria-pressed={holds}
+          aria-label="Make it a folder"
+          title="Make it a folder — you will land inside it"
+          className={`grid h-9 min-w-9 place-items-center border px-2 leading-none [@media(hover:none)]:h-11 [@media(hover:none)]:min-w-11 ${
+            holds
+              ? "border-ink bg-ink text-paper"
+              : "border-rule text-mute hover:border-ink hover:text-ink"
+          }`}
+        >
+          <Icon name="folderPlus" size={16} />
+        </button>
+
         <input
           ref={fileRef}
           type="file"
@@ -519,9 +619,15 @@ export function Compose({
         <button
           type="button"
           onMouseDown={hold}
-          onClick={save}
+          onClick={() => void save()}
           disabled={!ready}
-          aria-label={parentName ? `Put it in ${parentName}` : "Keep it"}
+          aria-label={
+            holds
+              ? "Make the folder"
+              : intoName
+                ? `Put it in ${intoName}`
+                : "Keep it"
+          }
           /*
            * A thumb-sized square on a phone, an ordinary worded button above
            * it. min-height rather than height, so the desktop version is
