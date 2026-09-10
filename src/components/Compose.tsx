@@ -14,37 +14,10 @@ import { Popover } from "./Popover";
 import { useNoella } from "@/lib/store/provider";
 import { PRIORITIES, PRIORITY, type Priority } from "@/lib/priority";
 import { MARK_GROUPS, markLabel, toggleMark } from "@/lib/stickers";
-import type { Color, NewNote, NoteImage } from "@/lib/types";
+import type { NewNote, NoteImage } from "@/lib/types";
 
 const DRAFT_KEY = "noella.draft";
 
-/** How many of the colours you actually use sit out in the open. */
-const RECENT = 5;
-
-/**
- * The folders you filed something in most recently.
- *
- * Derived from the notes rather than stored: a "recently used" list held in
- * settings would need writing on every save, migrating, and reconciling with
- * a wall that arrived by import. The notes already carry the answer in the
- * order they were written.
- */
-function useRecentColors(): Color[] {
-  const { notes, colors } = useNoella();
-  return useMemo(() => {
-    const seen: Color[] = [];
-    const ordered = [...notes].sort((a, b) =>
-      b.createdAt.localeCompare(a.createdAt),
-    );
-    for (const n of ordered) {
-      if (!n.colorId || seen.some((c) => c.id === n.colorId)) continue;
-      const hit = colors.find((c) => c.id === n.colorId);
-      if (hit) seen.push(hit);
-      if (seen.length === RECENT) break;
-    }
-    return seen;
-  }, [notes, colors]);
-}
 
 /*
  * There used to be four tabs here: Note, To do, Project, List.
@@ -260,18 +233,16 @@ export function Compose({
   const hold = (e: React.MouseEvent) => e.preventDefault();
 
   const ready = body.trim().length > 0 || pending.length > 0;
-  const selected = colors.find((c) => c.id === colorId) ?? null;
-  const recent = useRecentColors();
   /*
-   * What sits out in the open: the colours you actually use, plus whatever is
-   * chosen right now if it is not already among them. Without that second
-   * part, picking something from the full grid would leave nothing on screen
-   * showing it had been picked.
+   * One swatch, not six.
+   *
+   * A strip of recently-used colours sat beside the button that opens all
+   * fifty of them — six controls to do what one already did, on the row that
+   * was pushing the wall off the bottom of the screen. The trigger wears the
+   * chosen colour, so nothing is hidden; it is one tap further to change it
+   * and one row of phone screen back.
    */
-  const strip =
-    selected && !recent.some((c) => c.id === selected.id)
-      ? [selected, ...recent].slice(0, RECENT)
-      : recent;
+  const chosen = colors.find((c) => c.id === colorId) ?? null;
 
   return (
     <section
@@ -320,8 +291,12 @@ export function Compose({
          * cream above the fold, the largest empty thing on the screen, held
          * open for a rant that had not been typed yet. Three lines is enough
          * to say "write as much as you like"; the rant makes its own room.
+         *
+         * Short, though. A hundred pixels of empty box is a hundred pixels of
+         * the first screen, and the first screen decides whether the app is
+         * worth opening — measured at sixty-five per cent chrome before this.
          */
-        className="prose-note block min-h-24 w-full resize-none bg-transparent px-4 py-3.5 sm:min-h-32 sm:px-5 sm:py-4
+        className="prose-note block min-h-14 w-full resize-none bg-transparent px-4 py-3.5 sm:min-h-24 sm:px-5 sm:py-4
                    text-[calc(21px*var(--type))] leading-[1.5] outline-none placeholder:text-mute"
       />
 
@@ -403,49 +378,28 @@ export function Compose({
         </button>
 
         {/*
-          The colours you actually use.
-          
-          Thirty-six is the right number to have and the wrong number to
-          choose from every time — in practice a wall lives in four or five.
-          The last few used sit here for one tap; the rest are one tap deeper.
-          Nothing shows until you have used one, like everything else.
-        */}
-        {strip.length > 0 && (
-          <span className="flex items-center gap-1">
-            {strip.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onMouseDown={hold}
-                onClick={() => onColorId(c.id === colorId ? null : c.id)}
-                aria-pressed={c.id === colorId}
-                title={c.name ?? "Recent folder"}
-                className={`h-7 w-7 border ${
-                  c.id === colorId
-                    ? "border-ink ring-2 ring-ink ring-inset"
-                    : "border-rule-soft hover:border-ink"
-                }`}
-                style={{ backgroundColor: c.hex }}
-              >
-                <span className="sr-only">
-                  File in {c.name ?? "recent folder"}
-                </span>
-              </button>
-            ))}
-          </span>
-        )}
+          One swatch, wearing whatever is chosen.
 
-        {/*
-          The trigger means "the other thirty-one", not "the current one".
-
-          It used to show the selected colour, which sat immediately beside the
-          same colour in the strip — the same swatch twice, looking like a bug.
-          Selection lives in the strip now; this is only the way to the rest.
+          It used to be a strip of the last few colours used, sitting beside
+          the button that opens all of them — six controls doing what one
+          already did, on the row that was pushing the wall off the bottom of
+          a phone. Nothing is hidden by folding it: the trigger shows the
+          choice, and the rest are one tap away.
         */}
         <Popover
-          label="All folder colours"
-          set={false}
-          current={<Icon name="swatches" size={15} />}
+          label="Folder colour"
+          set={colorId !== null}
+          current={
+            chosen ? (
+              <span
+                aria-hidden
+                className="h-4 w-4 border border-rule-soft"
+                style={{ backgroundColor: chosen.hex }}
+              />
+            ) : (
+              <Icon name="swatches" size={15} />
+            )
+          }
         >
           {(close) => (
             <Palette
@@ -538,19 +492,19 @@ export function Compose({
         </Popover>
 
         {/*
-          Where it lands, before it lands.
+          Where it lands, and whether it is a place itself.
 
-          Filing was a thing you did afterwards: write it, find it on the wall,
-          open its menu, walk the shelves. Which is two minutes of tidying per
-          thought, so nobody does it and the wall silts up. The box knows where
-          you are standing and offers to point somewhere else.
+          These were two buttons, and two buttons is what pushed this row onto
+          a second line — a hundred and twenty pixels of the first screen on a
+          phone. They are one question anyway: where does this thing live. So
+          one button, and the panel answers both halves.
         */}
         <Popover
-          label={intoName ? `Going into ${intoName}` : "Put it somewhere"}
-          set={into !== null}
+          label={intoName ? `Going into ${intoName}` : "Where it goes"}
+          set={into !== null || holds}
           current={
             <span className="flex items-center gap-1.5">
-              <Icon name="fileInto" size={16} />
+              <Icon name={holds ? "folderPlus" : "fileInto"} size={16} />
               {intoName && (
                 <span className="label max-w-24 truncate">{intoName}</span>
               )}
@@ -558,41 +512,39 @@ export function Compose({
           }
         >
           {(close) => (
-            <Mover
-              targets={places}
-              notes={notes}
-              canClear={into !== null}
-              clearLabel="Top of the wall"
-              onPick={(id) => {
-                setInto(id);
-                close();
-              }}
-            />
+            <div className="flex w-64 flex-col gap-2 sm:w-72">
+              <button
+                type="button"
+                onMouseDown={hold}
+                onClick={() => setHolds((v) => !v)}
+                aria-pressed={holds}
+                className={`label flex items-center gap-2 border px-2.5 py-2 text-left ${
+                  holds ? "border-ink bg-ink text-paper" : "border-rule hover:border-ink"
+                }`}
+              >
+                <Icon name="folderPlus" size={15} />
+                This one holds things
+              </button>
+              <p className="prose-note text-[calc(13px*var(--type))] text-mute">
+                {holds
+                  ? "You will land inside it, ready to fill it."
+                  : "Or put it inside something you already have:"}
+              </p>
+              {!holds && (
+                <Mover
+                  targets={places}
+                  notes={notes}
+                  canClear={into !== null}
+                  clearLabel="Top of the wall"
+                  onPick={(id) => {
+                    setInto(id);
+                    close();
+                  }}
+                />
+              )}
+            </div>
           )}
         </Popover>
-
-        {/*
-          "This one is going to hold things."
-
-          Off by default, because almost nothing is a folder and a wall of
-          empty containers is worse than a wall of notes. On, it makes the
-          thing and stands you inside it with the box already pointed there.
-        */}
-        <button
-          type="button"
-          onMouseDown={hold}
-          onClick={() => setHolds((v) => !v)}
-          aria-pressed={holds}
-          aria-label="Make it a folder"
-          title="Make it a folder — you will land inside it"
-          className={`grid h-9 min-w-9 place-items-center border px-2 leading-none [@media(hover:none)]:h-11 [@media(hover:none)]:min-w-11 ${
-            holds
-              ? "border-ink bg-ink text-paper"
-              : "border-rule text-mute hover:border-ink hover:text-ink"
-          }`}
-        >
-          <Icon name="folderPlus" size={16} />
-        </button>
 
         <input
           ref={fileRef}

@@ -167,6 +167,8 @@ export function Home() {
    */
   const [area, setArea] = useState<Area>("work");
   const [group, setGroup] = useState<Grouping>("none");
+  /** Whether the filter rails are unfolded. Folded is the useful default. */
+  const [rails, setRails] = useState(false);
   const [sort, setSort] = useState<Sorting>("hand");
   /*
    * Shuffled has to hold still.
@@ -854,6 +856,14 @@ export function Home() {
           {ready && notes.length > 0 && cloud.state === "off" && <Alone />}
 
           {!inside && (
+            /*
+              The filter shares the tabs' line.
+
+              It had a row to itself, sixty pixels of a phone screen spent on
+              one word, directly above the wall it was pushing down. The tabs
+              row had empty space to its right on every screen there is.
+            */
+            <div className="mt-5 flex items-stretch gap-2 border-b border-rule-soft">
             <nav
               aria-label="Areas"
               /*
@@ -862,12 +872,28 @@ export function Home() {
                 not "it fits", it is "it fits on this phone". A 360px one
                 would have pushed the whole page sideways.
               */
-              className="relative mt-5 flex items-center gap-1 overflow-x-auto border-b border-rule-soft
+              className="relative flex min-w-0 flex-1 items-center gap-1 overflow-x-auto
                          [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
                          sm:overflow-visible"
             >
               <AreaTabs area={area} go={go} owed={owed} madeToday={madeToday} />
             </nav>
+            {showing === "wall" && live.length > 0 && (
+              <RailToggle
+                open={rails}
+                filtered={filtered}
+                onToggle={() => setRails((v) => !v)}
+                onClear={() => {
+                  setView("all");
+                  setWorld(null);
+                  setTag(null);
+                  setLevel(null);
+                  setMark(null);
+                  setQuery("");
+                }}
+              />
+            )}
+            </div>
           )}
 
           {showing === "work" && todayKey && (
@@ -914,7 +940,7 @@ export function Home() {
           )}
 
           {showing === "wall" && live.length > 0 && !inside && (
-            <>
+            <Rails open={rails || filtered}>
               {/*
               Nothing on this row exists until it means something.
 
@@ -1158,7 +1184,7 @@ export function Home() {
               />
 
               <TagIndex notes={notes} active={tag} onPick={setTag} />
-            </>
+            </Rails>
           )}
 
           {showing === "wall" && activeWorld && (
@@ -1703,6 +1729,83 @@ function Worlds({
 }
 
 /** Inside a folder, the app takes on its colour and offers you its name. */
+/**
+ * Every way of narrowing the wall, behind one word.
+ *
+ * Measured on a 430px phone: the header, the writing box and five rows of
+ * filter chips came to 608 pixels before the first note — sixty-five per cent
+ * of the screen, on the screen whose whole job is showing you your notes. And
+ * it gets worse as you use the app, because every rail grows: a colour you
+ * used once is a chip forever.
+ *
+ * Filters are a thing you reach for, not a thing you read, so they fold. What
+ * stays out is what is currently *on*, because a filter you cannot see is how
+ * a wall goes mysteriously empty — and the way to switch it off is right
+ * beside it.
+ */
+function Rails({
+  open,
+  children,
+}: {
+  open: boolean;
+  children: React.ReactNode;
+}) {
+  /*
+   * Folded means folded, even mid-drag.
+   *
+   * The chips are drop targets as well as filters, so the obvious kindness was
+   * to unfold them the moment you picked something up. That inserts a row
+   * above the wall while you are carrying something — every card slides down
+   * sixty pixels and the one you were aiming at is no longer under your
+   * finger. A target that moves as you approach it is worse than one you had
+   * to open a drawer for, which is the same lesson the area tabs taught.
+   *
+   * So: open the drawer, then drag. The drawer stays open while you do.
+   */
+  if (!open) return null;
+  return <div className="mt-3 flex flex-col gap-2">{children}</div>;
+}
+
+/** The one word, on the tabs' own line, and the way to switch it all off. */
+function RailToggle({
+  open,
+  filtered,
+  onToggle,
+  onClear,
+}: {
+  open: boolean;
+  filtered: boolean;
+  onToggle: () => void;
+  onClear: () => void;
+}) {
+  return (
+    <span className="flex shrink-0 items-center gap-1 self-center">
+      {filtered && (
+        <button
+          type="button"
+          onClick={onClear}
+          className="label border border-rule px-2 py-1.5 text-mute hover:bg-ink hover:text-paper"
+        >
+          All
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open || filtered}
+        aria-label="Narrow the wall down"
+        className={`label border px-2.5 py-1.5 ${
+          open || filtered
+            ? "border-ink bg-ink text-paper"
+            : "border-rule text-mute hover:border-ink hover:text-ink"
+        }`}
+      >
+        {filtered ? "Narrowed" : "Narrow"}
+      </button>
+    </span>
+  );
+}
+
 /**
  * The one-line warning, dismissible for the session.
  *
