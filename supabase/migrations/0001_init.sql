@@ -63,6 +63,8 @@ create table public.notes (
   actual_minutes   integer check (actual_minutes >= 0),
   -- Drift can be deferred; a permanent list of failures is a reason to stop
   -- opening the app. Local date key, 'YYYY-MM-DD'.
+  -- Minutes past midnight on `today_on`. The day strip's only storage.
+  block_at integer check (block_at >= 0 and block_at < 1440),
   snoozed_until text,
   -- Hand-set priority among siblings. Lower is sooner; rank one is today.
   "order"     integer not null default 0,

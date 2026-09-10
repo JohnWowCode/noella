@@ -6,6 +6,7 @@ import { ageOf, todayOf, TOO_MANY } from "@/lib/today";
 import { useNoella } from "@/lib/store/provider";
 import type { Note } from "@/lib/types";
 import { useMemo } from "react";
+import { useCarry } from "./DragProvider";
 import { Icon } from "./Icon";
 import { Where } from "./Where";
 
@@ -180,10 +181,19 @@ function Row({
   onOpen?: (id: string) => void;
 }) {
   const marks = marksOf(note);
+  const carry = useCarry();
   return (
-    <li className="group flex items-start gap-3 border-b border-rule-soft px-4 py-2.5 last:border-b-0">
+    /* A promise is a drag source too: today's list is where you reach when
+      you are putting the day together on the strip below it. */
+    <li
+      onPointerDown={(e) => carry.press(note.id, e)}
+      className={`group flex touch-none items-start gap-3 border-b border-rule-soft px-4 py-2.5 last:border-b-0 ${
+        carry.grab?.id === note.id ? "opacity-35" : ""
+      }`}
+    >
       <button
         type="button"
+        data-nodrag
         onClick={onTick}
         aria-label={finished ? "Not done after all" : "Done"}
         className="tap mt-[6px] grid h-4 w-4 shrink-0 place-items-center border border-mute text-[11px] leading-none hover:border-ink"
@@ -202,7 +212,11 @@ function Row({
       <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
         <button
           type="button"
-          onClick={() => onStart?.(note.id)}
+          data-nodrag
+          onClick={() => {
+            if (carry.wasDrag()) return;
+            onStart?.(note.id);
+          }}
           className={`prose-note w-full text-left text-[calc(17px*var(--type))] leading-snug ${
             finished ? "text-mute line-through" : ""
           }`}
@@ -225,6 +239,7 @@ function Row({
       )}
       <button
         type="button"
+        data-nodrag
         onClick={onDrop}
         aria-label="Take off today"
         title="Take off today"

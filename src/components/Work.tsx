@@ -9,8 +9,10 @@ import { contentsOf } from "@/lib/rooms";
 import { markLabel, marksOf } from "@/lib/stickers";
 import { useNoella } from "@/lib/store/provider";
 import type { Note } from "@/lib/types";
+import { useCarry } from "./DragProvider";
 import { Icon } from "./Icon";
 import { Timer } from "./Timer";
+import { Day } from "./Day";
 import { LeftOff } from "./LeftOff";
 import { Today } from "./Today";
 import { Where } from "./Where";
@@ -173,6 +175,10 @@ export function Work({
       {onStart && <LeftOff onStart={onStart} />}
 
       <Today todayKey={todayKey} onStart={onStart} onOpen={onOpen} />
+
+      {/* Under Today, because the list is what you promised and this is when
+        you are doing it — the promise has to exist before it can be placed. */}
+      {onOpen && <Day todayKey={todayKey} onOpen={onStart ?? onOpen} />}
 
       {showing && (
         <section className="mt-4 border-2 border-ink bg-field">
@@ -393,10 +399,24 @@ function Row({
   onOpen?: (id: string) => void;
 }) {
   const marks = marksOf(note);
+  const carry = useCarry();
   return (
-    <li className="group flex items-start gap-3 border-b border-rule-soft px-4 py-2.5 last:border-b-0">
+    /*
+      A queue row is a drag source.
+      
+      It was not, which meant the one gesture the day strip is built around —
+      take a job out of the list and put it at four o'clock — did not exist.
+      Every control on the row opts out by name, the same as on a card.
+    */
+    <li
+      onPointerDown={(e) => carry.press(note.id, e)}
+      className={`group flex touch-none items-start gap-3 border-b border-rule-soft px-4 py-2.5 last:border-b-0 ${
+        carry.grab?.id === note.id ? "opacity-35" : ""
+      }`}
+    >
       <button
         type="button"
+        data-nodrag
         onClick={onTick}
         aria-label="Done"
         className="tap mt-[6px] grid h-4 w-4 shrink-0 place-items-center border border-mute hover:border-ink"
@@ -419,7 +439,11 @@ function Row({
       <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
         <button
           type="button"
-          onClick={() => onStart?.(note.id)}
+          data-nodrag
+          onClick={() => {
+            if (carry.wasDrag()) return;
+            onStart?.(note.id);
+          }}
           className="prose-note w-full text-left text-[calc(17px*var(--type))] leading-snug"
         >
           {note.body.split("\n", 1)[0]}
@@ -428,6 +452,7 @@ function Row({
       </span>
       <button
         type="button"
+        data-nodrag
         onClick={onToday}
         className="label mt-[3px] shrink-0 border border-rule px-2 py-1 text-mute
                    opacity-0 group-hover:opacity-100 hover:bg-ink hover:text-paper

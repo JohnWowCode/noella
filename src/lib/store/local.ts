@@ -89,6 +89,7 @@ function migrate(snapshot: Snapshot): Snapshot {
       estimateMinutes: n.estimateMinutes ?? null,
       actualMinutes: n.actualMinutes ?? null,
       snoozedUntil: n.snoozedUntil ?? null,
+      blockAt: typeof n.blockAt === "number" ? n.blockAt : null,
       // A sticker was one glyph; a mark set is a list of reasons. An old note
       // arrives with its single icon read across (see marksOf) rather than lost.
       icons: marksOf({ icons: n.icons, icon: _sticker }),
@@ -248,6 +249,7 @@ export class LocalStore implements Store {
       amount: null,
       estimateMinutes: null,
       actualMinutes: null,
+      blockAt: input.blockAt ?? null,
       snoozedUntil: null,
       // New steps land at the bottom of their project's list unless placed.
       order:

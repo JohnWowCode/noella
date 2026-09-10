@@ -74,6 +74,16 @@ export interface Note {
    */
   estimateMinutes: number | null;
   actualMinutes: number | null;
+  /**
+   * Where on today's clock this sits, in minutes past midnight.
+   *
+   * Minutes rather than a datetime because a block is a plan for the day you
+   * are in, and `todayOn` already says which day that is — two fields that can
+   * disagree about the date is a bug waiting to be written. How long it runs
+   * is `estimateMinutes`, which has meant "how long this takes" since the
+   * timer was built and should not start meaning it twice.
+   */
+  blockAt: number | null;
   /** Drift can be deferred. An undismissable list of failures is a reason to stop opening the app. */
   snoozedUntil: string | null;
   /**
@@ -100,6 +110,7 @@ export interface NewNote {
   /** Explicit position among siblings. Used to insert a step above another. */
   order?: number;
   isTask?: boolean;
+  blockAt?: number | null;
   repeats?: Cadence | null;
   icons?: string[];
   priority?: Priority | null;

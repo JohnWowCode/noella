@@ -110,6 +110,8 @@ const MARKS: Record<string, Mark> = {
   fileInto: { d: "M12 3v9M8.5 8.5 12 12l3.5-3.5M4 15v5h16v-5" },
   /* Two arrows chasing each other. What "it comes back" looks like drawn. */
   repeat: { d: "M4 9h13l-3.5-3.5M20 15H7l3.5 3.5" },
+  /* A face and two hands. What "when" looks like drawn. */
+  clock: { d: "M12 3a9 9 0 100 18 9 9 0 000-18zM12 7v5.5l3.5 2" },
   cloud: { d: "M7 19a4.5 4.5 0 01-.6-8.96A6 6 0 0118.5 11 4 4 0 0118 19z" },
   folderPlus: { d: "M3 6h6l2 3h10v11H3zM12 12v6M9 15h6" },
 };

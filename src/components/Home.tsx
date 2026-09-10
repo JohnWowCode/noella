@@ -261,6 +261,24 @@ export function Home() {
         crew.forEach((m) => patchNote(m, { todayOn: todayKey }));
         return;
       }
+      /*
+       * An hour on the day strip. Blocking something is also promising it, so
+       * it goes on today at the same time — a block on a day the note is not
+       * part of would be a plan the list never heard about. A handful dropped
+       * together stack down the hour rather than landing on top of each other.
+       */
+      if (overId.startsWith("drop:hour:")) {
+        const at = Number(overId.slice("drop:hour:".length));
+        if (!Number.isFinite(at)) return;
+        crew.forEach((m, i) => {
+          const n = notes.find((x) => x.id === m);
+          patchNote(m, {
+            blockAt: at + i * Math.max(15, n?.estimateMinutes ?? 30),
+            todayOn: todayKey,
+          });
+        });
+        return;
+      }
       if (overId === "drop:pick") {
         setPicked((prev) => new Set(prev).add(id));
         return;
