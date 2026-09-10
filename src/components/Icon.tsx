@@ -100,8 +100,14 @@ const MARKS: Record<string, Mark> = {
     d: "M20 11.5 12 19.5a5 5 0 01-7-7l8-8a3.5 3.5 0 015 5l-8 8a2 2 0 01-3-3l7.5-7.5",
   },
   swatches: { d: "M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM17.5 14v7M14 17.5h7" },
-  /* A tab and a body: what a folder looks like when it is drawn, not photographed. */
-  folder: { d: "M3 6h6l2 3h10v11H3z" },
+  /*
+   * Two folders side by side meaning two different things is a rebus, not an
+   * interface: one said "where does this go" and the other "this one holds
+   * things", and at sixteen pixels they were the same picture. Filing is an
+   * arrow dropping into a tray, which is the gesture. Making a folder keeps
+   * the folder, because that is the noun being made.
+   */
+  fileInto: { d: "M12 3v9M8.5 8.5 12 12l3.5-3.5M4 15v5h16v-5" },
   /* Two arrows chasing each other. What "it comes back" looks like drawn. */
   repeat: { d: "M4 9h13l-3.5-3.5M20 15H7l3.5 3.5" },
   cloud: { d: "M7 19a4.5 4.5 0 01-.6-8.96A6 6 0 0118.5 11 4 4 0 0118 19z" },

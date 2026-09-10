@@ -13,6 +13,30 @@ const CONN = "noella.cloud";
 const GRAVES = "noella.graves";
 const SEEN = "noella.cloud.sha";
 
+/**
+ * Asks the browser to stop throwing this away.
+ *
+ * Storage written by a script is not permanent by default. Safari clears it
+ * after about a week of not visiting the site, and every browser will evict it
+ * under pressure — which for this app means the wall, the connection and the
+ * token all quietly vanish and it looks like being logged out. This is the one
+ * API that says "no, keep it"; where it is granted the data survives until it
+ * is deleted on purpose.
+ *
+ * Granted silently on an installed app or a site used often, refused
+ * elsewhere, and absent entirely on older browsers. Nothing here depends on
+ * the answer — it is a request, and asking costs nothing.
+ */
+export async function keepStorage(): Promise<boolean> {
+  try {
+    if (!navigator.storage?.persist) return false;
+    if (await navigator.storage.persisted()) return true;
+    return await navigator.storage.persist();
+  } catch {
+    return false;
+  }
+}
+
 export function readConnection(): Connection | null {
   try {
     const raw = localStorage.getItem(CONN);

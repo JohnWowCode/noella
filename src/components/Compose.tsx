@@ -550,7 +550,7 @@ export function Compose({
           set={into !== null}
           current={
             <span className="flex items-center gap-1.5">
-              <Icon name="folder" size={16} />
+              <Icon name="fileInto" size={16} />
               {intoName && (
                 <span className="label max-w-24 truncate">{intoName}</span>
               )}

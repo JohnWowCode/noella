@@ -1,132 +1,141 @@
 /**
- * Thirty-six worlds: twelve hues, each in a light, a medium and a dark.
+ * A palette organised the way a person names colours.
  *
- * Twelve flat mid-tones could not tell a "film" world from a "money" world
- * from a "someday" world once more than a handful of things were going, and a
- * wall you cannot read at a glance is a wall you stop opening. Three
- * intensities of one hue still read as a family — a light blue and a dark blue
- * are obviously related, which is exactly what colour-as-a-folder needs —
- * while being unmistakable side by side.
+ * It was twelve hues in three shades each, generated — which is tidy and does
+ * not match how anybody thinks. You do not want "deep orchid", you want a red,
+ * and there are four reds because four is how many different reds are worth
+ * telling apart. So the families are the ones people actually say, each family
+ * runs dark to light, and the sizes are the sizes each family earns: six blues
+ * and six greens because those are where a wall really spreads out, three
+ * browns because three is plenty.
  *
- * The twelve mediums are the original hand-tuned hexes, byte for byte, in
- * their original order. This is not sentiment: `migrate()` matches stored
- * worlds by hex, so changing one would hand an existing wall a duplicate
- * palette and orphan every note filed under it. The lights and darks are
- * derived from those same hexes, so a hue's three shades can never drift apart.
+ * Every one of the original twelve hexes is still in here, byte for byte, at
+ * the place in its family where it belongs. That is not sentiment: worlds are
+ * matched by hex, so dropping one would orphan every note filed under it.
  */
 
-/** The original twelve. Never edit, never reorder — notes are filed by these. */
-const MEDIUMS = [
-  "#F2E14C", // yellow
-  "#A8C64F", // lime
-  "#5FC9A8", // teal
-  "#6FA8F0", // blue
-  "#A98BE0", // violet
-  "#E87FB4", // pink
-  "#E85D5D", // red
-  "#F29441", // orange
-  "#F0B92E", // amber
-  "#CE8BE8", // orchid
-  "#6FD8E8", // cyan
-  "#7ED97E", // green
-] as const;
-
-const NAMES = [
-  "yellow",
-  "lime",
-  "teal",
-  "blue",
-  "violet",
-  "pink",
-  "red",
-  "orange",
-  "amber",
-  "orchid",
-  "cyan",
-  "green",
-] as const;
-
-interface Hsl {
-  h: number;
-  s: number;
-  l: number;
+interface Family {
+  name: string;
+  /** Dark to light. What "three of each" means. */
+  hexes: readonly string[];
+  /** Said before the shade: "deep red", "pale blue". */
+  bands: readonly string[];
 }
 
-function toHsl(hex: string): Hsl {
-  const v = hex.replace("#", "");
-  const r = parseInt(v.slice(0, 2), 16) / 255;
-  const g = parseInt(v.slice(2, 4), 16) / 255;
-  const b = parseInt(v.slice(4, 6), 16) / 255;
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const l = (max + min) / 2;
-  const d = max - min;
-  if (d === 0) return { h: 0, s: 0, l };
-  const s = d / (1 - Math.abs(2 * l - 1));
-  const h =
-    max === r
-      ? (g - b) / d + (g < b ? 6 : 0)
-      : max === g
-        ? (b - r) / d + 2
-        : (r - g) / d + 4;
-  return { h: h * 60, s, l };
-}
-
-function toHex({ h, s, l }: Hsl): string {
-  const k = (n: number) => (n + h / 30) % 12;
-  const a = s * Math.min(l, 1 - l);
-  const f = (n: number) =>
-    l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
-  const part = (n: number) =>
-    Math.round(255 * Math.max(0, Math.min(1, f(n))))
-      .toString(16)
-      .padStart(2, "0");
-  return `#${part(0)}${part(8)}${part(4)}`.toUpperCase();
-}
-
-/**
- * A shade of the same hue.
- *
- * Lightness is moved toward a target rather than set to it, so a hue that is
- * already pale (yellow) and one that is already deep (red) both end up
- * recognisably lighter or darker than their medium without either collapsing
- * to white or to mud. Saturation is pulled in on the darks: a fully saturated
- * dark reads as a colour cast rather than a colour.
- */
-function shade(hex: string, target: number, satScale: number): string {
-  const c = toHsl(hex);
-  return toHex({
-    h: c.h,
-    s: Math.max(0.18, Math.min(0.95, c.s * satScale)),
-    l: c.l + (target - c.l) * 0.78,
-  });
-}
+const DEEP3 = ["deep ", "", "pale "] as const;
 
 /*
- * These two targets are not taste, they are the tightest pair that keeps all
- * thirty-six swatches at WCAG AA (4.5:1) against whichever ink readableInk
- * picks for them. A dark target of 0.30 leaves deep amber at 4.39; 0.27 puts
- * the worst case at 4.71.
+ * Legacy hexes, marked where they sit. Never edit one of these.
+ *   #E85D5D red     #6FA8F0 blue    #6FD8E8 cyan   #5FC9A8 teal
+ *   #7ED97E green   #A8C64F lime    #F29441 orange #F0B92E amber
+ *   #A98BE0 violet  #CE8BE8 orchid  #E87FB4 pink   #F2E14C yellow
  */
-const LIGHTS = MEDIUMS.map((hex) => shade(hex, 0.87, 0.9));
-const DARKS = MEDIUMS.map((hex) => shade(hex, 0.27, 0.7));
+const FAMILIES: readonly Family[] = [
+  {
+    name: "red",
+    hexes: ["#8E2F2F", "#C43C3C", "#E85D5D", "#F2A0A0"],
+    bands: ["deepest ", "deep ", "", "pale "],
+  },
+  {
+    name: "blue",
+    hexes: ["#1F4F8F", "#2E6FC4", "#6FA8F0", "#A6CBF7", "#2FA3BF", "#6FD8E8"],
+    bands: ["deepest ", "deep ", "", "pale ", "steel ", "cyan "],
+  },
+  {
+    name: "green",
+    hexes: ["#1B6B3A", "#2E9B54", "#7ED97E", "#B7E8AC", "#5FC9A8", "#A8C64F"],
+    bands: ["deepest ", "deep ", "", "pale ", "teal ", "lime "],
+  },
+  {
+    /* Four, not three: amber is a legacy hex and dropping it would orphan
+      every note ever filed under it. */
+    name: "orange",
+    hexes: ["#B85C10", "#F29441", "#F0B92E", "#F7C089"],
+    bands: ["deep ", "", "amber", "pale "],
+  },
+  {
+    name: "yellow",
+    hexes: ["#B8961F", "#F2E14C", "#F7EFA0"],
+    bands: DEEP3,
+  },
+  {
+    name: "purple",
+    hexes: ["#4B2E83", "#7A4FC4", "#CE8BE8"],
+    bands: DEEP3,
+  },
+  {
+    name: "violet",
+    hexes: ["#5A3FA8", "#A98BE0", "#CFC0F2"],
+    bands: DEEP3,
+  },
+  {
+    name: "pink",
+    hexes: ["#B8446E", "#E87FB4", "#F5BAD5"],
+    bands: DEEP3,
+  },
+  {
+    name: "brown",
+    hexes: ["#4A3323", "#7A5233", "#A8794F"],
+    bands: DEEP3,
+  },
+  {
+    name: "tan",
+    hexes: ["#C9A47A", "#DCC29B", "#EFE0C4"],
+    bands: DEEP3,
+  },
+  {
+    name: "grey",
+    hexes: ["#1B1917", "#5A554E", "#9A948A", "#D8D4CC", "#FFFFFF"],
+    bands: ["black", "dark ", "", "light ", "white"],
+  },
+  {
+    /*
+     * The loud ones, kept together and kept last. A neon beside its ordinary
+     * cousin looks like a mistake; a row of them together looks like a choice.
+     */
+    name: "neon",
+    hexes: [
+      "#FF2D2D",
+      "#FF8A1F",
+      "#F0FF2D",
+      "#2DFF6A",
+      "#2D8CFF",
+      "#B02DFF",
+      "#FF2DA8",
+    ],
+    bands: [
+      "neon red",
+      "neon orange",
+      "neon yellow",
+      "neon green",
+      "neon blue",
+      "neon purple",
+      "neon pink",
+    ],
+  },
+];
 
 /**
- * Mediums first in their historical positions, then lights, then darks.
+ * Every swatch, family by family, dark to light.
+ *
  * Appending is the only safe edit: the index is a keyboard shortcut and, on an
  * existing wall, a filing decision somebody already made.
  */
-export const DEFAULT_SWATCHES: readonly string[] = [
-  ...MEDIUMS,
-  ...LIGHTS,
-  ...DARKS,
-];
+export const DEFAULT_SWATCHES: readonly string[] = FAMILIES.flatMap(
+  (f) => f.hexes,
+);
+
+const SWATCH_NAMES: readonly string[] = FAMILIES.flatMap((f) =>
+  f.hexes.map((_, i) => {
+    const band = f.bands[i] ?? "";
+    // A band that already names the colour ("black", "neon red") stands alone.
+    return band.endsWith(" ") || band === "" ? `${band}${f.name}` : band;
+  }),
+);
 
 /** What a world is called before you name it yourself. */
 export function swatchName(index: number): string {
-  const hue = NAMES[index % NAMES.length];
-  const band = ["", "light ", "deep "][Math.floor(index / NAMES.length)] ?? "";
-  return hue ? `${band}${hue}` : `world ${index + 1}`;
+  return SWATCH_NAMES[index] ?? `world ${index + 1}`;
 }
 
 /**

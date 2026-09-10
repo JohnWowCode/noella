@@ -21,7 +21,7 @@ import {
 } from "../types";
 import { descendantsOf } from "../tree";
 import { LocalStore } from "./local";
-import { readConnection } from "../sync/local";
+import { keepStorage, readConnection } from "../sync/local";
 import { syncOnce } from "../sync/run";
 import type { Backup, Store } from "./types";
 
@@ -89,6 +89,12 @@ export function NoellaProvider({ children }: { children: React.ReactNode }) {
    * function from referring to itself, which the compiler cannot memoize.
    */
   const loop = useRef<() => void>(() => {});
+
+  // Asked for once, on the way in. Without it a browser is free to bin the
+  // wall, the connection and the token, which reads as being logged out.
+  useEffect(() => {
+    void keepStorage();
+  }, []);
 
   useEffect(() => {
     let live = true;

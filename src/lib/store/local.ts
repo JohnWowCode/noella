@@ -12,6 +12,7 @@ import {
 } from "../types";
 import { todayKey } from "../clock";
 import { descendantsOf } from "../tree";
+import { dedupeColors } from "../sync/colors";
 import { bury, unbury } from "../sync/local";
 import { DEFAULT_SWATCHES } from "./defaults";
 import type { Backup, Snapshot, Store } from "./types";
@@ -100,7 +101,17 @@ function migrate(snapshot: Snapshot): Snapshot {
     };
   });
 
-  const colors = [...snapshot.colors];
+  /*
+   * Duplicates first, then the missing defaults.
+   *
+   * A wall that has synced with another device has two of every swatch — the
+   * two machines seeded their palettes independently and the merge unioned
+   * them by id. Collapsing here as well as in the merge means a wall that got
+   * into that state repairs itself the next time it is opened, rather than
+   * waiting for a sync it may never do again.
+   */
+  const tidy = dedupeColors(snapshot.colors, notes);
+  const colors = [...tidy.colors];
   const present = new Set(colors.map((c) => c.hex.toUpperCase()));
   for (const hex of DEFAULT_SWATCHES) {
     if (!present.has(hex.toUpperCase())) {
@@ -109,7 +120,7 @@ function migrate(snapshot: Snapshot): Snapshot {
   }
 
   return {
-    notes,
+    notes: tidy.notes,
     colors,
     settings: { ...DEFAULT_SETTINGS, ...(snapshot.settings ?? {}) },
   };

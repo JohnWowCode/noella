@@ -11,6 +11,7 @@
 import type { Color, Note, Settings } from "../types";
 import { DEFAULT_SETTINGS } from "../types";
 import type { Snapshot } from "../store/types";
+import { dedupeColors } from "./colors";
 
 export interface Grave {
   id: string;
@@ -115,17 +116,13 @@ export function mergeDocs(
 
   /*
    * Colours are folders now, so their names and stickers are real work and
-   * must not be lost — but a colour carries no timestamp. An untouched one
-   * (no name, no sticker) always yields to a touched one; between two touched
-   * ones the local copy stands, because that is the device you are looking at.
+   * must not be lost. They are collapsed by hex rather than unioned by id:
+   * two devices that have never spoken generated different ids for the very
+   * same yellow, and keying on id handed back two of everything.
    */
-  const touched = (c: Color) => c.name !== null || c.emoji !== null;
-  const colors = new Map<string, Color>();
-  for (const c of theirs.colors) colors.set(c.id, c);
-  for (const c of mine.colors) {
-    const held = colors.get(c.id);
-    if (!held || touched(c) || !touched(held)) colors.set(c.id, c);
-  }
+  const both = [...theirs.colors, ...mine.colors];
+  const tidy = dedupeColors(both, [...notes.values()]);
+  if (tidy.merged > 0) changed += tidy.merged;
 
   const cutoff = new Date(Date.now() - GRAVE_DAYS * 86_400_000).toISOString();
   return {
@@ -133,8 +130,8 @@ export function mergeDocs(
       format: "noella.sync",
       version: 1,
       writtenAt: new Date().toISOString(),
-      notes: [...notes.values()],
-      colors: [...colors.values()].sort((a, b) => a.position - b.position),
+      notes: tidy.notes,
+      colors: tidy.colors,
       settings:
         theirs.writtenAt > mine.writtenAt ? theirs.settings : mine.settings,
       graves: [...graves.values()].filter((g) => g.at > cutoff),
