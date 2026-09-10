@@ -146,7 +146,7 @@ type View = "all" | "todo" | "done" | "starred" | "rooms" | "archive";
  * filter one list of everything by folder, by kind, or by what is still open.
  */
 export function Home() {
-  const { ready, notes, colors, patchColor, patchNote } = useNoella();
+  const { ready, notes, colors, cloud, patchColor, patchNote } = useNoella();
   const todayKey = useTodayKey();
 
   const [query, setQuery] = useState("");
@@ -842,6 +842,17 @@ export function Home() {
           a hamburger: the whole app is still one page and the box you write
           in is still above this, so nothing about capture got slower.
         */}
+          {/*
+            A device on its own says so.
+
+            The cloud lived in one quiet button at the very bottom of the page,
+            behind a scroll, next to Export — so a phone that had never been
+            connected looked exactly like a phone that had, and the only clue
+            was that the lists disagreed. Whatever else this app does, it must
+            not let you believe your notes are somewhere they are not.
+          */}
+          {ready && notes.length > 0 && cloud.state === "off" && <Alone />}
+
           {!inside && (
             <nav
               aria-label="Areas"
@@ -1235,13 +1246,22 @@ export function Home() {
             </div>
           )}
 
-          {ready && notes.length > 0 && (
+          {/*
+            The cloud is reachable on an empty device, everything else is not.
+
+            This whole row waited for the wall to have something in it, which
+            is right for Export and dead wrong for the one control whose entire
+            job is to fetch the wall from somewhere else: a new phone had no
+            notes, so it had no button, so it could never get any. That is how
+            you end up with three devices holding three different lists.
+          */}
+          {ready && (
             <div className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-3">
-              <FolderLink />
+              {notes.length > 0 && <FolderLink />}
               <span className="ml-auto flex items-center gap-2">
                 <Cloud />
-                <ClaudeImport onOpen={open} />
-                <DataMenu />
+                {notes.length > 0 && <ClaudeImport onOpen={open} />}
+                {notes.length > 0 && <DataMenu />}
               </span>
             </div>
           )}
@@ -1683,6 +1703,54 @@ function Worlds({
 }
 
 /** Inside a folder, the app takes on its colour and offers you its name. */
+/**
+ * The one-line warning, dismissible for the session.
+ *
+ * Not a modal and not a nag: some devices genuinely are meant to be on their
+ * own, and being told twice is worse than not being told. It says the true
+ * thing and gets out of the way.
+ */
+function Alone() {
+  const [gone, setGone] = useState(false);
+  if (gone) return null;
+  return (
+    /*
+     * One line, and no taller than one.
+     *
+     * The first draft was a bordered block with two buttons in it, and on a
+     * small phone at large type it wrapped to three rows and pushed the top of
+     * the wall off the first screen — the app's oldest complaint, committed by
+     * the notice that was meant to be helping. The strip is the button; the
+     * only other thing on it is the way to dismiss it.
+     */
+    <div className="mt-3 flex items-stretch border border-ink">
+      <button
+        type="button"
+        onClick={() => {
+          const b = document.querySelector<HTMLButtonElement>(
+            '[aria-label="The same notes everywhere"]',
+          );
+          b?.scrollIntoView({ block: "center" });
+          b?.click();
+        }}
+        /* Wraps rather than truncates: at 375px the sentence does not fit on
+          one line, and a clipped warning is worse than a two-line one. */
+        className="label min-w-0 flex-1 px-3 py-2 text-left hover:bg-ink hover:text-paper"
+      >
+        Only on this device — put them everywhere
+      </button>
+      <button
+        type="button"
+        onClick={() => setGone(true)}
+        aria-label="Not now"
+        className="label shrink-0 border-l border-ink px-3 py-2 text-mute hover:bg-ink hover:text-paper"
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
 function WorldBand({
   color,
   index,

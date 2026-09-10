@@ -99,6 +99,39 @@ export async function repoFacts(c: Connection): Promise<RepoFacts> {
   };
 }
 
+/**
+ * The whole connection as one string you can paste.
+ *
+ * Setting up the second device meant retyping an owner, a repository, a path
+ * and a ninety-character token — on a phone, from a laptop screen. Nobody does
+ * that, which is how you end up with three devices holding three different
+ * lists and no idea why. One code, copied once, pasted once.
+ *
+ * It contains the token, so it is a password and the app says so.
+ */
+const CODE = "noella1:";
+
+export function packConnection(c: Connection): string {
+  return (
+    CODE +
+    toBase64(JSON.stringify({ o: c.owner, r: c.repo, p: c.path, t: c.token }))
+  );
+}
+
+export function unpackConnection(code: string): Connection | null {
+  const body = code.trim();
+  if (!body.startsWith(CODE)) return null;
+  try {
+    const raw: unknown = JSON.parse(fromBase64(body.slice(CODE.length)));
+    if (typeof raw !== "object" || raw === null) return null;
+    const c = raw as { o?: string; r?: string; p?: string; t?: string };
+    if (!c.o || !c.r || !c.p || !c.t) return null;
+    return { owner: c.o, repo: c.r, path: c.p, token: c.t };
+  } catch {
+    return null;
+  }
+}
+
 /** Base64 that survives anything you can type. btoa alone does not. */
 function toBase64(text: string): string {
   const bytes = new TextEncoder().encode(text);

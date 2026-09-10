@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { repoFacts, type Connection } from "@/lib/sync/github";
+import {
+  packConnection,
+  repoFacts,
+  unpackConnection,
+  type Connection,
+} from "@/lib/sync/github";
 import {
   forgetConnection,
   readConnection,
@@ -38,6 +43,9 @@ export function Cloud() {
   const [problem, setProblem] = useState<string | null>(null);
   const [warn, setWarn] = useState<string | null>(null);
   const [live, setLive] = useState<Connection | null>(null);
+  const [code, setCode] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [pasting, setPasting] = useState(false);
 
   useEffect(() => {
     const stored = readConnection();
@@ -49,6 +57,41 @@ export function Cloud() {
       setPath(stored.path);
     });
   }, []);
+
+  /**
+   * The whole connection in one paste.
+   *
+   * Same checks as typing it out by hand — a code from a device pointed at a
+   * public repository has to answer for that on this one too.
+   */
+  async function applyCode(force: boolean) {
+    const c = unpackConnection(code);
+    if (!c) {
+      setProblem("That is not a setup code. Copy it from a device that is already syncing.");
+      return;
+    }
+    setBusy(true);
+    setProblem(null);
+    try {
+      const facts = await repoFacts(c);
+      if (!facts.private && !force) {
+        setWarn(`${facts.fullName} is public.`);
+        setBusy(false);
+        return;
+      }
+      writeConnection(c);
+      setLive(c);
+      setCode("");
+      setWarn(null);
+      setPasting(false);
+      cloud.reconnect();
+      cloud.now();
+    } catch (err) {
+      setProblem(err instanceof Error ? err.message : "That did not work.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function connect(force: boolean) {
     const c: Connection = {
@@ -116,6 +159,41 @@ export function Cloud() {
                 Notes, folders and settings travel. Pictures stay on the device
                 they were added to.
               </p>
+              {/*
+                Getting the second and third device onto this same file, which
+                is the entire difficulty. Everything else here is one-time
+                setup; this is the part that was being done by hand.
+              */}
+              <button
+                type="button"
+                onClick={() => {
+                  const text = packConnection(live);
+                  void navigator.clipboard
+                    ?.writeText(text)
+                    .then(() => setCopied(true))
+                    .catch(() => setCode(text));
+                }}
+                className="label border border-rule px-3 py-2 hover:bg-ink hover:text-paper [@media(hover:none)]:min-h-11"
+              >
+                {copied ? "Copied — paste it on the other one" : "Copy setup code"}
+              </button>
+              {copied && (
+                <p className="prose-note text-[calc(13px*var(--type))] text-mute">
+                  It contains the token, so treat it like a password: paste it
+                  straight into the other device and do not leave it lying in a
+                  chat.
+                </p>
+              )}
+              {code && (
+                <textarea
+                  readOnly
+                  value={code}
+                  rows={3}
+                  aria-label="Setup code"
+                  onFocus={(e) => e.currentTarget.select()}
+                  className="prose-note w-full border border-rule bg-field px-2 py-1.5 text-[calc(12px*var(--type))] break-all outline-none"
+                />
+              )}
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 <button
                   type="button"
@@ -139,6 +217,52 @@ export function Cloud() {
             </>
           ) : (
             <>
+              {/*
+                The paste route first, because after the first device it is
+                the only one that should ever be used.
+              */}
+              <button
+                type="button"
+                onClick={() => {
+                  setPasting((v) => !v);
+                  setProblem(null);
+                }}
+                aria-pressed={pasting}
+                className={`label border px-3 py-2 [@media(hover:none)]:min-h-11 ${
+                  pasting
+                    ? "border-ink bg-ink text-paper"
+                    : "border-rule hover:border-ink"
+                }`}
+              >
+                I have a setup code
+              </button>
+
+              {pasting ? (
+                <>
+                  <textarea
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    rows={3}
+                    placeholder="noella1:…"
+                    aria-label="Paste a setup code"
+                    className="prose-note w-full border border-rule bg-field px-2.5 py-2 text-[calc(13px*var(--type))] break-all outline-none focus:border-ink"
+                  />
+                  {problem && (
+                    <p className="prose-note text-[calc(14px*var(--type))] text-mute">
+                      {problem}
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    disabled={busy || !code.trim()}
+                    onClick={() => void applyCode(warn !== null)}
+                    className="label border border-ink bg-ink px-3 py-2 text-paper enabled:hover:bg-transparent enabled:hover:text-ink disabled:opacity-50 [@media(hover:none)]:min-h-11"
+                  >
+                    {busy ? "Checking…" : warn ? "Use it anyway" : "Use it"}
+                  </button>
+                </>
+              ) : (
+                <>
               <p className="prose-note text-[calc(14px*var(--type))] text-mute">
                 One JSON file in a repository you own. Make it{" "}
                 <strong className="font-semibold">private</strong>, and make a
@@ -213,6 +337,8 @@ export function Cloud() {
                 The token is kept in this browser only. Anyone with this device
                 unlocked can use it, so scope it to the one repository.
               </p>
+                </>
+              )}
             </>
           )}
         </div>
