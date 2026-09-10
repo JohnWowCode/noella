@@ -71,6 +71,59 @@ async function call(
   return res;
 }
 
+/**
+ * Everything the token already knows, so you do not have to type it.
+ *
+ * Connecting asked for an owner, a repository, a path and a token — four
+ * boxes, three of which the fourth can answer. A token knows who made it and
+ * which repositories it can reach; the file is called noella.json unless you
+ * say otherwise. So there is one box now, and the rest is a question of
+ * picking from what came back.
+ */
+export async function whoAmI(token: string): Promise<string> {
+  const res = await call(`${API}/user`, token);
+  if (res.status === 404) throw new GitHubError(404, explain(404, ""));
+  const json = (await res.json()) as { login: string };
+  return json.login;
+}
+
+export interface Reachable {
+  owner: string;
+  repo: string;
+  fullName: string;
+  private: boolean;
+  pushable: boolean;
+}
+
+/**
+ * The repositories this token can actually reach, newest touched first.
+ *
+ * A fine-grained token scoped to one repository returns exactly that one,
+ * which is the case worth optimising: there is nothing to choose and the app
+ * should not pretend there is.
+ */
+export async function reachableRepos(token: string): Promise<Reachable[]> {
+  const res = await call(
+    `${API}/user/repos?per_page=100&sort=pushed&affiliation=owner,collaborator`,
+    token,
+  );
+  if (res.status === 404) return [];
+  const json = (await res.json()) as {
+    name: string;
+    full_name: string;
+    private: boolean;
+    owner: { login: string };
+    permissions?: { push?: boolean };
+  }[];
+  return json.map((r) => ({
+    owner: r.owner.login,
+    repo: r.name,
+    fullName: r.full_name,
+    private: r.private,
+    pushable: r.permissions?.push !== false,
+  }));
+}
+
 export interface RepoFacts {
   private: boolean;
   defaultBranch: string;

@@ -3,9 +3,12 @@
 import { useEffect, useState } from "react";
 import {
   packConnection,
+  reachableRepos,
   repoFacts,
   unpackConnection,
+  whoAmI,
   type Connection,
+  type Reachable,
 } from "@/lib/sync/github";
 import {
   forgetConnection,
@@ -17,75 +20,65 @@ import { Icon } from "./Icon";
 import { Popover } from "./Popover";
 
 const DEFAULT_PATH = "noella.json";
+const TOKEN_URL = "https://github.com/settings/personal-access-tokens/new";
 
 /**
  * The same wall on every screen you own, without an account.
  *
  * It writes one JSON file into a repository you already control, so nobody is
- * holding your notes but you and nothing needs a server — which is the promise
- * the app made on day one, extended to a second device. The side effect is the
- * good part: every sync is a commit, so the wall has a history you can walk
- * back through, and "I deleted something a week ago" stops being a disaster.
+ * holding your notes but you and nothing needs a server. Every sync is a
+ * commit, so the wall has a history you can walk back through.
  *
- * Two things this asks for honestly rather than burying. The token lives in
- * this browser's storage, so a fine-grained one scoped to a single repository
- * is the right kind to make. And the repository wants to be private, which is
- * the one mistake here that cannot be taken back — so it is checked before
- * anything is written, not after.
+ * The first version of this asked for an owner, a repository, a path and a
+ * token — four boxes, three of which the fourth can answer, and no clue what
+ * to put in any of them. A token knows who made it and what it can reach. So:
+ * one box, then pick the repository out of a list of the ones that came back.
+ * On the second and third device, not even that — one setup code, pasted.
  */
 export function Cloud() {
   const { cloud } = useNoella();
-  const [owner, setOwner] = useState("");
-  const [repo, setRepo] = useState("");
-  const [path, setPath] = useState(DEFAULT_PATH);
+  const [step, setStep] = useState<"choose" | "token" | "code" | "byhand">(
+    "choose",
+  );
   const [token, setToken] = useState("");
+  const [code, setCode] = useState("");
+  const [found, setFound] = useState<Reachable[] | null>(null);
+  const [who, setWho] = useState("");
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  const [warn, setWarn] = useState<string | null>(null);
-  const [live, setLive] = useState<Connection | null>(null);
-  const [code, setCode] = useState("");
+  const [risky, setRisky] = useState<Reachable | null>(null);
   const [copied, setCopied] = useState(false);
-  const [pasting, setPasting] = useState(false);
+  const [live, setLive] = useState<Connection | null>(null);
+  // Typed by hand, for the case where the token can list nothing.
+  const [owner, setOwner] = useState("");
+  const [repo, setRepo] = useState("");
 
   useEffect(() => {
     const stored = readConnection();
     Promise.resolve().then(() => {
-      if (!stored) return;
-      setLive(stored);
-      setOwner(stored.owner);
-      setRepo(stored.repo);
-      setPath(stored.path);
+      if (stored) setLive(stored);
     });
   }, []);
 
-  /**
-   * The whole connection in one paste.
-   *
-   * Same checks as typing it out by hand — a code from a device pointed at a
-   * public repository has to answer for that on this one too.
-   */
-  async function applyCode(force: boolean) {
-    const c = unpackConnection(code);
-    if (!c) {
-      setProblem("That is not a setup code. Copy it from a device that is already syncing.");
-      return;
-    }
+  const field =
+    "prose-note w-full border border-rule bg-field px-2.5 py-2 text-[calc(15px*var(--type))] outline-none focus:border-ink";
+  const primary =
+    "label border border-ink bg-ink px-3 py-2 text-paper enabled:hover:bg-transparent enabled:hover:text-ink disabled:opacity-50 [@media(hover:none)]:min-h-11";
+  const plain =
+    "label border border-rule px-3 py-2 hover:bg-ink hover:text-paper [@media(hover:none)]:min-h-11";
+
+  /** Step one: find out what this token can see. */
+  async function look() {
+    const t = token.trim();
+    if (!t) return;
     setBusy(true);
     setProblem(null);
     try {
-      const facts = await repoFacts(c);
-      if (!facts.private && !force) {
-        setWarn(`${facts.fullName} is public.`);
-        setBusy(false);
-        return;
-      }
-      writeConnection(c);
-      setLive(c);
-      setCode("");
-      setWarn(null);
-      setPasting(false);
-      cloud.reconnect();
-      cloud.now();
+      const login = await whoAmI(t);
+      const repos = await reachableRepos(t);
+      setWho(login);
+      setFound(repos.filter((r) => r.pushable));
+      setOwner(login);
     } catch (err) {
       setProblem(err instanceof Error ? err.message : "That did not work.");
     } finally {
@@ -93,11 +86,35 @@ export function Cloud() {
     }
   }
 
-  async function connect(force: boolean) {
+  function connect(c: Connection) {
+    writeConnection(c);
+    setLive(c);
+    setToken("");
+    setFound(null);
+    setRisky(null);
+    cloud.reconnect();
+    cloud.now();
+  }
+
+  /** Step two: use one. Public repositories have to be said out loud. */
+  function choose(r: Reachable) {
+    if (!r.private && risky?.fullName !== r.fullName) {
+      setRisky(r);
+      return;
+    }
+    connect({
+      owner: r.owner,
+      repo: r.repo,
+      path: DEFAULT_PATH,
+      token: token.trim(),
+    });
+  }
+
+  async function byHand(force: boolean) {
     const c: Connection = {
       owner: owner.trim().replace(/^@/, ""),
       repo: repo.trim(),
-      path: path.trim() || DEFAULT_PATH,
+      path: DEFAULT_PATH,
       token: token.trim(),
     };
     if (!c.owner || !c.repo || !c.token) {
@@ -109,18 +126,17 @@ export function Cloud() {
     try {
       const facts = await repoFacts(c);
       if (!facts.private && !force) {
-        setWarn(
-          `${facts.fullName} is public. Everything you have written would be readable by anyone, and would stay in the history even after you deleted it.`,
-        );
+        setRisky({
+          owner: c.owner,
+          repo: c.repo,
+          fullName: facts.fullName,
+          private: false,
+          pushable: true,
+        });
         setBusy(false);
         return;
       }
-      writeConnection(c);
-      setLive(c);
-      setToken("");
-      setWarn(null);
-      cloud.reconnect();
-      cloud.now();
+      connect(c);
     } catch (err) {
       setProblem(err instanceof Error ? err.message : "That did not work.");
     } finally {
@@ -128,8 +144,37 @@ export function Cloud() {
     }
   }
 
-  const field =
-    "prose-note min-w-0 flex-1 border border-rule bg-field px-2.5 py-2 text-[calc(15px*var(--type))] outline-none focus:border-ink";
+  async function applyCode(force: boolean) {
+    const c = unpackConnection(code);
+    if (!c) {
+      setProblem(
+        "That is not a setup code. Copy it from a device that is already syncing.",
+      );
+      return;
+    }
+    setBusy(true);
+    setProblem(null);
+    try {
+      const facts = await repoFacts(c);
+      if (!facts.private && !force) {
+        setRisky({
+          owner: c.owner,
+          repo: c.repo,
+          fullName: facts.fullName,
+          private: false,
+          pushable: true,
+        });
+        setBusy(false);
+        return;
+      }
+      connect(c);
+      setCode("");
+    } catch (err) {
+      setProblem(err instanceof Error ? err.message : "That did not work.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <Popover
@@ -146,197 +191,223 @@ export function Cloud() {
       {() => (
         <div className="flex w-72 flex-col gap-2 sm:w-80">
           {live ? (
+            <Connected
+              live={live}
+              copied={copied}
+              onCopy={() => {
+                void navigator.clipboard
+                  ?.writeText(packConnection(live))
+                  .then(() => setCopied(true))
+                  .catch(() => setCode(packConnection(live)));
+              }}
+              spilled={code}
+              trouble={cloud.trouble}
+              onSync={() => cloud.now()}
+              onForget={() => {
+                forgetConnection();
+                setLive(null);
+                setStep("choose");
+                setCopied(false);
+                cloud.reconnect();
+              }}
+            />
+          ) : step === "choose" ? (
             <>
-              <p className="label text-mute">
-                {live.owner}/{live.repo} · {live.path}
-              </p>
-              {cloud.trouble && (
-                <p className="prose-note text-[calc(14px*var(--type))] text-mute">
-                  {cloud.trouble}
-                </p>
-              )}
               <p className="prose-note text-[calc(14px*var(--type))] text-mute">
-                Notes, folders and settings travel. Pictures stay on the device
-                they were added to.
+                Your notes, in one file in a repository you own. No account, no
+                server.
               </p>
-              {/*
-                Getting the second and third device onto this same file, which
-                is the entire difficulty. Everything else here is one-time
-                setup; this is the part that was being done by hand.
-              */}
               <button
                 type="button"
-                onClick={() => {
-                  const text = packConnection(live);
-                  void navigator.clipboard
-                    ?.writeText(text)
-                    .then(() => setCopied(true))
-                    .catch(() => setCode(text));
-                }}
-                className="label border border-rule px-3 py-2 hover:bg-ink hover:text-paper [@media(hover:none)]:min-h-11"
+                onClick={() => setStep("code")}
+                className={primary}
               >
-                {copied ? "Copied — paste it on the other one" : "Copy setup code"}
+                I have a setup code
               </button>
-              {copied && (
-                <p className="prose-note text-[calc(13px*var(--type))] text-mute">
-                  It contains the token, so treat it like a password: paste it
-                  straight into the other device and do not leave it lying in a
-                  chat.
-                </p>
-              )}
-              {code && (
-                <textarea
-                  readOnly
-                  value={code}
-                  rows={3}
-                  aria-label="Setup code"
-                  onFocus={(e) => e.currentTarget.select()}
-                  className="prose-note w-full border border-rule bg-field px-2 py-1.5 text-[calc(12px*var(--type))] break-all outline-none"
-                />
-              )}
-              <div className="mt-1 flex flex-wrap items-center gap-2">
+              <p className="prose-note text-[calc(13px*var(--type))] text-mute">
+                From a device that is already syncing — that is the easy one.
+              </p>
+              <button
+                type="button"
+                onClick={() => setStep("token")}
+                className={plain}
+              >
+                Set up the first device
+              </button>
+            </>
+          ) : step === "code" ? (
+            <>
+              <textarea
+                autoFocus
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                rows={3}
+                placeholder="noella1:…"
+                aria-label="Paste a setup code"
+                className={`${field} break-all text-[calc(13px*var(--type))]`}
+              />
+              {risky && <Public name={risky.fullName} />}
+              {problem && <Problem>{problem}</Problem>}
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => cloud.now()}
-                  className="label border border-ink bg-ink px-3 py-2 text-paper hover:bg-transparent hover:text-ink [@media(hover:none)]:min-h-11"
+                  disabled={busy || !code.trim()}
+                  onClick={() => void applyCode(risky !== null)}
+                  className={primary}
                 >
-                  Sync now
+                  {busy ? "Checking…" : risky ? "Use it anyway" : "Use it"}
                 </button>
                 <button
                   type="button"
                   onClick={() => {
-                    forgetConnection();
-                    setLive(null);
-                    cloud.reconnect();
+                    setStep("choose");
+                    setProblem(null);
+                    setRisky(null);
                   }}
-                  className="label border border-rule px-3 py-2 text-mute hover:bg-ink hover:text-paper [@media(hover:none)]:min-h-11"
+                  className={plain}
                 >
-                  Forget the token
+                  Back
                 </button>
               </div>
             </>
           ) : (
             <>
-              {/*
-                The paste route first, because after the first device it is
-                the only one that should ever be used.
-              */}
-              <button
-                type="button"
-                onClick={() => {
-                  setPasting((v) => !v);
-                  setProblem(null);
-                }}
-                aria-pressed={pasting}
-                className={`label border px-3 py-2 [@media(hover:none)]:min-h-11 ${
-                  pasting
-                    ? "border-ink bg-ink text-paper"
-                    : "border-rule hover:border-ink"
-                }`}
-              >
-                I have a setup code
-              </button>
-
-              {pasting ? (
+              {found === null ? (
                 <>
-                  <textarea
-                    value={code}
-                    onChange={(e) => setCode(e.target.value)}
-                    rows={3}
-                    placeholder="noella1:…"
-                    aria-label="Paste a setup code"
-                    className="prose-note w-full border border-rule bg-field px-2.5 py-2 text-[calc(13px*var(--type))] break-all outline-none focus:border-ink"
+                  <p className="prose-note text-[calc(14px*var(--type))]">
+                    Two minutes, once.
+                  </p>
+                  <ol className="prose-note flex flex-col gap-1.5 text-[calc(14px*var(--type))] text-mute">
+                    <li>
+                      1. Make a <strong className="font-semibold">private</strong>{" "}
+                      repository on GitHub — call it anything.
+                    </li>
+                    <li>
+                      2.{" "}
+                      <a
+                        href={TOKEN_URL}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline decoration-1 underline-offset-2 hover:no-underline"
+                      >
+                        Make a token here
+                      </a>
+                      . Choose <em>Only select repositories</em>, pick that one,
+                      and under Repository permissions set{" "}
+                      <strong className="font-semibold">
+                        Contents: Read and write
+                      </strong>
+                      .
+                    </li>
+                    <li>3. Paste it below. Nothing else to fill in.</li>
+                  </ol>
+                  <input
+                    autoFocus
+                    value={token}
+                    onChange={(e) => setToken(e.target.value)}
+                    type="password"
+                    autoComplete="off"
+                    placeholder="github_pat_…"
+                    aria-label="Access token"
+                    className={field}
                   />
-                  {problem && (
-                    <p className="prose-note text-[calc(14px*var(--type))] text-mute">
-                      {problem}
-                    </p>
-                  )}
-                  <button
-                    type="button"
-                    disabled={busy || !code.trim()}
-                    onClick={() => void applyCode(warn !== null)}
-                    className="label border border-ink bg-ink px-3 py-2 text-paper enabled:hover:bg-transparent enabled:hover:text-ink disabled:opacity-50 [@media(hover:none)]:min-h-11"
-                  >
-                    {busy ? "Checking…" : warn ? "Use it anyway" : "Use it"}
-                  </button>
+                  {problem && <Problem>{problem}</Problem>}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={busy || !token.trim()}
+                      onClick={() => void look()}
+                      className={primary}
+                    >
+                      {busy ? "Looking…" : "Next"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStep("choose");
+                        setProblem(null);
+                      }}
+                      className={plain}
+                    >
+                      Back
+                    </button>
+                  </div>
+                  <p className="prose-note text-[calc(13px*var(--type))] text-mute">
+                    The token is kept in this browser only. Anyone with this
+                    device unlocked can use it, so keep it to the one
+                    repository.
+                  </p>
                 </>
               ) : (
                 <>
-              <p className="prose-note text-[calc(14px*var(--type))] text-mute">
-                One JSON file in a repository you own. Make it{" "}
-                <strong className="font-semibold">private</strong>, and make a
-                fine-grained token that can reach only that one repository, with
-                Contents: read and write.
-              </p>
-              <div className="flex items-center gap-2">
-                <input
-                  value={owner}
-                  onChange={(e) => setOwner(e.target.value)}
-                  placeholder="you"
-                  aria-label="GitHub owner"
-                  className={field}
-                />
-                <span aria-hidden className="label text-mute">
-                  /
-                </span>
-                <input
-                  value={repo}
-                  onChange={(e) => setRepo(e.target.value)}
-                  placeholder="my-notes"
-                  aria-label="Repository"
-                  className={field}
-                />
-              </div>
-              <input
-                value={path}
-                onChange={(e) => setPath(e.target.value)}
-                placeholder={DEFAULT_PATH}
-                aria-label="File in the repository"
-                className={field}
-              />
-              <input
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                type="password"
-                autoComplete="off"
-                placeholder="github_pat_…"
-                aria-label="Access token"
-                className={field}
-              />
-              {warn && (
-                <p className="prose-note border-2 border-ink px-2.5 py-2 text-[calc(14px*var(--type))]">
-                  {warn}
-                </p>
-              )}
-              {problem && (
-                <p className="prose-note text-[calc(14px*var(--type))] text-mute">
-                  {problem}
-                </p>
-              )}
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void connect(warn !== null)}
-                  className="label border border-ink bg-ink px-3 py-2 text-paper enabled:hover:bg-transparent enabled:hover:text-ink disabled:opacity-50 [@media(hover:none)]:min-h-11"
-                >
-                  {busy ? "Checking…" : warn ? "Use it anyway" : "Connect"}
-                </button>
-                {warn && (
+                  <p className="label text-mute">
+                    Signed in as {who}
+                    {found.length > 0 &&
+                      ` · ${found.length} ${found.length === 1 ? "repository" : "repositories"}`}
+                  </p>
+                  {risky && <Public name={risky.fullName} />}
+                  {found.length === 0 ? (
+                    <>
+                      <p className="prose-note text-[calc(14px*var(--type))] text-mute">
+                        That token cannot write to anything. Give it Contents:
+                        read and write on one repository, or name the repository
+                        yourself.
+                      </p>
+                      <input
+                        value={owner}
+                        onChange={(e) => setOwner(e.target.value)}
+                        placeholder="owner"
+                        aria-label="GitHub owner"
+                        className={field}
+                      />
+                      <input
+                        value={repo}
+                        onChange={(e) => setRepo(e.target.value)}
+                        placeholder="repository"
+                        aria-label="Repository"
+                        className={field}
+                      />
+                      {problem && <Problem>{problem}</Problem>}
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void byHand(risky !== null)}
+                        className={primary}
+                      >
+                        {busy ? "Checking…" : risky ? "Use it anyway" : "Use it"}
+                      </button>
+                    </>
+                  ) : (
+                    <ul className="flex max-h-56 flex-col gap-1 overflow-y-auto">
+                      {found.map((r) => (
+                        <li key={r.fullName}>
+                          <button
+                            type="button"
+                            onClick={() => choose(r)}
+                            className="flex w-full items-baseline gap-2 border border-rule px-2.5 py-2 text-left hover:bg-ink hover:text-paper [@media(hover:none)]:min-h-11"
+                          >
+                            <span className="prose-note min-w-0 flex-1 truncate text-[calc(15px*var(--type))]">
+                              {r.fullName}
+                            </span>
+                            <span className="label shrink-0 opacity-60">
+                              {r.private ? "private" : "public"}
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                   <button
                     type="button"
-                    onClick={() => setWarn(null)}
-                    className="label border border-rule px-3 py-2 text-mute hover:bg-ink hover:text-paper [@media(hover:none)]:min-h-11"
+                    onClick={() => {
+                      setFound(null);
+                      setRisky(null);
+                      setProblem(null);
+                    }}
+                    className={plain}
                   >
-                    Pick another
+                    Back
                   </button>
-                )}
-              </div>
-              <p className="prose-note text-[calc(13px*var(--type))] text-mute">
-                The token is kept in this browser only. Anyone with this device
-                unlocked can use it, so scope it to the one repository.
-              </p>
                 </>
               )}
             </>
@@ -344,6 +415,95 @@ export function Cloud() {
         </div>
       )}
     </Popover>
+  );
+}
+
+/** Connected: where it goes, one code to carry, and the way out. */
+function Connected({
+  live,
+  copied,
+  spilled,
+  trouble,
+  onCopy,
+  onSync,
+  onForget,
+}: {
+  live: Connection;
+  copied: boolean;
+  /** The code, shown as text when the clipboard refused it. */
+  spilled: string;
+  trouble: string | null;
+  onCopy: () => void;
+  onSync: () => void;
+  onForget: () => void;
+}) {
+  return (
+    <>
+      <p className="label text-mute">
+        {live.owner}/{live.repo}
+      </p>
+      {trouble && (
+        <p className="prose-note text-[calc(14px*var(--type))] text-mute">
+          {trouble}
+        </p>
+      )}
+      <button type="button" onClick={onCopy} className="label border border-ink bg-ink px-3 py-2 text-paper hover:bg-transparent hover:text-ink [@media(hover:none)]:min-h-11">
+        {copied ? "Copied — paste it on the other one" : "Copy setup code"}
+      </button>
+      <p className="prose-note text-[calc(13px*var(--type))] text-mute">
+        {copied
+          ? "It contains the token, so treat it like a password."
+          : "Paste this into your other devices and they become the same wall."}
+      </p>
+      {spilled && (
+        <textarea
+          readOnly
+          value={spilled}
+          rows={3}
+          aria-label="Setup code"
+          onFocus={(e) => e.currentTarget.select()}
+          className="prose-note w-full border border-rule bg-field px-2 py-1.5 text-[calc(12px*var(--type))] break-all outline-none"
+        />
+      )}
+      <p className="prose-note text-[calc(13px*var(--type))] text-mute">
+        Notes, folders and settings travel. Pictures stay on the device they
+        were added to.
+      </p>
+      <div className="mt-1 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={onSync}
+          className="label border border-rule px-3 py-2 hover:bg-ink hover:text-paper [@media(hover:none)]:min-h-11"
+        >
+          Sync now
+        </button>
+        <button
+          type="button"
+          onClick={onForget}
+          className="label border border-rule px-3 py-2 text-mute hover:bg-ink hover:text-paper [@media(hover:none)]:min-h-11"
+        >
+          Forget the token
+        </button>
+      </div>
+    </>
+  );
+}
+
+/** The one mistake that cannot be taken back, said before it is made. */
+function Public({ name }: { name: string }) {
+  return (
+    <p className="prose-note border-2 border-ink px-2.5 py-2 text-[calc(14px*var(--type))]">
+      {name} is public. Everything you have written would be readable by
+      anyone, and would stay in the history even after you deleted it.
+    </p>
+  );
+}
+
+function Problem({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="prose-note text-[calc(14px*var(--type))] text-mute">
+      {children}
+    </p>
   );
 }
 
