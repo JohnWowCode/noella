@@ -124,6 +124,66 @@ export async function reachableRepos(token: string): Promise<Reachable[]> {
   }));
 }
 
+/**
+ * Makes the private repository, so nobody has to leave the app to have one.
+ *
+ * The list of what a token can reach is only useful if something on it is
+ * private, and a person who has never wanted a private repository does not
+ * have one — so the honest first run ends at a list of three public repos and
+ * a correct refusal to pick any of them. That is a dead end, and the way out
+ * of it is one request.
+ *
+ * Not every token may. A fine-grained token is scoped to repositories that
+ * already exist and cannot create one; the caller is expected to say so and
+ * point at the page that can.
+ */
+export async function createPrivateRepo(
+  token: string,
+  name: string,
+): Promise<Reachable> {
+  const res = await fetch(`${API}/user/repos`, {
+    method: "POST",
+    headers: { ...headers(token), "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name,
+      private: true,
+      auto_init: true,
+      description: "My Noella notes. Written by the app, private on purpose.",
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    if (res.status === 403 || res.status === 404) {
+      throw new GitHubError(
+        res.status,
+        "This token cannot make repositories. Make one on GitHub yourself — it takes a moment — then come back.",
+      );
+    }
+    if (res.status === 422) {
+      throw new GitHubError(
+        422,
+        body.includes("already exists")
+          ? `You already have one called ${name}. Pick another name.`
+          : "GitHub would not take that name.",
+      );
+    }
+    throw new GitHubError(res.status, explain(res.status, body));
+  }
+  const json = (await res.json()) as {
+    name: string;
+    full_name: string;
+    private: boolean;
+    owner: { login: string };
+  };
+  return {
+    owner: json.owner.login,
+    repo: json.name,
+    fullName: json.full_name,
+    private: json.private,
+    pushable: true,
+  };
+}
+
 export interface RepoFacts {
   private: boolean;
   defaultBranch: string;

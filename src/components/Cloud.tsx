@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
+  createPrivateRepo,
   packConnection,
   reachableRepos,
   repoFacts,
@@ -52,6 +53,8 @@ export function Cloud() {
   // Typed by hand, for the case where the token can list nothing.
   const [owner, setOwner] = useState("");
   const [repo, setRepo] = useState("");
+  const [fresh, setFresh] = useState("noella-notes");
+  const [making, setMaking] = useState(false);
 
   useEffect(() => {
     const stored = readConnection();
@@ -77,7 +80,12 @@ export function Cloud() {
       const login = await whoAmI(t);
       const repos = await reachableRepos(t);
       setWho(login);
-      setFound(repos.filter((r) => r.pushable));
+      /* Private first: it is the only kind that should be picked. */
+      setFound(
+        repos
+          .filter((r) => r.pushable)
+          .sort((a, b) => Number(b.private) - Number(a.private)),
+      );
       setOwner(login);
     } catch (err) {
       setProblem(err instanceof Error ? err.message : "That did not work.");
@@ -108,6 +116,30 @@ export function Cloud() {
       path: DEFAULT_PATH,
       token: token.trim(),
     });
+  }
+
+  /**
+   * Makes one, because a list of public repositories is a list of wrong
+   * answers and stopping there is not help.
+   */
+  async function makeOne() {
+    const name = fresh.trim();
+    if (!name) return;
+    setMaking(true);
+    setProblem(null);
+    try {
+      const made = await createPrivateRepo(token.trim(), name);
+      connect({
+        owner: made.owner,
+        repo: made.repo,
+        path: DEFAULT_PATH,
+        token: token.trim(),
+      });
+    } catch (err) {
+      setProblem(err instanceof Error ? err.message : "That did not work.");
+    } finally {
+      setMaking(false);
+    }
   }
 
   async function byHand(force: boolean) {
@@ -349,9 +381,9 @@ export function Cloud() {
                   {found.length === 0 ? (
                     <>
                       <p className="prose-note text-[calc(14px*var(--type))] text-mute">
-                        That token cannot write to anything. Give it Contents:
-                        read and write on one repository, or name the repository
-                        yourself.
+                        That token cannot write to anything yet. Make one below,
+                        or give it Contents: read and write on a repository you
+                        already have and name it here.
                       </p>
                       <input
                         value={owner}
@@ -367,7 +399,6 @@ export function Cloud() {
                         aria-label="Repository"
                         className={field}
                       />
-                      {problem && <Problem>{problem}</Problem>}
                       <button
                         type="button"
                         disabled={busy}
@@ -378,7 +409,7 @@ export function Cloud() {
                       </button>
                     </>
                   ) : (
-                    <ul className="flex max-h-56 flex-col gap-1 overflow-y-auto">
+                    <ul className="flex max-h-48 flex-col gap-1 overflow-y-auto">
                       {found.map((r) => (
                         <li key={r.fullName}>
                           <button
@@ -397,6 +428,47 @@ export function Cloud() {
                       ))}
                     </ul>
                   )}
+                  {/*
+                    The way out of a list of wrong answers.
+
+                    Somebody who has never wanted a private repository does not
+                    have one, so an honest first run ends at three public repos
+                    and a correct refusal to pick any of them. Offered always,
+                    and said loudly when nothing on the list is private.
+                  */}
+                  <div className="flex flex-col gap-1.5 border-t border-rule-soft pt-2">
+                    {found.length > 0 && found.every((r) => !r.private) && (
+                      <p className="prose-note text-[calc(14px*var(--type))]">
+                        None of those are private — anything you wrote would be
+                        readable by anyone. Make one that is not:
+                      </p>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <input
+                        value={fresh}
+                        onChange={(e) => setFresh(e.target.value)}
+                        aria-label="Name for a new private repository"
+                        className={field}
+                      />
+                      <button
+                        type="button"
+                        disabled={making || !fresh.trim()}
+                        onClick={() => void makeOne()}
+                        className={`${primary} shrink-0`}
+                      >
+                        {making ? "Making…" : "Make it"}
+                      </button>
+                    </div>
+                    {/* Where the making of it can go wrong: a name already
+                      taken, or a token that is not allowed to. Both were being
+                      set and never drawn, so pressing Make it did nothing
+                      visible at all. */}
+                    {problem && <Problem>{problem}</Problem>}
+                    <p className="prose-note text-[calc(13px*var(--type))] text-mute">
+                      A new private repository in your account, connected
+                      straight away.
+                    </p>
+                  </div>
                   <button
                     type="button"
                     onClick={() => {
