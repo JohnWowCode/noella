@@ -32,6 +32,7 @@ import { ON_COLOR_BUTTON, surfaceStyle } from "@/lib/surface";
 import type { Color, Note } from "@/lib/types";
 import { Footer, Header } from "./Chrome";
 import { Compose } from "./Compose";
+import { GrownUp } from "./GrownUp";
 import { Journal } from "./Journal";
 import { ClaudeImport } from "./ClaudeImport";
 import { Cloud } from "./Cloud";
@@ -126,6 +127,7 @@ const AREAS = {
   work: "Work",
   wall: "Wall",
   journal: "Journal",
+  house: "Grown-up",
 } as const;
 
 type Area = keyof typeof AREAS;
@@ -398,6 +400,7 @@ export function Home() {
         "1": "work",
         "2": "wall",
         "3": "journal",
+        "4": "house",
       };
       if (AREA_KEYS[e.key] && !inside) {
         e.preventDefault();
@@ -842,7 +845,15 @@ export function Home() {
           {!inside && (
             <nav
               aria-label="Areas"
-              className="relative mt-5 flex items-center gap-1 border-b border-rule-soft"
+              /*
+                Scrollable, because there are four of these now and on a 390px
+                phone they came to exactly the width of the screen — which is
+                not "it fits", it is "it fits on this phone". A 360px one
+                would have pushed the whole page sideways.
+              */
+              className="relative mt-5 flex items-center gap-1 overflow-x-auto border-b border-rule-soft
+                         [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
+                         sm:overflow-visible"
             >
               <AreaTabs area={area} go={go} owed={owed} madeToday={madeToday} />
             </nav>
@@ -874,6 +885,10 @@ export function Home() {
                 </section>
               )}
             </>
+          )}
+
+          {showing === "house" && (
+            <GrownUp todayKey={todayKey} onOpen={open} />
           )}
 
           {showing === "journal" && (

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { fromKey } from "@/lib/clock";
+import { grownUp } from "@/lib/grownup";
 import { candidates, pick, type Candidate } from "@/lib/pick";
 import { PRIORITIES, PRIORITY, rankOf } from "@/lib/priority";
 import { contentsOf } from "@/lib/rooms";
@@ -59,7 +60,16 @@ export function Work({
         n.todayOn === null &&
         // A room is a place, not a job: what you queue is what is inside it.
         contentsOf(notes, n.id).length === 0 &&
-        (n.priority !== null || n.isTask),
+        (n.priority !== null || n.isTask) &&
+        /*
+         * The shopping is not in the queue.
+         *
+         * Bins and groceries in the same list as "vertical slice by the 20th"
+         * made both feel the same weight, and the usual result was neither
+         * one happening. Anything wearing a Life mark has its own screen now;
+         * unmark it and it comes straight back here.
+         */
+        !grownUp(notes, n),
     );
     return rows.sort((a, b) => {
       const r = rankOf(a.priority) - rankOf(b.priority);
@@ -140,6 +150,21 @@ export function Work({
     setDrawn(next);
     setLine(LINES[Math.floor(Math.random() * LINES.length)]);
   }
+
+  /* Said once, at the bottom, so nothing looks like it went missing. */
+  const house = useMemo(
+    () =>
+      notes.filter(
+        (n) =>
+          n.archivedAt === null &&
+          n.doneAt === null &&
+          n.todayOn === null &&
+          contentsOf(notes, n.id).length === 0 &&
+          (n.priority !== null || n.isTask) &&
+          grownUp(notes, n),
+      ).length,
+    [notes],
+  );
 
   return (
     <>
@@ -267,6 +292,13 @@ export function Work({
             </button>
           )}
         </section>
+      )}
+
+      {house > 0 && (
+        <p className="label mt-4 text-mute">
+          {house} household {house === 1 ? "thing is" : "things are"} in
+          Grown-up.
+        </p>
       )}
 
       {unsorted.length > 0 && (

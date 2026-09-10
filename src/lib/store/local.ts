@@ -72,7 +72,17 @@ function migrate(snapshot: Snapshot): Snapshot {
        * paused / done" is answered better by the priority beside it and the
        * tick on it.
        */
-      repeats: listCadence ?? null,
+      /*
+       * The note's own cadence first, the old one only as a fallback.
+       *
+       * This read `listCadence ?? null`, which is right for a wall written
+       * before repeats existed and catastrophic for every wall written since:
+       * a note saved with repeats set has no listCadence, so the cadence was
+       * overwritten with null on every single load. Recurring lists have never
+       * survived a reload — the reset that makes a shopping list worth having
+       * was being erased the moment you came back to it.
+       */
+      repeats: n.repeats ?? listCadence ?? null,
       amount: typeof n.amount === "number" ? n.amount : null,
       order: typeof n.order === "number" ? n.order : 0,
       estimateMinutes: n.estimateMinutes ?? null,
