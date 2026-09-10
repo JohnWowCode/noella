@@ -13,7 +13,22 @@
 
 import type { Note } from "./types";
 
-export const CADENCES = ["weekly", "monthly", "yearly"] as const;
+/*
+ * The rhythms a household actually runs on.
+ *
+ * Weekly, monthly and yearly covered bills and not much else. Chores are the
+ * case that breaks it: the dishes are daily, the laundry is weekly, the sheets
+ * are every other week, and those three cannot live on one list if the list
+ * owns the rhythm. Daily and fortnightly are not decoration — they are two of
+ * the four things a person actually does on a repeat.
+ */
+export const CADENCES = [
+  "daily",
+  "weekly",
+  "fortnightly",
+  "monthly",
+  "yearly",
+] as const;
 export type Cadence = (typeof CADENCES)[number];
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -25,11 +40,36 @@ function weekStart(on: Date): Date {
   return d;
 }
 
+/**
+ * The Sunday that opened this fortnight.
+ *
+ * Counted from a fixed point rather than from anything stored: an anchor per
+ * list would be one more thing to keep, to get wrong, and to lose in a merge.
+ * Which of two weeks you are in is decided by the parity of the week number
+ * since the epoch, and the answer is a real date — the first attempt returned
+ * an index and multiplied it back up, which lands on a Thursday, because the
+ * epoch began on one. That put the end of the fortnight before the start of
+ * it and every fortnightly chore read "back in 0d" forever.
+ *
+ * Rounded rather than floored so the hour that daylight saving moves cannot
+ * push a Sunday into the week before it.
+ */
+function fortnightStart(on: Date): Date {
+  const start = weekStart(on);
+  const weeks = Math.round(start.getTime() / 604_800_000);
+  if (weeks % 2 !== 0) start.setDate(start.getDate() - 7);
+  return start;
+}
+
 /** The bucket a date belongs to. Two dates in the same bucket are one period. */
 export function periodKey(cadence: Cadence, on: Date): string {
   switch (cadence) {
+    case "daily":
+      return `D${on.getFullYear()}-${pad(on.getMonth() + 1)}-${pad(on.getDate())}`;
     case "weekly":
       return `W${weekStart(on).toDateString()}`;
+    case "fortnightly":
+      return `F${fortnightStart(on).toDateString()}`;
     case "monthly":
       return `${on.getFullYear()}-${pad(on.getMonth() + 1)}`;
     case "yearly":
@@ -47,22 +87,62 @@ export function isSettled(
   today: Date,
 ): boolean {
   if (item.doneAt === null) return false;
-  if (cadence === null) return true;
-  return (
-    periodKey(cadence, new Date(item.doneAt)) === periodKey(cadence, today)
-  );
+  // Its own rhythm beats the list's. The dishes are daily on a weekly list
+  // and the sheets are fortnightly on the same one; a list that forced every
+  // item to share a rhythm meant a chore list per rhythm, which is three
+  // lists to keep and two of them permanently half-read.
+  const rhythm = item.repeats ?? cadence;
+  if (rhythm === null) return true;
+  return periodKey(rhythm, new Date(item.doneAt)) === periodKey(rhythm, today);
+}
+
+/** The rhythm actually governing an item, list included. */
+export function rhythmOf(item: Note, list: Cadence | null): Cadence | null {
+  return item.repeats ?? list;
 }
 
 export function describeCadence(cadence: Cadence): string {
-  return { weekly: "every week", monthly: "every month", yearly: "every year" }[
-    cadence
-  ];
+  return {
+    daily: "every day",
+    weekly: "every week",
+    fortnightly: "every other week",
+    monthly: "every month",
+    yearly: "every year",
+  }[cadence];
+}
+
+/** Two words for a chip. "Every other week" is a sentence, not a label. */
+export function shortCadence(cadence: Cadence): string {
+  return {
+    daily: "Daily",
+    weekly: "Weekly",
+    fortnightly: "Fortnightly",
+    monthly: "Monthly",
+    yearly: "Yearly",
+  }[cadence];
 }
 
 /** When this period ends, in days. What "resets in 9 days" is counting. */
 export function daysLeftInPeriod(cadence: Cadence, today: Date): number {
+  /*
+   * Built out of the period's own start, never by adding to today.
+   *
+   * The weekly case read `end.setDate(weekStart(today).getDate() + 7)`, which
+   * takes the day-of-month the week began on and sets it on *this* month — so
+   * a week that started on the 30th asked for the 37th of the following one,
+   * and every wall was told the wrong day for the first few days of a month.
+   */
   const end = new Date(today);
-  if (cadence === "weekly") end.setDate(weekStart(today).getDate() + 7);
+  end.setHours(0, 0, 0, 0);
+  if (cadence === "daily") end.setDate(end.getDate() + 1);
+  if (cadence === "weekly") {
+    const from = weekStart(today);
+    end.setFullYear(from.getFullYear(), from.getMonth(), from.getDate() + 7);
+  }
+  if (cadence === "fortnightly") {
+    const from = fortnightStart(today);
+    end.setFullYear(from.getFullYear(), from.getMonth(), from.getDate() + 14);
+  }
   if (cadence === "monthly") end.setMonth(today.getMonth() + 1, 1);
   if (cadence === "yearly") end.setFullYear(today.getFullYear() + 1, 0, 1);
   end.setHours(0, 0, 0, 0);

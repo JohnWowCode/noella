@@ -3,10 +3,17 @@
 import { useMemo, useState } from "react";
 import { fromKey } from "@/lib/clock";
 import { grownUp, household, LIFE_MARKS, marked, openIn } from "@/lib/grownup";
-import { CADENCES, daysLeftInPeriod, isSettled } from "@/lib/recurrence";
+import {
+  CADENCES,
+  daysLeftInPeriod,
+  isSettled,
+  rhythmOf,
+  shortCadence,
+} from "@/lib/recurrence";
 import { titleOf } from "@/lib/rooms";
 import { markLabel, marksOf } from "@/lib/stickers";
 import { useNoella } from "@/lib/store/provider";
+import type { Cadence } from "@/lib/recurrence";
 import type { Note } from "@/lib/types";
 import { Icon } from "./Icon";
 import { Popover } from "./Popover";
@@ -182,6 +189,13 @@ function List({
     .filter((n) => n.parentId === list.id && n.archivedAt === null)
     .sort((a, b) => a.order - b.order || a.createdAt.localeCompare(b.createdAt));
   const done = items.filter((i) => isSettled(i, list.repeats, today));
+  /* When the soonest of them comes back, not just when the list turns. */
+  const soonest = items.reduce<number | null>((least, i) => {
+    const r = rhythmOf(i, list.repeats);
+    if (!r) return least;
+    const days = daysLeftInPeriod(r, today);
+    return least === null || days < least ? days : least;
+  }, list.repeats ? daysLeftInPeriod(list.repeats, today) : null);
   const left = items.length - done.length;
 
   return (
@@ -201,10 +215,8 @@ function List({
           {left === 0 ? "all in" : `${left} left`}
         </span>
         <span className="ml-auto flex items-center gap-2">
-          {list.repeats && (
-            <span className="label text-mute">
-              back in {daysLeftInPeriod(list.repeats, today)}d
-            </span>
+          {soonest !== null && (
+            <span className="label text-mute">back in {soonest}d</span>
           )}
           <Popover
             label="How often it comes back"
@@ -215,7 +227,7 @@ function List({
                 ? "border-ink"
                 : "border-rule text-mute hover:border-ink"
             }`}
-            current={list.repeats ?? "Repeat?"}
+            current={list.repeats ? shortCadence(list.repeats) : "Repeat?"}
           >
             {(close) => (
               <span className="flex flex-col gap-1">
@@ -233,7 +245,7 @@ function List({
                       list.repeats === c ? "bg-ink text-paper" : "hover:bg-ink/10"
                     }`}
                   >
-                    Every {c.replace("ly", "")}
+                    {shortCadence(c)}
                   </button>
                 ))}
                 {list.repeats && (
@@ -260,7 +272,7 @@ function List({
           return (
             <li
               key={item.id}
-              className="flex items-start gap-3 border-b border-rule-soft px-4 py-2 last:border-b-0"
+              className="group flex items-start gap-3 border-b border-rule-soft px-4 py-2 last:border-b-0"
             >
               <button
                 type="button"
@@ -284,6 +296,17 @@ function List({
               >
                 {item.body.split("\n", 1)[0]}
               </button>
+              {/*
+                Its own rhythm, when it has one.
+
+                The dishes are daily and the sheets are fortnightly and they
+                live on the same list, so an item has to be able to disagree
+                with the list it is on. Every item that carries a rhythm shows
+                it, including the ones that happen to match — on a chore list
+                the rhythms are the information, and reading a column of them
+                is the point. An item with none stays a plain row.
+              */}
+              <Rhythm item={item} list={list.repeats} />
             </li>
           );
         })}
@@ -319,6 +342,128 @@ function List({
   );
 }
 
+/**
+ * How often this one comes back, when that is not what the list says.
+ *
+ * Quiet by default and quiet when it agrees: the chip only draws once an item
+ * has been given a rhythm of its own, and the way to give it one is the same
+ * small button that shows it.
+ */
+function Rhythm({ item, list }: { item: Note; list: Cadence | null }) {
+  const { patchNote } = useNoella();
+  const own = item.repeats;
+  return (
+    <Popover
+      label={
+        own ? `${shortCadence(own)} — change it` : "How often it comes back"
+      }
+      set={own !== null}
+      align="right"
+      trigger={
+        own
+          ? "label mt-[3px] shrink-0 border border-rule px-1.5 py-0.5 text-mute hover:border-ink"
+          : `label tap mt-[5px] hidden h-4 w-4 shrink-0 place-items-center text-mute
+             opacity-0 group-hover:opacity-70 focus-visible:opacity-100
+             [@media(hover:hover)]:grid`
+      }
+      current={own ? shortCadence(own) : <Icon name="repeat" size={13} />}
+    >
+      {(close) => (
+        <span className="flex flex-col gap-1">
+          {CADENCES.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => {
+                patchNote(item.id, { repeats: own === c ? null : c });
+                close();
+              }}
+              className={`label px-2 py-2 text-left ${
+                own === c ? "bg-ink text-paper" : "hover:bg-ink/10"
+              }`}
+            >
+              {shortCadence(c)}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => {
+              patchNote(item.id, { repeats: null });
+              close();
+            }}
+            className="label px-2 py-2 text-left hover:bg-ink/10"
+          >
+            {list ? `Same as the list · ${shortCadence(list)}` : "Just once"}
+          </button>
+        </span>
+      )}
+    </Popover>
+  );
+}
+
+/**
+ * The chores list, made for you, once.
+ *
+ * Everything needed to have one already existed — a colour, a mark, a folder,
+ * a cadence — and putting them together was six separate acts across three
+ * screens before a single chore was written down. That is exactly the setup
+ * cost that means it never happens. One button, and the rhythms are the ones
+ * these things actually have: the dishes every day, the laundry and the bins
+ * every week, the sheets and the hoovering every other one.
+ */
+const CHORES: { body: string; repeats: Cadence }[] = [
+  { body: "Dishes", repeats: "daily" },
+  { body: "Laundry", repeats: "weekly" },
+  { body: "Bins out", repeats: "weekly" },
+  { body: "Sheets", repeats: "fortnightly" },
+  { body: "Hoover", repeats: "fortnightly" },
+];
+
+function Starter() {
+  const { colors, addNote, addNotes, patchColor } = useNoella();
+  const [busy, setBusy] = useState(false);
+
+  async function make() {
+    setBusy(true);
+    /*
+     * A colour that means chores, so the wall shows them as one thing without
+     * anything having to be read. The first swatch nobody has named yet is
+     * taken rather than a new one invented — the palette is fixed, and a
+     * thirty-seventh colour would be a colour with no square on the rail.
+     */
+    const spare = colors.find((c) => c.name === null && c.emoji === null);
+    if (spare) patchColor(spare.id, { name: "Chores", emoji: "home" });
+    const room = await addNote({
+      body: "Chores",
+      colorId: spare?.id ?? null,
+      icons: ["home"],
+      repeats: "weekly",
+    });
+    await addNotes(
+      CHORES.map((c, i) => ({
+        body: c.body,
+        colorId: spare?.id ?? null,
+        parentId: room.id,
+        isTask: true,
+        repeats: c.repeats,
+        order: i,
+      })),
+    );
+    setBusy(false);
+  }
+
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      onClick={() => void make()}
+      className="label mt-4 border-2 border-ink bg-ink px-3 py-2.5 text-paper enabled:hover:bg-transparent enabled:hover:text-ink disabled:opacity-50 [@media(hover:none)]:min-h-11"
+    >
+      {busy ? "Making it…" : "Start me a chores list"}
+    </button>
+  );
+}
+
 /** Empty, and saying how to fill it — not standing there blank. */
 function Nothing() {
   return (
@@ -339,6 +484,7 @@ function Nothing() {
         renewals, the dentist. Mark a folder and everything you put in it comes
         too, so a Groceries list only has to be said once.
       </p>
+      <Starter />
     </section>
   );
 }
