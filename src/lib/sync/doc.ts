@@ -11,7 +11,8 @@
 import type { Color, Note, Settings } from "../types";
 import { DEFAULT_SETTINGS } from "../types";
 import type { Snapshot } from "../store/types";
-import { dedupeColors } from "./colors";
+import { dedupeColors, retireColors } from "./colors";
+import { RETIRED_SWATCHES } from "../store/defaults";
 
 export interface Grave {
   id: string;
@@ -124,6 +125,19 @@ export function mergeDocs(
   const tidy = dedupeColors(both, [...notes.values()]);
   if (tidy.merged > 0) changed += tidy.merged;
 
+  /*
+   * Withdrawn swatches are dropped here as well as on load, for the same
+   * reason duplicates are: a repair that happens in only one of the two
+   * places does not hold. A device that has trimmed its palette still reads a
+   * file written before the trim, and the union puts every retired colour
+   * back — so it would trim again on adopting, agree with the file about
+   * nothing, and quietly redo the same work on every round for ever while the
+   * file itself never got fixed. Dropping them from the merge means the next
+   * write settles it and all of them converge.
+   */
+  const trimmed = retireColors(tidy.colors, [...notes.values()], RETIRED_SWATCHES);
+  if (trimmed.removed > 0) changed += trimmed.removed;
+
   const cutoff = new Date(Date.now() - GRAVE_DAYS * 86_400_000).toISOString();
   return {
     doc: {
@@ -131,7 +145,7 @@ export function mergeDocs(
       version: 1,
       writtenAt: new Date().toISOString(),
       notes: tidy.notes,
-      colors: tidy.colors,
+      colors: trimmed.colors,
       settings:
         theirs.writtenAt > mine.writtenAt ? theirs.settings : mine.settings,
       graves: [...graves.values()].filter((g) => g.at > cutoff),
