@@ -3,24 +3,58 @@
 import { useEffect, useState } from "react";
 import { useNoella } from "@/lib/store/provider";
 import { formatDuration, isVideo } from "@/lib/images";
+import { tooBigToSync } from "@/lib/sync/pictures";
 import type { NoteImage } from "@/lib/types";
 
-/** Resolves an image id to a blob URL, once, after mount. */
-function useImageUrl(id: string): string | null {
+/**
+ * Resolves an image id to a blob URL, once, after mount — and says which kind
+ * of nothing it got when it fails.
+ *
+ * "Still loading" and "these bytes are not on this device" look identical
+ * from here and mean completely different things to whoever is looking at the
+ * card. Reporting both as an ellipsis is what made a picture that had not
+ * synced indistinguishable from one that was about to appear, so the wall
+ * just seemed to be permanently thinking.
+ */
+function useImageUrl(id: string): { url: string | null; missing: boolean } {
   const { imageUrl } = useNoella();
-  const [url, setUrl] = useState<string | null>(null);
+  // Stamped with the id it answers, rather than cleared when the id changes:
+  // clearing means a setState in the effect body, which is a cascading render
+  // on every mount. An answer about some other picture simply does not match.
+  const [state, setState] = useState<{
+    id: string;
+    url: string | null;
+    missing: boolean;
+  } | null>(null);
 
   useEffect(() => {
     let live = true;
     imageUrl(id).then((next) => {
-      if (live) setUrl(next);
+      if (live) setState({ id, url: next, missing: next === null });
     });
     return () => {
       live = false;
     };
   }, [id, imageUrl]);
 
-  return url;
+  const mine = state?.id === id ? state : null;
+  return { url: mine?.url ?? null, missing: mine?.missing ?? false };
+}
+
+/**
+ * What to say in the space a picture has not filled.
+ *
+ * The frame is already the right size — the note carries the dimensions — so
+ * the only question is what goes in it. A clip too large to have been sent is
+ * a permanent answer and says so plainly; anything else missing is waiting on
+ * a sync that has not reached this device yet, which is temporary and worth
+ * saying, because "not synced yet" is a thing you can wait out and a blank
+ * grey box is not.
+ */
+function Waiting({ image, missing }: { image: NoteImage; missing: boolean }) {
+  if (!missing) return <>…</>;
+  if (tooBigToSync(image)) return <>Too big to sync · on its own device</>;
+  return <>Not synced yet</>;
 }
 
 export function NoteImages({
@@ -63,7 +97,7 @@ function Thumb({
   single: boolean;
   onOpen: () => void;
 }) {
-  const url = useImageUrl(image.id);
+  const { url, missing } = useImageUrl(image.id);
 
   // A lone image sizes itself — width and height attributes reserve the right
   // space before the blob resolves, so nothing shifts — and only its height is
@@ -93,8 +127,12 @@ function Thumb({
             className="h-full w-full bg-black object-contain"
           />
         ) : (
-          <span className="label grid h-full w-full place-items-center opacity-40">
-            {image.duration ? formatDuration(image.duration) : "…"}
+          <span className="label grid h-full w-full place-items-center px-2 text-center opacity-40">
+            {missing ? (
+              <Waiting image={image} missing />
+            ) : (
+              (image.duration && formatDuration(image.duration)) || "…"
+            )}
           </span>
         )}
       </div>
@@ -121,10 +159,10 @@ function Thumb({
           />
         ) : (
           <span
-            className="label grid w-full place-items-center opacity-40"
+            className="label grid w-full place-items-center px-3 text-center opacity-40"
             style={{ aspectRatio: `${image.width} / ${image.height}` }}
           >
-            …
+            <Waiting image={image} missing={missing} />
           </span>
         )}
       </button>
@@ -146,8 +184,8 @@ function Thumb({
           draggable={false}
         />
       ) : (
-        <span className="label grid h-full w-full place-items-center opacity-40">
-          …
+        <span className="label grid h-full w-full place-items-center px-2 text-center opacity-40">
+          <Waiting image={image} missing={missing} />
         </span>
       )}
     </button>
@@ -167,7 +205,7 @@ export function Lightbox({
   onClose: () => void;
 }) {
   const image = images[index];
-  const url = useImageUrl(image?.id ?? "");
+  const { url, missing } = useImageUrl(image?.id ?? "");
   const video = image ? isVideo(image) : false;
 
   useEffect(() => {
@@ -228,6 +266,11 @@ export function Lightbox({
         </button>
       </div>
       <div className="flex flex-1 items-center justify-center overflow-auto p-5">
+        {missing && (
+          <span className="label text-mute">
+            <Waiting image={image} missing />
+          </span>
+        )}
         {url &&
           (video ? (
             <video

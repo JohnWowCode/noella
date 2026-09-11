@@ -17,9 +17,21 @@ import { Popover } from "./Popover";
  * of it — so export writes a single self-contained JSON file, images inlined.
  */
 export function DataMenu() {
-  const { exportBackup, importBackup, notes } = useNoella();
+  const { exportBackup, importBackup, mergeBackup, notes } = useNoella();
   const [status, setStatus] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  /*
+   * Which of the two things a file is for, decided before the file is picked.
+   *
+   * There was one button, and it replaced the wall. That is right for the one
+   * case it was built for — a backup, restored onto a browser that has lost
+   * everything — and catastrophic for the far more common one, which is
+   * somebody handing you a file of notes to keep. The difference cannot be
+   * guessed from the file, both are the same format, so it is asked before
+   * rather than confirmed after: a dialog that appears once the file is chosen
+   * is read as "yes, that is the file I meant" and clicked through.
+   */
+  const [mode, setMode] = useState<"add" | "replace">("add");
 
   async function download() {
     setStatus("Packing…");
@@ -40,21 +52,51 @@ export function DataMenu() {
     }
   }
 
-  async function restore(file: File) {
-    // Import replaces the whole wall, so it asks first.
-    const ok = window.confirm(
-      `Replace all ${notes.length} notes on this wall with the contents of ${file.name}?`,
-    );
-    if (!ok) return;
+  async function take(file: File) {
+    let backup: Backup;
+    try {
+      backup = JSON.parse(await file.text()) as Backup;
+    } catch {
+      setStatus("Not a Noella backup");
+      return;
+    }
 
+    if (mode === "add") {
+      setStatus("Adding…");
+      try {
+        const added = await mergeBackup(backup);
+        setStatus(
+          added === 0
+            ? "Nothing new in that file"
+            : `${added} added · nothing removed`,
+        );
+      } catch {
+        setStatus("Not a Noella backup");
+      }
+      return;
+    }
+
+    // Replacing is the destructive one, so it is the one that asks.
+    const ok = window.confirm(
+      `Replace all ${notes.length} notes on this wall with the contents of ${file.name}? What is here now will be gone.`,
+    );
+    if (!ok) {
+      setStatus(null);
+      return;
+    }
     setStatus("Restoring…");
     try {
-      const backup = JSON.parse(await file.text()) as Backup;
       await importBackup(backup);
       setStatus(`${backup.notes?.length ?? 0} rows restored`);
     } catch {
       setStatus("Not a Noella backup");
     }
+  }
+
+  function pick(next: "add" | "replace") {
+    setMode(next);
+    setStatus(null);
+    fileRef.current?.click();
   }
 
   return (
@@ -75,16 +117,25 @@ export function DataMenu() {
         className="sr-only"
         onChange={(e) => {
           const file = e.target.files?.[0];
-          if (file) void restore(file);
+          if (file) void take(file);
           e.target.value = "";
         }}
       />
       <button
         type="button"
-        onClick={() => fileRef.current?.click()}
+        onClick={() => pick("add")}
+        title="Add a file's notes to this wall, keeping everything already here"
         className="label border border-rule px-3 py-2.5 hover:bg-ink hover:text-paper"
       >
-        Import
+        Add a file
+      </button>
+      <button
+        type="button"
+        onClick={() => pick("replace")}
+        title="Throw this wall away and restore a backup in its place"
+        className="label border border-rule px-3 py-2.5 text-mute hover:bg-ink hover:text-paper"
+      >
+        Restore
       </button>
     </span>
   );

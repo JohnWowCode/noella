@@ -93,15 +93,23 @@
    * move the whole screen.
    *
    * Chrome grows more slowly than prose on purpose. Doubling the size of a
-   * twelve-pixel uppercase counter alongside the words makes the furniture
-   * shout; it needs to stay readable, not keep pace.
+   * small uppercase counter alongside the words makes the furniture shout; it
+   * needs to stay readable, not keep pace.
+   *
+   * Slower than prose is not the same as small, which is the mistake the
+   * first pass made. Counted on a 430px phone: three quarters of every run of
+   * text on the screen was the 12px label — and a label is uppercase mono
+   * tracked out a twentieth of an em, which is the least legible combination
+   * in the app. The words you write were 17 to 18px and everything telling
+   * you what they were was 12. The floor is 14 now, and nothing on any screen
+   * is under 13.
    */
   --read-scale: 1;
   --label-scale: 1;
   --face-adjust: 1;
   --type: calc(var(--read-scale) * var(--face-adjust));
 
-  --read-size: calc(18px * var(--type));
+  --read-size: calc(19px * var(--type));
   --read-leading: 1.62;
   --read-tracking: 0em;
   --read-word: normal;
@@ -242,7 +250,7 @@ html[data-size="huge"] {
  */
 @utility label {
   font-family: var(--font-geist-mono), ui-monospace, monospace;
-  font-size: calc(12px * var(--label-scale));
+  font-size: calc(14px * var(--label-scale));
   line-height: 1.15;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -266,6 +274,15 @@ html[data-size="huge"] {
    * lines tall on a phone and nothing in the markup said why.
    */
   text-wrap-style: pretty;
+  /*
+   * A word longer than the box breaks rather than hanging out of it.
+   *
+   * Found by raising the row size by a single pixel: at the Huge setting on a
+   * 375px phone one title came out seven pixels wider than the column and the
+   * end of it was simply cut off. The pixel was not the bug — any word long
+   * enough does this at any size, and a pasted link does it at every size.
+   */
+  overflow-wrap: break-word;
 }
 
 /*
@@ -279,7 +296,7 @@ html[data-size="huge"] {
  */
 @utility title {
   font-family: var(--font-body);
-  font-size: calc(19px * var(--type));
+  font-size: calc(20px * var(--type));
   font-weight: 640;
   line-height: 1.2;
   letter-spacing: -0.01em;
@@ -313,11 +330,6 @@ html[data-size="huge"] {
 }
 
 @media (hover: none) {
-  /* Six columns of thumb-sized swatches instead of twelve tight ones. */
-  :root {
-    --palette-cols: 6;
-  }
-
   .tap::after {
     content: "";
     position: absolute;

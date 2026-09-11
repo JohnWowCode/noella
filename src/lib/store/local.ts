@@ -12,9 +12,11 @@ import {
 } from "../types";
 import { todayKey } from "../clock";
 import { descendantsOf } from "../tree";
-import { dedupeColors } from "../sync/colors";
-import { bury, unbury } from "../sync/local";
-import { DEFAULT_SWATCHES } from "./defaults";
+import { dedupeColors, retireColors } from "../sync/colors";
+import { docFrom, mergeDocs } from "../sync/doc";
+import { bury, readConnection, unbury } from "../sync/local";
+import { fetchPicture } from "../sync/pictures";
+import { DEFAULT_SWATCHES, RETIRED_SWATCHES } from "./defaults";
 import type { Backup, Snapshot, Store } from "./types";
 
 const KEY = "noella.v1";
@@ -112,7 +114,11 @@ function migrate(snapshot: Snapshot): Snapshot {
    * waiting for a sync it may never do again.
    */
   const tidy = dedupeColors(snapshot.colors, notes);
-  const colors = [...tidy.colors];
+  // Then the swatches the palette has since withdrawn, minus any that are
+  // doing a job — see retireColors. Before the defaults are topped up, or a
+  // retired one would be seeded straight back in.
+  const trimmed = retireColors(tidy.colors, notes, RETIRED_SWATCHES);
+  const colors = [...trimmed.colors];
   const present = new Set(colors.map((c) => c.hex.toUpperCase()));
   for (const hex of DEFAULT_SWATCHES) {
     if (!present.has(hex.toUpperCase())) {
@@ -210,6 +216,8 @@ export class LocalStore implements Store {
   };
   /** Object URLs handed out for <img src>, reused so one blob maps to one URL. */
   private urls = new Map<string, string>();
+  /** Picture downloads in flight, so two cards asking make one request. */
+  private fetching = new Map<string, Promise<Blob | null>>();
 
   async load(): Promise<Snapshot> {
     const existing = read();
@@ -408,14 +416,60 @@ export class LocalStore implements Store {
     await putBlob(id, blob);
   }
 
+  /**
+   * A picture, from wherever it happens to be.
+   *
+   * Three places, in the order it is cheapest to ask: a blob URL already made
+   * this session, this device's IndexedDB, and — only if both come up empty —
+   * the repository the wall syncs through. That last one is why a photo taken
+   * on the phone appears on the laptop at all; before it existed the miss
+   * simply returned null and the card drew a placeholder for ever.
+   *
+   * Fetched at the moment something tries to draw it, rather than in a batch
+   * after syncing, because a wall of four hundred photos should pull down the
+   * six that are on screen. Fetching also files the bytes locally, so it
+   * happens exactly once per device and everything afterwards — including
+   * being offline — behaves as though the picture had always been here.
+   */
   async imageUrl(id: string): Promise<string | null> {
     const cached = this.urls.get(id);
     if (cached) return cached;
-    const blob = await getBlob(id);
+
+    const blob = (await getBlob(id)) ?? (await this.fetchImage(id));
     if (!blob) return null;
+
     const url = URL.createObjectURL(blob);
     this.urls.set(id, url);
     return url;
+  }
+
+  /**
+   * One request per picture, however many components ask for it.
+   *
+   * A note's images are drawn by a card on the wall, by the row inside a
+   * folder and by the lightbox over the top, each resolving the same id on
+   * mount. Without this they would each start their own download of the same
+   * file. The promise is dropped once it settles so a failure — offline, say,
+   * or a token that has expired — can be retried later rather than cached as
+   * a permanent absence.
+   */
+  private fetchImage(id: string): Promise<Blob | null> {
+    const running = this.fetching.get(id);
+    if (running) return running;
+
+    const connection = readConnection();
+    if (!connection) return Promise.resolve(null);
+
+    const media = this.snapshot.notes
+      .flatMap((n) => n.images)
+      .find((img) => img.id === id);
+    if (!media) return Promise.resolve(null);
+
+    const job = fetchPicture(connection, media)
+      .catch(() => null)
+      .finally(() => this.fetching.delete(id));
+    this.fetching.set(id, job);
+    return job;
   }
 
   async export(): Promise<Backup> {
@@ -460,6 +514,59 @@ export class LocalStore implements Store {
     });
     write(this.snapshot);
     return this.clone();
+  }
+
+  /**
+   * The same merge two devices use on each other, pointed at a file.
+   *
+   * Reusing it rather than writing a second rule is the point: the wall
+   * already has an answer for "these two lists both claim to know about this
+   * note", and a file is just another list. Nothing is deleted — no graves are
+   * carried in, so a note the file contains arrives even if this device threw
+   * one away with that id before, because asking for the file is a clearer
+   * statement of intent than an old delete.
+   *
+   * Settings stay this device's own. A file is being asked for its notes, not
+   * for its opinion about your typeface.
+   */
+  async merge(backup: Backup): Promise<{ snapshot: Snapshot; added: number }> {
+    if (backup.format !== "noella.backup") {
+      throw new Error("not a Noella backup");
+    }
+
+    // Pictures before notes: a note that lands without its bytes draws an
+    // empty frame, and the frame is the whole reason for adding it.
+    for (const [id, dataUrl] of Object.entries(backup.images ?? {})) {
+      try {
+        await putBlob(id, await dataUrlToBlob(dataUrl));
+      } catch {
+        // One unreadable picture should not sink the rest of the file.
+      }
+    }
+
+    const before = this.snapshot.notes.length;
+    const { doc } = mergeDocs(
+      docFrom(this.snapshot, []),
+      docFrom(
+        {
+          notes: backup.notes ?? [],
+          colors: backup.colors ?? [],
+          settings: this.snapshot.settings,
+        },
+        [],
+      ),
+    );
+
+    this.snapshot = migrate({
+      notes: doc.notes,
+      colors: doc.colors,
+      settings: this.snapshot.settings,
+    });
+    write(this.snapshot);
+    return {
+      snapshot: this.clone(),
+      added: this.snapshot.notes.length - before,
+    };
   }
 
   private forgetImage(id: string): void {

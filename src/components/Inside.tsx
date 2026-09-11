@@ -345,7 +345,7 @@ function Branch({
             }
             aria-label={settled ? "Not done after all" : "Done"}
             data-nodrag
-            className="tap mt-0.5 grid h-4 w-4 shrink-0 place-items-center border border-current text-[10px] leading-none"
+            className="tap mt-0.5 grid h-4 w-4 shrink-0 place-items-center border border-current text-[12px] leading-none"
           >
             {settled ? "×" : ""}
           </button>

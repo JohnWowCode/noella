@@ -335,7 +335,7 @@ export function Work({
                   <button
                     type="button"
                     onClick={() => onStart?.(n.id)}
-                    className="prose-note w-full text-left text-[calc(17px*var(--type))] leading-snug"
+                    className="prose-note w-full text-left text-[calc(18px*var(--type))] leading-snug"
                   >
                     {n.body.split("\n", 1)[0]}
                   </button>
@@ -444,7 +444,7 @@ function Row({
             if (carry.wasDrag()) return;
             onStart?.(note.id);
           }}
-          className="prose-note w-full text-left text-[calc(17px*var(--type))] leading-snug"
+          className="prose-note w-full text-left text-[calc(18px*var(--type))] leading-snug"
         >
           {note.body.split("\n", 1)[0]}
         </button>

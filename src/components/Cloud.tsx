@@ -216,7 +216,7 @@ export function Cloud() {
       current={
         <span className="label flex items-center gap-1.5">
           <Icon name="cloud" size={15} />
-          {said(cloud.state, cloud.at)}
+          {said(cloud.state, cloud.at, cloud.doing)}
         </span>
       }
     >
@@ -580,8 +580,10 @@ function Problem({ children }: { children: React.ReactNode }) {
 }
 
 /** Four words for four states. Never a spinner that says nothing. */
-function said(state: string, at: number): string {
-  if (state === "working") return "Syncing";
+function said(state: string, at: number, doing: string | null): string {
+  // A round that is uploading photos is the one round slow enough that
+  // "Syncing" stops being informative and starts being worrying.
+  if (state === "working") return doing ?? "Syncing";
   if (state === "stuck") return "Stuck";
   if (state === "ok") return at ? `Synced ${ago(at)}` : "Synced";
   return "Cloud";

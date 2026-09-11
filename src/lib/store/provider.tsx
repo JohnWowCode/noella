@@ -34,6 +34,8 @@ export interface Cloud {
   at: number;
   /** Why it is stuck, in words. */
   trouble: string | null;
+  /** What this round is busy with, when it is busy with something slow. */
+  doing: string | null;
   /** Runs a round now. Safe to call while one is already going.*/
   now: () => void;
   /** Re-reads the stored connection after it has been changed. */
@@ -61,6 +63,7 @@ interface Noella {
   imageUrl: (id: string) => Promise<string | null>;
   exportBackup: () => Promise<Backup>;
   importBackup: (backup: Backup) => Promise<void>;
+  mergeBackup: (backup: Backup) => Promise<number>;
   cloud: Cloud;
 }
 
@@ -78,6 +81,7 @@ export function NoellaProvider({ children }: { children: React.ReactNode }) {
   const [cloudState, setCloudState] = useState<CloudState>("off");
   const [cloudAt, setCloudAt] = useState(0);
   const [trouble, setTrouble] = useState<string | null>(null);
+  const [doing, setDoing] = useState<string | null>(null);
   /** Bumped when the connection is changed, so the effects below re-arm. */
   const [wiring, setWiring] = useState(0);
   const [connected, setConnected] = useState(false);
@@ -128,7 +132,7 @@ export function NoellaProvider({ children }: { children: React.ReactNode }) {
     running.current = true;
     setCloudState("working");
     try {
-      const result = await syncOnce(connection, store.here());
+      const result = await syncOnce(connection, store.here(), setDoing);
       if (result.merged) {
         const kept = await store.adopt(result.merged);
         setNotes(kept.notes);
@@ -142,6 +146,7 @@ export function NoellaProvider({ children }: { children: React.ReactNode }) {
       setTrouble(err instanceof Error ? err.message : "Something went wrong.");
       setCloudState("stuck");
     } finally {
+      setDoing(null);
       running.current = false;
       if (again.current) {
         again.current = false;
@@ -193,12 +198,13 @@ export function NoellaProvider({ children }: { children: React.ReactNode }) {
   const cloud = useMemo<Cloud>(
     () => ({
       state: connected ? cloudState : "off",
+      doing,
       at: cloudAt,
       trouble,
       now: () => void runSync(),
       reconnect: () => setWiring((n) => n + 1),
     }),
-    [connected, cloudState, cloudAt, trouble, runSync],
+    [connected, cloudState, cloudAt, trouble, doing, runSync],
   );
 
   // Every mutation writes to state first and reconciles after. The card shows
@@ -320,6 +326,17 @@ export function NoellaProvider({ children }: { children: React.ReactNode }) {
 
   const exportBackup = useCallback(() => store.export(), [store]);
 
+  const mergeBackup = useCallback(
+    async (backup: Backup) => {
+      const { snapshot, added } = await store.merge(backup);
+      setNotes(snapshot.notes);
+      setColors(snapshot.colors);
+      setSettings(snapshot.settings);
+      return added;
+    },
+    [store],
+  );
+
   const importBackup = useCallback(
     async (backup: Backup) => {
       const snapshot = await store.import(backup);
@@ -352,6 +369,7 @@ export function NoellaProvider({ children }: { children: React.ReactNode }) {
       imageUrl,
       exportBackup,
       importBackup,
+      mergeBackup,
       cloud,
     };
   }, [
@@ -372,6 +390,7 @@ export function NoellaProvider({ children }: { children: React.ReactNode }) {
     imageUrl,
     exportBackup,
     importBackup,
+    mergeBackup,
     cloud,
   ]);
 

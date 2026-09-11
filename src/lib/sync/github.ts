@@ -299,3 +299,72 @@ export async function writeFile(
   const json = (await res.json()) as { content: { sha: string } };
   return json.content.sha;
 }
+
+/**
+ * A file of bytes, written once and never again.
+ *
+ * Pictures are not the wall. The wall is one JSON file that both devices
+ * rewrite all day and merge by hand; a picture is a few hundred kilobytes
+ * that will never change, because its name is a uuid minted when the shutter
+ * closed. So it needs none of that machinery — no sha, no merge, no read
+ * before write. It either is up there already or it is not.
+ *
+ * Which is also why a 422 is success. Writing without a sha means "create
+ * this", and GitHub refuses if something is already there; for content that
+ * cannot differ from itself, being refused for existing is the same outcome
+ * as having written it.
+ */
+export async function writeBytes(
+  c: Connection,
+  path: string,
+  blob: Blob,
+  message: string,
+): Promise<void> {
+  const url = `${API}/repos/${c.owner}/${c.repo}/contents/${encodeURI(path)}`;
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: { ...headers(c.token), "Content-Type": "application/json" },
+    body: JSON.stringify({ message, content: await blobToBase64(blob) }),
+  });
+  if (res.ok || res.status === 422) return;
+  throw new GitHubError(res.status, explain(res.status, await res.text()));
+}
+
+/**
+ * The bytes back, as a blob.
+ *
+ * Asking for raw rather than JSON is not a preference. The contents endpoint
+ * base64s the file into its response body and gives up above a megabyte,
+ * handing back a null where the content should be — which is most of a video
+ * and some of a photo. The raw media type streams the file itself and is good
+ * to a hundred megabytes, which is more than anything here is allowed to be.
+ */
+export async function readBytes(
+  c: Connection,
+  path: string,
+): Promise<Blob | null> {
+  const url = `${API}/repos/${c.owner}/${c.repo}/contents/${encodeURI(path)}`;
+  const res = await fetch(url, {
+    headers: { ...headers(c.token), Accept: "application/vnd.github.raw" },
+    cache: "no-store",
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new GitHubError(res.status, explain(res.status, await res.text()));
+  }
+  return await res.blob();
+}
+
+function blobToBase64(blob: Blob): Promise<string> {
+  return blob.arrayBuffer().then((buf) => {
+    const bytes = new Uint8Array(buf);
+    // In chunks: one apply() over a few million arguments overflows the stack,
+    // which is exactly the size a phone video arrives at.
+    let binary = "";
+    const STEP = 0x8000;
+    for (let i = 0; i < bytes.length; i += STEP) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + STEP));
+    }
+    return btoa(binary);
+  });
+}

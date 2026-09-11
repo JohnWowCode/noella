@@ -7,7 +7,7 @@ import {
   mediaFilesFrom,
   isMediaFile,
 } from "@/lib/images";
-import { swatchName } from "@/lib/store/defaults";
+import { SWATCH_FAMILIES, swatchName } from "@/lib/store/defaults";
 import { Icon, type IconName } from "./Icon";
 import { Mover } from "./Mover";
 import { Popover } from "./Popover";
@@ -620,10 +620,18 @@ export function Compose({
  * pick from rather than a very long line of buttons.
  */
 /**
- * Thirty-six worlds, twelve across and three down: one hue per column, one
- * intensity per row. It reads as a palette rather than a very long line of
- * buttons — and it lives behind a swatch now, because thirty-six of anything
- * is not something a writing box should open with.
+ * A row per family, dark to light along it.
+ *
+ * It was one grid whose width was the number of colours divided by three —
+ * true when the palette was twelve hues in three shades each, and nonsense
+ * once families had their own sizes. Fifty over three is seventeen columns,
+ * so the picker drew seventeen columns of twenty-pixel squares and the
+ * complaint wrote itself: too many, too cramped, and half of them too alike
+ * to tell apart at that size anyway. Nine of the too-alike ones are gone now;
+ * the rest are drawn the way the data is actually shaped.
+ *
+ * A family to a row is also how somebody looks for a colour. Nobody scans a
+ * grid for #2E9B54. They look for the greens, and then for a green.
  */
 function Palette({
   colorId,
@@ -633,38 +641,57 @@ function Palette({
   onColorId: (id: string | null) => void;
 }) {
   const { colors } = useNoella();
-  const hues = Math.max(1, Math.round(colors.length / 3));
+
+  /*
+   * Grouped by the family each colour belongs to, with anything the palette
+   * does not know about — a swatch somebody renamed from a retired default,
+   * a colour carried in from another device — gathered at the end rather than
+   * dropped. The picker must show every colour the wall holds: one it will
+   * not draw is a folder that cannot be reached.
+   */
+  const byHex = new Map(colors.map((c, index) => [c.hex.toUpperCase(), index]));
+  const placed = new Set<string>();
+  const rows = SWATCH_FAMILIES.map((family) => ({
+    name: family.name,
+    swatches: family.hexes.flatMap((hex) => {
+      const index = byHex.get(hex.toUpperCase());
+      if (index === undefined) return [];
+      placed.add(hex.toUpperCase());
+      return [{ color: colors[index], index }];
+    }),
+  })).filter((row) => row.swatches.length > 0);
+
+  const rest = colors
+    .map((color, index) => ({ color, index }))
+    .filter(({ color }) => !placed.has(color.hex.toUpperCase()));
+  if (rest.length > 0) rows.push({ name: "yours", swatches: rest });
 
   return (
     <span className="flex flex-col gap-2">
-      {/* Twelve across is one hue per column, which is the right reading —
-          and 12 × 32px does not fit a 390px phone. Six across on small
-          screens keeps the bands intact and the swatches thumb-sized. */}
-      <span
-        className="grid gap-[3px]"
-        style={{
-          gridTemplateColumns: `repeat(var(--palette-cols, ${hues}), minmax(0, 1fr))`,
-        }}
-      >
-        {colors.map((c, index) => (
-          <button
-            key={c.id}
-            type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => onColorId(c.id === colorId ? null : c.id)}
-            aria-pressed={c.id === colorId}
-            title={c.name ?? swatchName(index)}
-            className={`h-6 w-6 border [@media(hover:none)]:h-8 [@media(hover:none)]:w-8 ${
-              c.id === colorId
-                ? "border-ink ring-2 ring-ink ring-inset"
-                : "border-rule-soft hover:border-ink"
-            }`}
-            style={{ backgroundColor: c.hex }}
-          >
-            <span className="sr-only">
-              File in {c.name ?? swatchName(index)}
-            </span>
-          </button>
+      <span className="flex flex-col gap-[3px]">
+        {rows.map((row) => (
+          <span key={row.name} className="flex gap-[3px]">
+            {row.swatches.map(({ color: c, index }) => (
+              <button
+                key={c.id}
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => onColorId(c.id === colorId ? null : c.id)}
+                aria-pressed={c.id === colorId}
+                title={c.name ?? swatchName(index)}
+                className={`h-7 w-7 shrink-0 border [@media(hover:none)]:h-9 [@media(hover:none)]:w-9 ${
+                  c.id === colorId
+                    ? "border-ink ring-2 ring-ink ring-inset"
+                    : "border-rule-soft hover:border-ink"
+                }`}
+                style={{ backgroundColor: c.hex }}
+              >
+                <span className="sr-only">
+                  File in {c.name ?? swatchName(index)}
+                </span>
+              </button>
+            ))}
+          </span>
         ))}
       </span>
       <button

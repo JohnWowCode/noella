@@ -196,7 +196,7 @@ function Row({
         data-nodrag
         onClick={onTick}
         aria-label={finished ? "Not done after all" : "Done"}
-        className="tap mt-[6px] grid h-4 w-4 shrink-0 place-items-center border border-mute text-[11px] leading-none hover:border-ink"
+        className="tap mt-[6px] grid h-4 w-4 shrink-0 place-items-center border border-mute text-[12px] leading-none hover:border-ink"
       >
         {finished ? "×" : ""}
       </button>
@@ -217,7 +217,7 @@ function Row({
             if (carry.wasDrag()) return;
             onStart?.(note.id);
           }}
-          className={`prose-note w-full text-left text-[calc(17px*var(--type))] leading-snug ${
+          className={`prose-note w-full text-left text-[calc(18px*var(--type))] leading-snug ${
             finished ? "text-mute line-through" : ""
           }`}
         >

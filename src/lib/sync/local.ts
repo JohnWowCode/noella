@@ -8,6 +8,7 @@
 
 import type { Grave } from "./doc";
 import type { Connection } from "./github";
+import { forgetSent } from "./pictures";
 
 const CONN = "noella.cloud";
 const GRAVES = "noella.graves";
@@ -61,6 +62,12 @@ export function forgetConnection(): void {
   try {
     localStorage.removeItem(CONN);
     localStorage.removeItem(SEEN);
+    // What this device has already sent is a fact about one repository, not
+    // about the device. Carrying it across a reconnection would mean every
+    // picture taken before the switch was believed to be in the new place and
+    // never sent there — a wall of notes whose photos are in a repository
+    // nobody is looking at any more.
+    forgetSent();
   } catch {
     // As above.
   }

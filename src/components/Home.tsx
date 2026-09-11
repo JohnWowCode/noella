@@ -890,7 +890,7 @@ export function Home() {
                 not "it fits", it is "it fits on this phone". A 360px one
                 would have pushed the whole page sideways.
               */
-              className="relative flex min-w-0 flex-1 items-center gap-1 overflow-x-auto
+              className="relative flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto sm:gap-1
                          [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
                          sm:overflow-visible"
             >
@@ -1465,6 +1465,23 @@ function AreaTabs({
   madeToday: number;
 }) {
   const carry = useCarry();
+
+  /*
+   * Whichever area you are in, you can see that you are in it.
+   *
+   * Four tabs at a readable size do not fit beside the filter on a phone —
+   * measured at 390px, they want 279 pixels of the 277 they are given, and a
+   * 360px phone is worse. The row has scrolled for that reason since there
+   * were four of them, but scrolling alone left the last tab permanently
+   * half-off the edge: reachable only by a horizontal swipe on a nav nobody
+   * expects to swipe, and invisible when it was the one you were in. Moving
+   * to an area now brings its tab with you.
+   */
+  useEffect(() => {
+    const tab = document.querySelector(`[data-area="${area}"]`);
+    tab?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [area]);
+
   /*
    * Work means today and Wall means the top level, so carrying something onto
    * either says the thing the word already says. Journal is deliberately not a
@@ -1486,8 +1503,9 @@ function AreaTabs({
             type="button"
             onClick={() => go(id)}
             aria-current={area === id ? "page" : undefined}
+            data-area={id}
             data-drop-id={target[id]}
-            className={`label flex items-center gap-1.5 px-3 py-2.5 ${
+            className={`label flex items-center gap-1.5 whitespace-nowrap px-2 py-2.5 sm:px-3 ${
               area === id
                 ? "-mb-px border-b-2 border-ink text-ink"
                 : "text-mute hover:text-ink"
@@ -1812,7 +1830,7 @@ function RailToggle({
         onClick={onToggle}
         aria-expanded={open || filtered}
         aria-label="Narrow the wall down"
-        className={`label border px-2.5 py-1.5 ${
+        className={`label border px-2 py-1.5 sm:px-2.5 ${
           open || filtered
             ? "border-ink bg-ink text-paper"
             : "border-rule text-mute hover:border-ink hover:text-ink"
@@ -1924,7 +1942,7 @@ function WorldBand({
             placeholder="Name it"
             aria-label="Folder name"
             className="prose-note border border-current bg-transparent px-2 py-1
-                       text-[calc(17px*var(--type))] outline-none placeholder:opacity-60"
+                       text-[calc(18px*var(--type))] outline-none placeholder:opacity-60"
           />
         </form>
       ) : (

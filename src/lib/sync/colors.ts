@@ -74,3 +74,42 @@ export function dedupeColors(colors: Color[], notes: Note[]): Deduped {
     merged: colors.length - kept.length,
   };
 }
+
+/**
+ * Takes the withdrawn swatches off a wall, and only the ones it can.
+ *
+ * A wall stores its own copy of every default it has ever been seeded with,
+ * so shortening the list of defaults does nothing to a device that already
+ * ran — the palette only ever grows. Trimming it therefore has to be an
+ * active removal, and an active removal of something a person is using would
+ * be far worse than the crowding it is meant to fix.
+ *
+ * So two things protect a swatch, and either is enough: something is filed
+ * under it, or somebody gave it a name or an emoji. A colour is a folder
+ * here. Tidying away a folder with things in it, because the palette changed
+ * its mind about which colours are too alike, is not tidying.
+ */
+export function retireColors(
+  colors: Color[],
+  notes: Note[],
+  retired: readonly string[],
+): { colors: Color[]; removed: number } {
+  const going = new Set(retired.map(key));
+  if (going.size === 0) return { colors, removed: 0 };
+
+  const used = new Set(
+    notes.map((n) => n.colorId).filter((id): id is string => id !== null),
+  );
+
+  const kept = colors.filter((c) => {
+    if (!going.has(key(c.hex))) return true;
+    if (c.name !== null || c.emoji !== null) return true;
+    return used.has(c.id);
+  });
+
+  if (kept.length === colors.length) return { colors, removed: 0 };
+  return {
+    colors: kept.map((c, position) => ({ ...c, position })),
+    removed: colors.length - kept.length,
+  };
+}

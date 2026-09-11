@@ -57,4 +57,14 @@ export interface Store {
   export(): Promise<Backup>;
   /** Replaces everything. Returns the restored snapshot. */
   import(backup: Backup): Promise<Snapshot>;
+  /**
+   * Adds a file's notes to the wall instead of becoming the wall.
+   *
+   * Restoring and receiving are two different acts that had one button. A
+   * backup you are restoring should replace what is there — that is what
+   * restoring means. A file somebody hands you, or one cut from a video for
+   * you to keep, should land beside your own work, and losing a fortnight of
+   * notes to get it is not a trade anybody would make knowingly.
+   */
+  merge(backup: Backup): Promise<{ snapshot: Snapshot; added: number }>;
 }

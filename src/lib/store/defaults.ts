@@ -24,6 +24,36 @@ interface Family {
 
 const DEEP3 = ["deep ", "", "pale "] as const;
 
+/**
+ * Swatches this palette used to offer and no longer does.
+ *
+ * Fifty colours drawn four rows deep is not a palette, it is a screenful of
+ * twenty-pixel squares, and the ones doing the damage were the ones nobody
+ * could tell apart anyway. Measured as perceptual distance rather than picked
+ * by eye: every pair below is under a delta-E of eighteen from something else
+ * still in the list, which is close enough to read as the same colour at the
+ * size these are drawn. Nine went; what is left has no avoidable clash in it.
+ *
+ * They are listed rather than simply deleted because a wall already holds its
+ * own copy of every default it was ever seeded with, so removing one from the
+ * list above would take it off new devices and leave it on this one for ever.
+ * A retired swatch is withdrawn from a wall on load — but only if nothing is
+ * filed under it and nobody has named it. A colour is a folder here, and a
+ * folder with things in it does not get tidied away because the palette
+ * changed its mind.
+ */
+export const RETIRED_SWATCHES: readonly string[] = [
+  "#C43C3C", // deep red, 12.2 from red
+  "#1F4F8F", // deepest blue, 16.8 from deep blue
+  "#F7C089", // pale orange, 15.2 from tan
+  "#5A3FA8", // deep violet, 10.6 from mid purple
+  "#CFC0F2", // pale violet, 17.2 from pale blue
+  "#7A5233", // mid brown, 16.9 from light brown
+  "#C9A47A", // deep tan, 11.6 from tan
+  "#EFE0C4", // pale tan, 12.1 from light grey
+  "#FF8A1F", // neon orange, 15.8 from orange
+];
+
 /*
  * Legacy hexes, marked where they sit. Never edit one of these.
  *   #E85D5D red     #6FA8F0 blue    #6FD8E8 cyan   #5FC9A8 teal
@@ -33,13 +63,13 @@ const DEEP3 = ["deep ", "", "pale "] as const;
 const FAMILIES: readonly Family[] = [
   {
     name: "red",
-    hexes: ["#8E2F2F", "#C43C3C", "#E85D5D", "#F2A0A0"],
-    bands: ["deepest ", "deep ", "", "pale "],
+    hexes: ["#8E2F2F", "#E85D5D", "#F2A0A0"],
+    bands: ["deep ", "", "pale "],
   },
   {
     name: "blue",
-    hexes: ["#1F4F8F", "#2E6FC4", "#6FA8F0", "#A6CBF7", "#2FA3BF", "#6FD8E8"],
-    bands: ["deepest ", "deep ", "", "pale ", "steel ", "cyan "],
+    hexes: ["#2E6FC4", "#6FA8F0", "#A6CBF7", "#2FA3BF", "#6FD8E8"],
+    bands: ["deep ", "", "pale ", "steel ", "cyan "],
   },
   {
     name: "green",
@@ -47,11 +77,11 @@ const FAMILIES: readonly Family[] = [
     bands: ["deepest ", "deep ", "", "pale ", "teal ", "lime "],
   },
   {
-    /* Four, not three: amber is a legacy hex and dropping it would orphan
-      every note ever filed under it. */
+    /* Three, and amber is one of them: it is a legacy hex and dropping it
+      would orphan every note ever filed under it. */
     name: "orange",
-    hexes: ["#B85C10", "#F29441", "#F0B92E", "#F7C089"],
-    bands: ["deep ", "", "amber", "pale "],
+    hexes: ["#B85C10", "#F29441", "#F0B92E"],
+    bands: ["deep ", "", "amber"],
   },
   {
     name: "yellow",
@@ -59,14 +89,18 @@ const FAMILIES: readonly Family[] = [
     bands: DEEP3,
   },
   {
+    /*
+     * Purple and violet were two families, and measured against each other
+     * three of their six swatches were closer than a person can tell apart at
+     * the size a swatch is drawn — the deep violet sat between the two deep
+     * purples. They are one family running dark to light. Both of the middle
+     * pair are legacy hexes, which is the only reason two colours this close
+     * are still here; side by side in one ramp they at least read as a range
+     * rather than as the same colour offered twice.
+     */
     name: "purple",
-    hexes: ["#4B2E83", "#7A4FC4", "#CE8BE8"],
-    bands: DEEP3,
-  },
-  {
-    name: "violet",
-    hexes: ["#5A3FA8", "#A98BE0", "#CFC0F2"],
-    bands: DEEP3,
+    hexes: ["#4B2E83", "#7A4FC4", "#A98BE0", "#CE8BE8"],
+    bands: ["deep ", "", "violet ", "pale "],
   },
   {
     name: "pink",
@@ -75,13 +109,18 @@ const FAMILIES: readonly Family[] = [
   },
   {
     name: "brown",
-    hexes: ["#4A3323", "#7A5233", "#A8794F"],
-    bands: DEEP3,
+    hexes: ["#4A3323", "#A8794F"],
+    bands: ["deep ", ""],
   },
   {
+    /*
+     * One tan. There were three, and they were the closest cluster in the
+     * whole palette — every pair of them under a delta-E of thirteen, and the
+     * palest was nearer to light grey than to the other two.
+     */
     name: "tan",
-    hexes: ["#C9A47A", "#DCC29B", "#EFE0C4"],
-    bands: DEEP3,
+    hexes: ["#DCC29B"],
+    bands: [""],
   },
   {
     name: "grey",
@@ -94,18 +133,9 @@ const FAMILIES: readonly Family[] = [
      * cousin looks like a mistake; a row of them together looks like a choice.
      */
     name: "neon",
-    hexes: [
-      "#FF2D2D",
-      "#FF8A1F",
-      "#F0FF2D",
-      "#2DFF6A",
-      "#2D8CFF",
-      "#B02DFF",
-      "#FF2DA8",
-    ],
+    hexes: ["#FF2D2D", "#F0FF2D", "#2DFF6A", "#2D8CFF", "#B02DFF", "#FF2DA8"],
     bands: [
       "neon red",
-      "neon orange",
       "neon yellow",
       "neon green",
       "neon blue",
@@ -121,6 +151,29 @@ const FAMILIES: readonly Family[] = [
  * Appending is the only safe edit: the index is a keyboard shortcut and, on an
  * existing wall, a filing decision somebody already made.
  */
+/**
+ * The families, for anything that wants to draw the palette as a palette.
+ *
+ * The picker laid its swatches out as one grid and worked out the number of
+ * columns as the number of colours over three — which was right when the
+ * palette was twelve hues in three shades each and became nonsense the moment
+ * families had their own sizes: fifty colours over three is seventeen columns,
+ * which on any real screen is a seventeen-wide wall of twenty-pixel squares.
+ * A family is a row. That is the shape the data has had since it stopped
+ * being generated, and it is how a person looks for a colour — they want the
+ * greens, then a green.
+ */
+export const SWATCH_FAMILIES: readonly {
+  name: string;
+  hexes: readonly string[];
+}[] = FAMILIES.map((f) => ({ name: f.name, hexes: f.hexes }));
+
+/** The widest family, which is how many columns the palette needs. */
+export const WIDEST_FAMILY: number = FAMILIES.reduce(
+  (n, f) => Math.max(n, f.hexes.length),
+  1,
+);
+
 export const DEFAULT_SWATCHES: readonly string[] = FAMILIES.flatMap(
   (f) => f.hexes,
 );

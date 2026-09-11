@@ -16,6 +16,7 @@ import {
   type Connection,
 } from "./github";
 import { readGraves, readSha, writeGraves, writeSha } from "./local";
+import { sendPictures } from "./pictures";
 
 export interface SyncResult {
   /** The wall as it stands after merging. Null when nothing changed here. */
@@ -24,6 +25,8 @@ export interface SyncResult {
   pulled: number;
   /** Whether we wrote a new commit. */
   pushed: boolean;
+  /** Sets of picture bytes sent up this round. */
+  pictures: number;
   at: number;
 }
 
@@ -43,7 +46,11 @@ function commitMessage(doc: SyncDoc): string {
 export async function syncOnce(
   connection: Connection,
   local: Snapshot,
+  onStep?: (doing: string | null) => void,
 ): Promise<SyncResult> {
+  const pictureStep = (done: number, total: number) =>
+    onStep?.(done >= total ? null : `Sending pictures · ${done + 1} of ${total}`);
+
   let attempt = 0;
   let mine = docFrom(local, readGraves());
 
@@ -63,7 +70,14 @@ export async function syncOnce(
         commitMessage(mine),
       );
       writeSha(sha);
-      return { merged: null, pulled: 0, pushed: true, at: Date.now() };
+      const pictures = await sendPictures(connection, mine.notes, pictureStep);
+      return {
+        merged: null,
+        pulled: 0,
+        pushed: true,
+        pictures: pictures.sent,
+        at: Date.now(),
+      };
     }
 
     const { doc, changed } = mergeDocs(mine, theirs);
@@ -74,10 +88,12 @@ export async function syncOnce(
       // Their copy already says everything ours does.
       writeSha(remote!.sha);
       writeGraves(doc.graves);
+      const pictures = await sendPictures(connection, doc.notes, pictureStep);
       return {
         merged: nothingToKeep ? null : toSnapshot(doc),
         pulled: changed,
         pushed: false,
+        pictures: pictures.sent,
         at: Date.now(),
       };
     }
@@ -91,10 +107,12 @@ export async function syncOnce(
       );
       writeSha(sha);
       writeGraves(doc.graves);
+      const pictures = await sendPictures(connection, doc.notes, pictureStep);
       return {
         merged: nothingToKeep ? null : toSnapshot(doc),
         pulled: changed,
         pushed: true,
+        pictures: pictures.sent,
         at: Date.now(),
       };
     } catch (err) {
